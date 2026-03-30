@@ -26,6 +26,7 @@ export function BookingFormPage() {
     resolver: zodResolver(bookingSchema),
     defaultValues: {
       agencyName: "",
+      agencyCode: "",
       contactName: "",
       email: "",
       phone: "",
@@ -80,7 +81,13 @@ export function BookingFormPage() {
   const handleNext = async () => {
     let fieldsToValidate: any[] = [];
     if (step === 1)
-      fieldsToValidate = ["agencyName", "contactName", "email", "phone"];
+      fieldsToValidate = [
+        "agencyName",
+        "agencyCode",
+        "contactName",
+        "email",
+        "phone",
+      ];
     if (step === 2)
       fieldsToValidate = [
         "hotelId",
@@ -108,6 +115,7 @@ export function BookingFormPage() {
       const payload = {
         nom_agence: data.agencyName,
         nom_contact: data.contactName,
+        code_agence: data.agencyCode,
         email: data.email,
         telephone: data.phone,
         id_hotel: data.hotelId,
@@ -242,4 +250,17 @@ export function BookingFormPage() {
                     disabled={submitting}
                     className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-slate-900 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
                   >
-                    {submitting ? "Envoi en cours..." : "✓ Envoyer la dem
+                    {submitting ? "Envoi en cours..." : "✓ Envoyer la demande"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <p className="text-center text-slate-500 text-xs mt-6">
+            Groupe Résidences Hôtelières · 2026
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}

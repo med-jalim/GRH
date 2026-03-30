@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -30,15 +30,20 @@ export function ReservationDetailsStep({ hotels, nights, totalPrice }: Props) {
   );
 
   const typesWithPrices = useMemo(() => {
-    if (!selectedHotel) return [];
+    if (!selectedHotel || !selectedHotel.chambres) return [];
+
     const uniqueTypeIds = [
-      ...new Set(selectedHotel.chambres.map((c) => c.id_type)),
+      ...new Set(selectedHotel.chambres.map((c) => c?.id_type).filter(Boolean)),
     ];
-    return uniqueTypeIds.map((tid) => {
-      const chambre = selectedHotel.chambres.find((c) => c.id_type === tid);
-      const tarif = selectedHotel.tarifs.find((t) => t.id_type === tid);
-      return { type: chambre!.type, price: tarif?.prix || 0 };
-    });
+
+    return uniqueTypeIds
+      .map((tid) => {
+        const chambre = selectedHotel.chambres.find((c) => c.id_type === tid);
+        const tarif = selectedHotel.tarifs?.find((t) => t.id_type === tid);
+        if (!chambre?.type) return null;
+        return { type: chambre.type, price: tarif?.prix || 0 };
+      })
+      .filter(Boolean) as { type: any; price: number }[];
   }, [selectedHotel]);
 
   const handleHotelChange = (id: number | null) => {
@@ -60,6 +65,9 @@ export function ReservationDetailsStep({ hotels, nights, totalPrice }: Props) {
       formData.rooms.filter((r) => r.uid !== uid),
     );
   };
+  useEffect(() => {
+    console.log(formData);
+  }, [formData]);
 
   return (
     <div>
@@ -199,4 +207,41 @@ export function ReservationDetailsStep({ hotels, nights, totalPrice }: Props) {
                     const firstUnused = typesWithPrices.find(
                       (tp) =>
                         !formData.rooms
-                          
+                          .map((r) => r.roomTypeId)
+                          .includes(tp.type.id),
+                    );
+                    if (firstUnused) {
+                      setValue("rooms", [
+                        ...formData.rooms,
+                        {
+                          uid: crypto.randomUUID(),
+                          roomTypeId: firstUnused.type.id,
+                          quantity: 1,
+                        },
+                      ]);
+                    }
+                  }}
+                  className="w-full py-2.5 border-2 border-dashed border-slate-300 rounded-xl text-sm text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                >
+                  + Ajouter un type de chambre
+                </button>
+              )}
+              {errors.rooms && (
+                <p className="text-red-500 text-xs">{errors.rooms.message}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {formData.rooms.length > 0 && nights > 0 && (
+          <PriceSummary
+            rooms={formData.rooms}
+            hotel={selectedHotel}
+            nights={nights}
+            totalPrice={totalPrice}
+          />
+        )}
+      </div>
+    </div>
+  );
+}

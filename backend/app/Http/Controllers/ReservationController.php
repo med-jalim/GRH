@@ -37,8 +37,8 @@ class ReservationController extends Controller
     {
         $validated = $request->validate([
             'nom_agence'          => 'nullable|string|max:255',
+            'code_agence'         => 'required|string|max:100',
             'nom_contact'         => 'required|string|max:255',
-            'code_agence'         => 'nullable|string|max:100',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
             'id_hotel'            => 'required|integer|exists:hotels,id',

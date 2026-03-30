@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const bookingSchema = z.object({
   // Step 1: Agency Info
   agencyName:  z.string().min(2, 'Le nom de l\'agence est requis'),
+  agencyCode:  z.string().min(3, 'Le code agence est requis'),
   contactName: z.string().min(2, 'Le nom du contact est requis'),
   email:       z.string().email('Adresse e-mail invalide'),
   phone:       z.string().min(8, 'Numéro de téléphone invalide'),

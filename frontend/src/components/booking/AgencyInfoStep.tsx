@@ -26,24 +26,37 @@ export function AgencyInfoStep() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-        {/* Agence */}
+        {/* Nom Agence */}
         <div className="space-y-2">
-          <Label
-            htmlFor="agencyName"
-            className="text-slate-700 font-semibold text-sm"
-          >
-            Nom de l'agence de voyage
-          </Label>
+          <Label htmlFor="agencyName" className="text-slate-700 font-semibold text-sm">Nom de l'agence de voyage</Label>
           <div className="relative">
-            <Input
-              id="agencyName"
-              {...register("agencyName")}
-              placeholder="Ex : Oasis Voyages"
-              className={`h-12 px-4 rounded-xl transition-all focus:ring-2 focus:ring-slate-100 ${errors.agencyName ? "border-red-400 focus:ring-red-50" : "border-slate-200"}`}
+            <Input 
+              id="agencyName" 
+              {...register('agencyName')} 
+              placeholder="Ex : Oasis Voyages" 
+              className={`h-12 px-4 rounded-xl transition-all focus:ring-2 focus:ring-slate-100 ${errors.agencyName ? 'border-red-400 focus:ring-red-50' : 'border-slate-200'}`} 
             />
             {errors.agencyName && (
               <span className="absolute -bottom-5 left-0 text-[10px] font-bold text-red-500 uppercase tracking-tight">
                 {errors.agencyName.message}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Code Agence */}
+        <div className="space-y-2">
+          <Label htmlFor="agencyCode" className="text-slate-700 font-semibold text-sm">Code Agence <span className="text-slate-400 font-normal">(ID unique)</span></Label>
+          <div className="relative">
+            <Input 
+              id="agencyCode" 
+              {...register('agencyCode')} 
+              placeholder="Ex : AG-2026" 
+              className={`h-12 px-4 rounded-xl transition-all focus:ring-2 focus:ring-slate-100 ${errors.agencyCode ? 'border-red-400 focus:ring-red-50' : 'border-slate-200'}`} 
+            />
+            {errors.agencyCode && (
+              <span className="absolute -bottom-5 left-0 text-[10px] font-bold text-red-500 uppercase tracking-tight">
+                {errors.agencyCode.message}
               </span>
             )}
           </div>
@@ -110,4 +123,15 @@ export function AgencyInfoStep() {
               {...register("phone")}
               placeholder="Ex : 021 xx xx xx"
               className={`h-12 px-4 rounded-xl transition-all focus:ring-2 focus:ring-slate-100 ${errors.phone ? "border-red-400 focus:ring-red-50" : "border-slate-200"}`}
-          
+            />
+            {errors.phone && (
+              <span className="absolute -bottom-5 left-0 text-[10px] font-bold text-red-500 uppercase tracking-tight">
+                {errors.phone.message}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

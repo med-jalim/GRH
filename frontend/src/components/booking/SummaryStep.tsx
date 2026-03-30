@@ -46,8 +46,9 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
 
       <div className="space-y-5">
         <div className="bg-slate-50 rounded-2xl p-5">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Agence de voyage</h3>
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Agence & Contact</h3>
           <Row label="Agence"      value={formData.agencyName} />
+          <Row label="Code Agence" value={formData.agencyCode} />
           <Row label="Responsable" value={formData.contactName} />
           <Row label="E-mail"      value={formData.email} />
           <Row label="Téléphone"   value={formData.phone} />

@@ -13,7 +13,7 @@ class HotelController extends Controller
      */
     public function index(): JsonResponse
     {
-        $hotels = Hotel::withCount('chambres')->get();
+        $hotels = Hotel::with('chambres.type', 'tarifs.type')->get();
 
         return $this->sendResponse($hotels, 'Liste des hôtels récupérée avec succès.');
     }
