@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('tarifs', function (Blueprint $table) {
+            $table->id();
             $table->timestamps();
             $table->foreignId('id_type')->constrained('types')->onDelete('cascade');
             $table->foreignId('id_hotel')->constrained('hotels')->onDelete('cascade');
-            $table->primary(['id_type',"id_hotel"]);
-            $table->float('prix')->default('0');
-            $table->date('date_d');
-            $table->date('date_f');
+            $table->float('prix')->default(0);
+            $table->date('date_debut');
+            $table->date('date_fin');
         });
     }
 
@@ -29,4 +29,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('tarifs');
     }
+
 };

@@ -14,11 +14,19 @@ return new class extends Migration
         Schema::create('reservations', function (Blueprint $table) {
             $table->id();
             $table->timestamps();
-            $table->string('nom_client');
+            $table->string('nom_agence');
+            $table->string('nom_contact');
+            $table->string('code_agence');
             $table->string('email');
-            $table->float('total')->default(0);
-            $table->string('code_autorisation');
-            $table->integer('nombre_personnes');
+            $table->string('telephone');
+            $table->foreignId('id_hotel')->constrained('hotels')->onDelete('cascade');
+            $table->date('date_arrivee');
+            $table->date('date_depart');
+            $table->integer('nb_personnes');
+            $table->float('prix_total')->default(0);
+            $table->text('remarques_speciales')->nullable();
+            $table->enum('statut', ['en_attente', 'confirme', 'annule'])->default('en_attente');
+            $table->string('code_reference')->unique();
         });
     }
 
@@ -29,4 +37,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('reservations');
     }
+
 };
