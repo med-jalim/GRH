@@ -24,5 +24,3 @@ Route::post('/reservations', function (Request $request) {
     // Placeholder for colleague to implement actual logic in a Controller
     return response()->json(['message' => 'Route ready for reservation logic'], 201);
 });
-
-
