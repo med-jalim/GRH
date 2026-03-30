@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Reservation extends Model
 {
@@ -21,4 +23,19 @@ class Reservation extends Model
         'statut',
         'code_reference'
     ];
+
+    protected $casts = [
+        'date_arrivee' => 'date',
+        'date_depart'  => 'date',
+    ];
+
+    public function hotel(): BelongsTo
+    {
+        return $this->belongsTo(Hotel::class, 'id_hotel');
+    }
+
+    public function details(): HasMany
+    {
+        return $this->hasMany(ItemReservation::class, 'id_reservation');
+    }
 }
