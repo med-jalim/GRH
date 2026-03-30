@@ -33,7 +33,7 @@ class ReservationController extends Controller
     /**
      * Store a newly created reservation with its line items.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $validated = $request->validate([
             'nom_agence'          => 'nullable|string|max:255',
@@ -81,7 +81,15 @@ class ReservationController extends Controller
 
         $reservation->load(['hotel', 'details.type']);
 
-        return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
+        }
+
+        return redirect()->back()->with([
+            'success' => 'Votre réservation a été enregistrée avec succès.',
+            'reference' => $reservation->code_reference,
+            'reservation' => $reservation,
+        ]);
     }
 
     /**

@@ -14,15 +14,7 @@ use App\Http\Controllers\ReservationController;
 |--------------------------------------------------------------------------
 */
 
-// Configuration des Ressources API
-Route::apiResource('hotels', HotelController::class);
-Route::apiResource('chambres', ChambreController::class);
-Route::apiResource('types', TypeController::class);
-Route::apiResource('tarifs', TarifController::class);
-
-// Gestion des Réservations
-Route::apiResource('reservations', ReservationController::class);
-Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut']);
+// Les routes API ont été migrées vers web.php en tant que routes Inertia.
 
 // Route pour l'utilisateur authentifié (via Sanctum)
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

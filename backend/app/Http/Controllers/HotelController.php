@@ -5,9 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Hotel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class HotelController extends Controller
 {
+    /**
+     * Display the booking form page.
+     */
+    public function bookingPage(): Response
+    {
+        $hotels = Hotel::with(['chambres.type', 'tarifs.type'])->get();
+
+        return Inertia::render('BookingFormPage', [
+            'hotels' => $hotels,
+        ]);
+    }
+
     /**
      * Display a listing of all hotels.
      */

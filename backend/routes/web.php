@@ -11,18 +11,20 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
+
 // ----- Hotel -----
-Route::apiResource('hotels', HotelController::class);
+Route::resource('hotels', HotelController::class);
 
 // ----- Chambre -----
-Route::apiResource('chambres', ChambreController::class);
+Route::resource('chambres', ChambreController::class);
 
 // ----- Type de chambre -----
-Route::apiResource('types', TypeController::class);
+Route::resource('types', TypeController::class);
 
 // ----- Tarif -----
-Route::apiResource('tarifs', TarifController::class);
+Route::resource('tarifs', TarifController::class);
 
 // ----- Réservation -----
-Route::apiResource('reservations', ReservationController::class);
+Route::resource('reservations', ReservationController::class);
 Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut']);
