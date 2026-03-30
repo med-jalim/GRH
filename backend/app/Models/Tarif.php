@@ -6,5 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class Tarif extends Model
 {
-    protected $fillable = ['id_type','id_hotel','prix','date_d','date_f'];
+    protected $fillable = [
+        'id_type',
+        'id_hotel',
+        'prix',
+        'date_debut',
+        'date_fin'];
 }
