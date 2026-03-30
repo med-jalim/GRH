@@ -27,10 +27,7 @@ class ReservationController extends Controller
 
         $reservations = $query->orderByDesc('created_at')->paginate(15);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $reservations,
-        ]);
+        return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
     }
 
     /**
@@ -84,11 +81,7 @@ class ReservationController extends Controller
 
         $reservation->load(['hotel', 'details.type']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Réservation créée avec succès.',
-            'data'    => $reservation,
-        ], 201);
+        return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
     }
 
     /**
@@ -99,16 +92,10 @@ class ReservationController extends Controller
         $reservation = Reservation::with(['hotel', 'details.type'])->find($id);
 
         if (! $reservation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Réservation introuvable.',
-            ], 404);
+            return $this->sendError('Réservation introuvable.');
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $reservation,
-        ]);
+        return $this->sendResponse($reservation, 'Détails de la réservation récupérés avec succès.');
     }
 
     /**
@@ -185,19 +172,13 @@ class ReservationController extends Controller
         $reservation = Reservation::find($id);
 
         if (! $reservation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Réservation introuvable.',
-            ], 404);
+            return $this->sendError('Réservation introuvable.');
         }
 
         // Delete line items first
         $reservation->details()->delete();
         $reservation->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Réservation supprimée avec succès.',
-        ]);
+        return $this->sendResponse(null, 'Réservation supprimée avec succès.');
     }
 }

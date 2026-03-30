@@ -21,10 +21,7 @@ class ChambreController extends Controller
 
         $chambres = $query->get();
 
-        return response()->json([
-            'success' => true,
-            'data'    => $chambres,
-        ]);
+        return $this->sendResponse($chambres, 'Liste des chambres récupérée avec succès.');
     }
 
     /**
@@ -38,14 +35,7 @@ class ChambreController extends Controller
             'id_type'  => 'required|integer|exists:types,id',
         ]);
 
-        $chambre = Chambre::create($validated);
-        $chambre->load(['hotel', 'type']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Chambre créée avec succès.',
-            'data'    => $chambre,
-        ], 201);
+        return $this->sendResponse($chambre, 'Chambre créée avec succès.', 201);
     }
 
     /**
@@ -56,16 +46,10 @@ class ChambreController extends Controller
         $chambre = Chambre::with(['hotel', 'type'])->find($id);
 
         if (! $chambre) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Chambre introuvable.',
-            ], 404);
+            return $this->sendError('Chambre introuvable.');
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $chambre,
-        ]);
+        return $this->sendResponse($chambre, 'Chambre récupérée avec succès.');
     }
 
     /**

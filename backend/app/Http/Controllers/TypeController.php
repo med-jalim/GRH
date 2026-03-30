@@ -15,10 +15,7 @@ class TypeController extends Controller
     {
         $types = Type::withCount('chambres')->get();
 
-        return response()->json([
-            'success' => true,
-            'data'    => $types,
-        ]);
+        return $this->sendResponse($types, 'Liste des types de chambre récupérée avec succès.');
     }
 
     /**
@@ -33,11 +30,7 @@ class TypeController extends Controller
 
         $type = Type::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Type créé avec succès.',
-            'data'    => $type,
-        ], 201);
+        return $this->sendResponse($type, 'Type créé avec succès.', 201);
     }
 
     /**
@@ -48,16 +41,10 @@ class TypeController extends Controller
         $type = Type::with('chambres.hotel')->find($id);
 
         if (! $type) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Type introuvable.',
-            ], 404);
+            return $this->sendError('Type introuvable.');
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $type,
-        ]);
+        return $this->sendResponse($type, 'Type récupéré avec succès.');
     }
 
     /**
@@ -96,17 +83,11 @@ class TypeController extends Controller
         $type = Type::find($id);
 
         if (! $type) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Type introuvable.',
-            ], 404);
+            return $this->sendError('Type introuvable.');
         }
 
         $type->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Type supprimé avec succès.',
-        ]);
+        return $this->sendResponse(null, 'Type supprimé avec succès.');
     }
 }

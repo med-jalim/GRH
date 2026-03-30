@@ -2,25 +2,29 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HotelController;
+use App\Http\Controllers\ChambreController;
+use App\Http\Controllers\TypeController;
+use App\Http\Controllers\TarifController;
+use App\Http\Controllers\ReservationController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
-// Fetch hotels with their types and prices
-Route::get('/hotels', function () {
-    return \App\Models\Hotel::with(['chambres.type', 'tarifs'])->get();
-});
+// Configuration des Ressources API
+Route::apiResource('hotels', HotelController::class);
+Route::apiResource('chambres', ChambreController::class);
+Route::apiResource('types', TypeController::class);
+Route::apiResource('tarifs', TarifController::class);
 
-// Submit a booking request
-Route::post('/reservations', function (Request $request) {
-    // Placeholder for colleague to implement actual logic in a Controller
-    return response()->json(['message' => 'Route ready for reservation logic'], 201);
+// Gestion des Réservations
+Route::apiResource('reservations', ReservationController::class);
+Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut']);
+
+// Route pour l'utilisateur authentifié (via Sanctum)
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
 });

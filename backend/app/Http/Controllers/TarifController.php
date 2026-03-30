@@ -25,10 +25,7 @@ class TarifController extends Controller
 
         $tarifs = $query->orderBy('date_debut')->get();
 
-        return response()->json([
-            'success' => true,
-            'data'    => $tarifs,
-        ]);
+        return $this->sendResponse($tarifs, 'Liste des tarifs récupérée avec succès.');
     }
 
     /**
@@ -47,11 +44,7 @@ class TarifController extends Controller
         $tarif = Tarif::create($validated);
         $tarif->load(['hotel', 'type']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tarif créé avec succès.',
-            'data'    => $tarif,
-        ], 201);
+        return $this->sendResponse($tarif, 'Tarif créé avec succès.', 201);
     }
 
     /**
@@ -62,16 +55,10 @@ class TarifController extends Controller
         $tarif = Tarif::with(['hotel', 'type'])->find($id);
 
         if (! $tarif) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tarif introuvable.',
-            ], 404);
+            return $this->sendError('Tarif introuvable.');
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $tarif,
-        ]);
+        return $this->sendResponse($tarif, 'Tarif récupéré avec succès.');
     }
 
     /**
@@ -114,17 +101,11 @@ class TarifController extends Controller
         $tarif = Tarif::find($id);
 
         if (! $tarif) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tarif introuvable.',
-            ], 404);
+            return $this->sendError('Tarif introuvable.');
         }
 
         $tarif->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tarif supprimé avec succès.',
-        ]);
+        return $this->sendResponse(null, 'Tarif supprimé avec succès.');
     }
 }
