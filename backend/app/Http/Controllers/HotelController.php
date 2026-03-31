@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
+use App\Models\Type;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -11,7 +13,7 @@ use Inertia\Response;
 class HotelController extends Controller
 {
     /**
-     * Display the booking form page.
+     * Display the booking form page (public).
      */
     public function bookingPage(): Response
     {
@@ -23,77 +25,142 @@ class HotelController extends Controller
     }
 
     /**
-     * Display a listing of all hotels.
+     * Admin: list all hotels with counts.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): Response|JsonResponse
     {
-        $hotels = Hotel::with('chambres.type', 'tarifs.type')->get();
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse(
+                Hotel::with('chambres.type', 'tarifs.type')->get(),
+                'Liste des hôtels récupérée avec succès.'
+            );
+        }
 
-        return $this->sendResponse($hotels, 'Liste des hôtels récupérée avec succès.');
+        $hotels = Hotel::withCount(['chambres', 'reservations'])
+            ->with(['tarifs.type'])
+            ->orderBy('name')
+            ->get();
+
+        $stats = [
+            'total'       => $hotels->count(),
+            'villes'      => $hotels->pluck('ville')->filter()->unique()->count(),
+            'chambres'    => $hotels->sum('chambres_count'),
+            'reservations'=> $hotels->sum('reservations_count'),
+        ];
+
+        return Inertia::render('Admin/Hotels/Index', [
+            'hotels' => $hotels,
+            'stats'  => $stats,
+        ]);
     }
 
     /**
-     * Store a newly created hotel in storage.
+     * Admin: store a new hotel.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
-            'description' => 'nullable|string',
             'ville'       => 'nullable|string|max:255',
             'stars'       => 'nullable|integer|min:1|max:5',
+            'description' => 'nullable|string',
         ]);
 
         $hotel = Hotel::create($validated);
 
-        return $this->sendResponse($hotel, 'Hôtel créé avec succès.', 201);
-    }
-
-    /**
-     * Display the specified hotel with its rooms and tariffs.
-     */
-    public function show(string $id): JsonResponse
-    {
-        $hotel = Hotel::with(['chambres.type', 'tarifs.type'])->find($id);
-
-        if (! $hotel) {
-            return $this->sendError('Hôtel introuvable.');
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse($hotel, 'Hôtel créé avec succès.', 201);
         }
 
-        return $this->sendResponse($hotel, 'Hôtel récupéré avec succès.');
+        return redirect()->route('admin.hotels.index')
+            ->with('success', "L'hôtel \"{$hotel->name}\" a été créé avec succès.");
     }
 
     /**
-     * Update the specified hotel in storage.
+     * Admin: show one hotel in detail.
      */
-    public function update(Request $request, string $id): JsonResponse
+    public function show(Request $request, string $id): Response|JsonResponse|RedirectResponse
+    {
+        $hotel = Hotel::with([
+            'chambres.type',
+            'tarifs.type',
+            'reservations' => fn ($q) => $q->orderByDesc('created_at')->limit(10),
+        ])->find($id);
+
+        if (! $hotel) {
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return $this->sendError('Hôtel introuvable.');
+            }
+            return redirect()->route('admin.hotels.index')
+                ->with('error', 'Hôtel introuvable.');
+        }
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse($hotel, 'Hôtel récupéré avec succès.');
+        }
+
+        $types = Type::orderBy('nom')->get();
+
+        return Inertia::render('Admin/Hotels/Show', [
+            'hotel' => $hotel,
+            'types' => $types,
+        ]);
+    }
+
+    /**
+     * Admin: update a hotel.
+     */
+    public function update(Request $request, string $id): RedirectResponse|JsonResponse
     {
         $hotel = Hotel::find($id);
 
         if (! $hotel) {
-            return $this->sendError('Hôtel introuvable.');
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return $this->sendError('Hôtel introuvable.');
+            }
+            return redirect()->route('admin.hotels.index')
+                ->with('error', 'Hôtel introuvable.');
         }
 
-        // ... validation logic (omitted for brevity in replacement but kept in file) ...
+        $validated = $request->validate([
+            'name'        => 'sometimes|required|string|max:255',
+            'ville'       => 'nullable|string|max:255',
+            'stars'       => 'nullable|integer|min:1|max:5',
+            'description' => 'nullable|string',
+        ]);
 
         $hotel->update($validated);
 
-        return $this->sendResponse($hotel, 'Hôtel mis à jour avec succès.');
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse($hotel, 'Hôtel mis à jour avec succès.');
+        }
+
+        return redirect()->route('admin.hotels.show', $hotel->id)
+            ->with('success', 'Hôtel mis à jour avec succès.');
     }
 
     /**
-     * Remove the specified hotel from storage.
+     * Admin: delete a hotel.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): RedirectResponse|JsonResponse
     {
         $hotel = Hotel::find($id);
 
         if (! $hotel) {
-            return $this->sendError('Hôtel introuvable.');
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return $this->sendError('Hôtel introuvable.');
+            }
+            return redirect()->route('admin.hotels.index')
+                ->with('error', 'Hôtel introuvable.');
         }
 
         $hotel->delete();
 
-        return $this->sendResponse(null, 'Hôtel supprimé avec succès.');
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse(null, 'Hôtel supprimé avec succès.');
+        }
+
+        return redirect()->route('admin.hotels.index')
+            ->with('success', 'Hôtel supprimé avec succès.');
     }
 }
