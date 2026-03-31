@@ -350,18 +350,7 @@ export default function ReservationShow({ reservation }: Props) {
               />
             </div>
 
-            {/* Duration bar */}
-            <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 mt-2">
-              <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full"
-                  style={{ width: `${Math.min(100, (nights / 30) * 100)}%` }}
-                />
-              </div>
-              <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-                {nights} nuit{nights !== 1 ? "s" : ""}
-              </span>
-            </div>
+            
           </Section>
 
           {/* Room items */}
