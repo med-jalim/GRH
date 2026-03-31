@@ -15,17 +15,27 @@ class ReservationController extends Controller
      */
     public function index(Request $request): \Inertia\Response|\Illuminate\Http\JsonResponse
     {
-        $query = Reservation::with(['hotel', 'details.type']);
+        $baseQuery = Reservation::query();
 
         if ($request->has('id_hotel') && $request->id_hotel !== null && $request->id_hotel !== '') {
-            $query->where('id_hotel', $request->id_hotel);
+            $baseQuery->where('id_hotel', $request->id_hotel);
         }
+
+        // Stats counts (always across the full unfiltered-by-status scope)
+        $stats = [
+            'total'       => (clone $baseQuery)->count(),
+            'en_attente'  => (clone $baseQuery)->where('statut', 'en_attente')->count(),
+            'confirme'    => (clone $baseQuery)->where('statut', 'confirme')->count(),
+            'annule'      => (clone $baseQuery)->where('statut', 'annule')->count(),
+        ];
 
         if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
-            $query->where('statut', $request->statut);
+            $baseQuery->where('statut', $request->statut);
         }
 
-        $reservations = $query->orderByDesc('created_at')->paginate(15);
+        $reservations = $baseQuery->with(['hotel', 'details.type'])
+            ->orderByDesc('created_at')
+            ->paginate(15);
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
@@ -33,7 +43,8 @@ class ReservationController extends Controller
 
         return \Inertia\Inertia::render('Admin/Reservations/Index', [
             'reservations' => $reservations,
-            'filters' => $request->only(['id_hotel', 'statut']),
+            'filters'      => $request->only(['id_hotel', 'statut']),
+            'stats'        => $stats,
         ]);
     }
 
@@ -53,7 +64,7 @@ class ReservationController extends Controller
             'date_depart'         => 'required|date|after:date_arrivee',
             'nb_personnes'        => 'required|integer|min:1',
             'remarques_speciales' => 'nullable|string',
-            'statut'              => 'nullable|string|in:en_attente,confirmée,annulée',
+            'statut'              => 'nullable|string|in:en_attente,confirme,annule',
 
             // Line items
             'details'                  => 'nullable|array',
@@ -148,7 +159,7 @@ class ReservationController extends Controller
             'nb_personnes'        => 'sometimes|required|integer|min:1',
             'prix_total'          => 'sometimes|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
-            'statut'              => 'nullable|string|in:en_attente,confirmée,annulée',
+            'statut'              => 'nullable|string|in:en_attente,confirme,annule',
         ]);
 
         $reservation->update($validated);
@@ -179,7 +190,7 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut' => 'required|string|in:en_attente,confirmée,annulée',
+            'statut' => 'required|string|in:en_attente,confirme,annule',
         ]);
 
         $reservation->update($validated);
