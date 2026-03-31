@@ -1,10 +1,18 @@
 import { useForm, router } from "@inertiajs/react";
-import { BedDouble, Check, Edit3, Plus, Trash2, X } from "lucide-react";
+import { BedDouble, Check, Edit3, Plus, Trash2, X, Search } from "lucide-react";
 import { useState } from "react";
 
 export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
   const [showModal, setShowModal] = useState(false);
   const [editingChambre, setEditingChambre] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+
+  const filteredChambres = (hotel.chambres || []).filter((c: any) => {
+    const matchesSearch = c.numero.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = filterType === "all" || c.id_type.toString() === filterType;
+    return matchesSearch && matchesType;
+  });
 
   const { data, setData, post, put, processing, errors, reset } = useForm({
     numero: "",
@@ -74,6 +82,29 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
         </button>
       </div>
 
+      <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par numéro de chambre..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition"
+          />
+        </div>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value)}
+          className="w-full sm:w-64 px-4 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition bg-white font-medium"
+        >
+          <option value="all">Tous les types ({hotel.chambres?.length || 0})</option>
+          {types.map((t) => (
+            <option key={t.id} value={t.id.toString()}>{t.nom}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="p-0">
         <table className="w-full text-sm">
           <thead>
@@ -84,16 +115,27 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {!hotel.chambres || hotel.chambres.length === 0 ? (
+            {filteredChambres.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-slate-400">Aucune chambre trouvée pour cet hôtel.</td>
+                <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
+                  {searchQuery || filterType !== "all" 
+                    ? "Aucune chambre ne correspond à vos filtres."
+                    : "Aucune chambre trouvée pour cet hôtel."}
+                </td>
               </tr>
             ) : (
-              hotel.chambres.map((c: any) => (
+              filteredChambres.map((c: any) => (
                 <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-6 py-4 font-bold text-slate-700">N° {c.numero}</td>
                   <td className="px-6 py-4 text-slate-500">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-semibold rounded-lg">
+                    <span 
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border"
+                      style={{
+                        backgroundColor: (c.type?.color || "#6366f1") + "10", // 10 is ~6% opacity in hex
+                        color: c.type?.color || "#6366f1",
+                        borderColor: (c.type?.color || "#6366f1") + "30" // 30 is ~18% opacity
+                      }}
+                    >
                       {c.type?.nom ?? `Type #${c.id_type}`}
                     </span>
                   </td>

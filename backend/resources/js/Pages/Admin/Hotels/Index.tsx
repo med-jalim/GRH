@@ -65,6 +65,10 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
     ville: "",
     stars: "3",
     description: "",
+    telephone: "",
+    email: "",
+    adresse: "",
+    rib: "",
   });
 
   function submit(e: React.FormEvent) {
@@ -169,6 +173,57 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
               placeholder="Courte description de l'établissement..."
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition bg-slate-50 resize-none"
             />
+          </div>
+
+          {/* Contact Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Téléphone</label>
+              <input
+                type="text"
+                value={data.telephone}
+                onChange={(e) => setData("telephone", e.target.value)}
+                placeholder="Ex : 0522..."
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50"
+              />
+              {errors.telephone && <p className="text-red-500 text-xs mt-1">{errors.telephone}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Email</label>
+              <input
+                type="email"
+                value={data.email}
+                onChange={(e) => setData("email", e.target.value)}
+                placeholder="contact@hotel.com"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50"
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Adresse</label>
+            <input
+              type="text"
+              value={data.adresse}
+              onChange={(e) => setData("adresse", e.target.value)}
+              placeholder="Adresse complète"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50"
+            />
+            {errors.adresse && <p className="text-red-500 text-xs mt-1">{errors.adresse}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">R.I.B (24 Chiffres)</label>
+            <input
+              type="text"
+              maxLength={24}
+              value={data.rib}
+              onChange={(e) => setData("rib", e.target.value.replace(/\D/g, ''))} // only digits
+              placeholder="012345678901234567890123"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 tracking-widest font-mono"
+            />
+            {errors.rib && <p className="text-red-500 text-xs mt-1">{errors.rib}</p>}
           </div>
 
           {/* Footer */}

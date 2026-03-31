@@ -60,6 +60,10 @@ interface Hotel {
   ville: string | null;
   stars: number | null;
   description: string | null;
+  telephone: string | null;
+  email: string | null;
+  adresse: string | null;
+  rib: string | null;
   chambres: Chambre[];
   tarifs: Tarif[];
   reservations: Reservation[];
@@ -117,6 +121,10 @@ function EditHotelModal({
     ville: hotel.ville ?? "",
     stars: String(hotel.stars ?? 3),
     description: hotel.description ?? "",
+    telephone: hotel.telephone ?? "",
+    email: hotel.email ?? "",
+    adresse: hotel.adresse ?? "",
+    rib: hotel.rib ?? "",
   });
 
   function submit(e: React.FormEvent) {
@@ -164,6 +172,31 @@ function EditHotelModal({
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Description</label>
             <textarea value={data.description} onChange={(e) => setData("description", e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition resize-none" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Téléphone</label>
+              <input type="text" value={data.telephone} onChange={(e) => setData("telephone", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              {errors.telephone && <p className="text-red-500 text-xs mt-1">{errors.telephone}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Email</label>
+              <input type="email" value={data.email} onChange={(e) => setData("email", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Adresse</label>
+            <input type="text" value={data.adresse} onChange={(e) => setData("adresse", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+            {errors.adresse && <p className="text-red-500 text-xs mt-1">{errors.adresse}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">R.I.B (24 Chiffres)</label>
+            <input type="text" maxLength={24} value={data.rib} onChange={(e) => setData("rib", e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition font-mono tracking-widest" />
+            {errors.rib && <p className="text-red-500 text-xs mt-1">{errors.rib}</p>}
           </div>
 
           <div className="flex gap-3 pt-1">
