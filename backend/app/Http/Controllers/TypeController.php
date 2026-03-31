@@ -3,91 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\Models\Type;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class TypeController extends Controller
 {
-    /**
-     * Display a listing of all room types.
-     */
-    public function index(): JsonResponse
+    public function index()
     {
-        $types = Type::withCount('chambres')->get();
-
-        return $this->sendResponse($types, 'Liste des types de chambre récupérée avec succès.');
+        return redirect()->route('admin.hotels.index');
     }
 
-    /**
-     * Store a newly created room type.
-     */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'nom'         => 'required|string|max:255',
+            'nom'         => 'required|string|max:100',
             'description' => 'nullable|string',
         ]);
 
-        $type = Type::create($validated);
+        Type::create($validated);
 
-        return $this->sendResponse($type, 'Type créé avec succès.', 201);
+        return redirect()->back()->with('success', 'Type de chambre ajouté avec succès.');
     }
 
-    /**
-     * Display the specified room type with its rooms.
-     */
-    public function show(string $id): JsonResponse
+    public function show(string $id)
     {
-        $type = Type::with('chambres.hotel')->find($id);
-
-        if (! $type) {
-            return $this->sendError('Type introuvable.');
-        }
-
-        return $this->sendResponse($type, 'Type récupéré avec succès.');
+        return redirect()->back();
     }
 
-    /**
-     * Update the specified room type.
-     */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id): RedirectResponse
     {
-        $type = Type::find($id);
-
-        if (! $type) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Type introuvable.',
-            ], 404);
-        }
+        $type = Type::findOrFail($id);
 
         $validated = $request->validate([
-            'nom'         => 'sometimes|required|string|max:255',
+            'nom'         => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
         ]);
 
         $type->update($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Type mis à jour avec succès.',
-            'data'    => $type,
-        ]);
+        return redirect()->back()->with('success', 'Type de chambre modifié avec succès.');
     }
 
-    /**
-     * Remove the specified room type.
-     */
-    public function destroy(string $id): JsonResponse
+    public function destroy(string $id): RedirectResponse
     {
-        $type = Type::find($id);
-
-        if (! $type) {
-            return $this->sendError('Type introuvable.');
-        }
-
+        $type = Type::findOrFail($id);
         $type->delete();
 
-        return $this->sendResponse(null, 'Type supprimé avec succès.');
+        return redirect()->back()->with('success', 'Type de chambre supprimé avec succès.');
     }
 }

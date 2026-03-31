@@ -3,31 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Chambre;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ChambreController extends Controller
 {
-    /**
-     * Display a listing of all rooms, optionally filtered by hotel.
-     */
-    public function index(Request $request): JsonResponse
+    public function index()
     {
-        $query = Chambre::with(['hotel', 'type']);
-
-        if ($request->has('id_hotel')) {
-            $query->where('id_hotel', $request->id_hotel);
-        }
-
-        $chambres = $query->get();
-
-        return $this->sendResponse($chambres, 'Liste des chambres récupérée avec succès.');
+        // Now managed inside Hotels/Show.tsx
+        return redirect()->route('admin.hotels.index');
     }
 
-    /**
-     * Store a newly created room in storage.
-     */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'numero'   => 'required|string|max:50',
@@ -35,36 +22,19 @@ class ChambreController extends Controller
             'id_type'  => 'required|integer|exists:types,id',
         ]);
 
-        return $this->sendResponse($chambre, 'Chambre créée avec succès.', 201);
+        Chambre::create($validated);
+
+        return redirect()->back()->with('success', 'Chambre ajoutée avec succès.');
     }
 
-    /**
-     * Display the specified room.
-     */
-    public function show(string $id): JsonResponse
+    public function show(string $id)
     {
-        $chambre = Chambre::with(['hotel', 'type'])->find($id);
-
-        if (! $chambre) {
-            return $this->sendError('Chambre introuvable.');
-        }
-
-        return $this->sendResponse($chambre, 'Chambre récupérée avec succès.');
+        return redirect()->back();
     }
 
-    /**
-     * Update the specified room in storage.
-     */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id): RedirectResponse
     {
-        $chambre = Chambre::find($id);
-
-        if (! $chambre) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Chambre introuvable.',
-            ], 404);
-        }
+        $chambre = Chambre::findOrFail($id);
 
         $validated = $request->validate([
             'numero'   => 'sometimes|required|string|max:50',
@@ -73,34 +43,15 @@ class ChambreController extends Controller
         ]);
 
         $chambre->update($validated);
-        $chambre->load(['hotel', 'type']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Chambre mise à jour avec succès.',
-            'data'    => $chambre,
-        ]);
+        return redirect()->back()->with('success', 'Chambre modifiée avec succès.');
     }
 
-    /**
-     * Remove the specified room from storage.
-     */
-    public function destroy(string $id): JsonResponse
+    public function destroy(string $id): RedirectResponse
     {
-        $chambre = Chambre::find($id);
-
-        if (! $chambre) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Chambre introuvable.',
-            ], 404);
-        }
-
+        $chambre = Chambre::findOrFail($id);
         $chambre->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Chambre supprimée avec succès.',
-        ]);
+        return redirect()->back()->with('success', 'Chambre supprimée avec succès.');
     }
 }

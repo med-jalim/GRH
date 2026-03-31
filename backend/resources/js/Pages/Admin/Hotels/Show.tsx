@@ -2,22 +2,23 @@ import { AdminLayout } from "@/Layouts/AdminLayout";
 import { Link, router, useForm } from "@inertiajs/react";
 import {
   ArrowLeft,
-  BedDouble,
   Building2,
-  CalendarCheck,
-  Check,
   Edit3,
   MapPin,
-  Plus,
   Star,
   Trash2,
   X,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Tag,
+  Check,
+  LayoutDashboard,
+  Layers,
+  BedDouble,
+  Tag
 } from "lucide-react";
 import { useState } from "react";
+import { ApercuTab } from "./Partials/ApercuTab";
+import { TypesTab } from "./Partials/TypesTab";
+import { ChambresTab } from "./Partials/ChambresTab";
+import { TarifsTab } from "./Partials/TarifsTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -102,24 +103,6 @@ function StarRating({
   );
 }
 
-function formatPrice(n: number) {
-  return new Intl.NumberFormat("fr-DZ").format(n) + " د.ج";
-}
-
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-const STATUT_CONFIG = {
-  en_attente: { label: "En attente", icon: Clock, cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  confirme:   { label: "Confirmée",  icon: CheckCircle, cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  annule:     { label: "Annulée",    icon: XCircle, cls: "bg-red-50 text-red-700 border-red-200" },
-} as const;
-
 // ── Edit Hotel Modal ───────────────────────────────────────────────────────
 
 function EditHotelModal({
@@ -142,7 +125,7 @@ function EditHotelModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden z-10">
         <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
@@ -196,41 +179,16 @@ function EditHotelModal({
   );
 }
 
-// ── Section wrapper ────────────────────────────────────────────────────────
-
-function Section({ title, icon: Icon, count, children, action }: {
-  title: string;
-  icon: React.ElementType;
-  count?: number;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
-            <Icon className="w-4 h-4 text-amber-600" />
-          </div>
-          <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{title}</h2>
-          {count !== undefined && (
-            <span className="ml-1 px-2 py-0.5 bg-slate-200 text-slate-600 text-xs font-bold rounded-full">{count}</span>
-          )}
-        </div>
-        {action}
-      </div>
-      <div className="p-6">{children}</div>
-    </div>
-  );
-}
-
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function HotelShow({ hotel, types }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // Onglets State
+  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"tarifs">("apercu");
 
-  // Group rooms by type for display
+  // Group rooms by type for Apercu display
   const chambresByType = hotel.chambres.reduce<Record<string, Chambre[]>>((acc, c) => {
     const key = c.type?.nom ?? `Type #${c.id_type}`;
     (acc[key] ??= []).push(c);
@@ -242,6 +200,13 @@ export default function HotelShow({ hotel, types }: Props) {
     setDeleting(true);
     router.delete(`/admin/hotels/${hotel.id}`);
   }
+
+  const TABS = [
+    { id: "apercu", label: "Aperçu Global", icon: LayoutDashboard },
+    { id: "types", label: "Types de Chambres", icon: Layers },
+    { id: "chambres", label: "Chambres", icon: BedDouble },
+    { id: "tarifs", label: "Tarifs & Prix", icon: Tag },
+  ] as const;
 
   return (
     <AdminLayout>
@@ -281,10 +246,10 @@ export default function HotelShow({ hotel, types }: Props) {
           <div className="flex gap-2">
             <button
               onClick={() => setShowEdit(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-semibold rounded-xl transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-semibold rounded-xl transition-colors shadow-sm"
             >
               <Edit3 className="w-4 h-4" />
-              Modifier
+              Modifier Hôtel
             </button>
             <button
               onClick={handleDeleteHotel}
@@ -298,155 +263,35 @@ export default function HotelShow({ hotel, types }: Props) {
         </div>
       </div>
 
-      {/* ── Summary strip ── */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { label: "Chambres", value: hotel.chambres.length, icon: BedDouble, color: "text-blue-700", bg: "bg-blue-50" },
-          { label: "Tarifs actifs", value: hotel.tarifs.length, icon: Tag, color: "text-violet-700", bg: "bg-violet-50" },
-          { label: "Dernières rés.", value: hotel.reservations.length, icon: CalendarCheck, color: "text-emerald-700", bg: "bg-emerald-50" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}>
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-slate-800">{s.value}</p>
-              <p className="text-xs text-slate-500 font-medium">{s.label}</p>
-            </div>
-          </div>
-        ))}
+      {/* ── TABS NAVIGATION ── */}
+      <div className="bg-white px-2 py-2 rounded-2xl shadow-sm border border-slate-100 flex gap-2 mb-6 overflow-x-auto custom-scrollbar">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex-shrink-0 ${
+                isActive 
+                  ? "bg-amber-500 text-white shadow-md shadow-amber-500/20" 
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              <tab.icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── Left ── */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-
-          {/* Description */}
-          {hotel.description && (
-            <Section title="À propos" icon={Building2}>
-              <p className="text-sm text-slate-600 leading-relaxed">{hotel.description}</p>
-            </Section>
-          )}
-
-          {/* Chambres */}
-          <Section title="Chambres" icon={BedDouble} count={hotel.chambres.length}
-            action={
-              <Link href={`/admin/chambres?hotel=${hotel.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Gérer
-              </Link>
-            }
-          >
-            {hotel.chambres.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucune chambre enregistrée.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {Object.entries(chambresByType).map(([typeName, rooms]) => (
-                  <div key={typeName}>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{typeName}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {rooms.map((c) => (
-                        <span key={c.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg border border-blue-100">
-                          <BedDouble className="w-3 h-3" />
-                          N° {c.numero}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
-
-          {/* Tarifs */}
-          <Section title="Tarifs" icon={Tag} count={hotel.tarifs.length}
-            action={
-              <Link href={`/admin/tarifs?hotel=${hotel.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Gérer
-              </Link>
-            }
-          >
-            {hotel.tarifs.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucun tarif défini.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Type</th>
-                      <th className="text-right py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Prix/nuit</th>
-                      <th className="text-right py-2 text-xs text-slate-400 font-semibold uppercase tracking-wide">Période</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {hotel.tarifs.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-50 text-violet-700 text-xs font-semibold rounded-lg">
-                            {t.type?.nom ?? `Type #${t.id_type}`}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right font-bold text-emerald-700 text-sm">
-                          {formatPrice(t.prix)}
-                        </td>
-                        <td className="py-3 text-right text-xs text-slate-500">
-                          {formatDate(t.date_debut)} → {formatDate(t.date_fin)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Section>
-        </div>
-
-        {/* ── Right ── */}
-        <div className="flex flex-col gap-6">
-          {/* Recent reservations */}
-          <Section title="Réservations récentes" icon={CalendarCheck} count={hotel.reservations.length}>
-            {hotel.reservations.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">Aucune réservation.</p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {hotel.reservations.map((r) => {
-                  const cfg = STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG] ?? STATUT_CONFIG.en_attente;
-                  const Icon = cfg.icon;
-                  return (
-                    <Link
-                      key={r.id}
-                      href={`/admin/reservations/${r.id}`}
-                      className="flex items-start justify-between gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-slate-100 group"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs font-bold text-amber-600 truncate">
-                          {r.code_reference}
-                        </p>
-                        <p className="text-xs text-slate-600 font-medium mt-0.5 truncate">{r.nom_contact}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {formatDate(r.date_arrivee)} → {formatDate(r.date_depart)}
-                        </p>
-                      </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold border ${cfg.cls} flex-shrink-0`}>
-                        <Icon className="w-3 h-3" />
-                        {cfg.label}
-                      </span>
-                    </Link>
-                  );
-                })}
-
-                <Link
-                  href={`/admin/reservations?id_hotel=${hotel.id}`}
-                  className="mt-1 text-xs text-center text-amber-600 hover:text-amber-700 font-semibold transition-colors"
-                >
-                  Voir toutes les réservations →
-                </Link>
-              </div>
-            )}
-          </Section>
-        </div>
+      {/* ── TAB CONTENT ── */}
+      <div className="min-h-[400px]">
+        {activeTab === "apercu" && <ApercuTab hotel={hotel} chambresByType={chambresByType} />}
+        {activeTab === "types" && <TypesTab types={types} />}
+        {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
+        {activeTab === "tarifs" && <TarifsTab hotel={hotel} types={types} />}
       </div>
+
     </AdminLayout>
   );
 }
