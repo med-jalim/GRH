@@ -226,7 +226,7 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <span className="text-slate-400 font-semibold sm:text-sm">
-                                                DH
+                                                MAD
                                             </span>
                                         </div>
                                         <input

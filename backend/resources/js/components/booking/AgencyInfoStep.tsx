@@ -98,7 +98,7 @@ export function AgencyInfoStep() {
               id="email"
               type="email"
               {...register("email")}
-              placeholder="contact@agence-dz.com"
+              placeholder="contact@agence-ma.com"
               className={`h-12 px-4 rounded-xl transition-all focus:ring-2 focus:ring-slate-100 ${errors.email ? "border-red-400 focus:ring-red-50" : "border-slate-200"}`}
             />
             {errors.email && (

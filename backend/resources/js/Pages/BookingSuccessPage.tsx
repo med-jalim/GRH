@@ -14,7 +14,7 @@ interface Props {
 
 export function BookingSuccessPage({ reference, formData, hotel, totalPrice, nights }: Props) {
   const fmt = (d: string) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('fr-DZ', {
+    new Date(d + 'T00:00:00').toLocaleDateString('fr-MA', {
       day: 'numeric', month: 'long', year: 'numeric',
     });
 
