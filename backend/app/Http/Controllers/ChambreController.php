@@ -17,7 +17,7 @@ class ChambreController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'numero'   => 'required|string|max:50',
+            'numero'   => 'required|string|max:50|unique:chambres,numero',
             'id_hotel' => 'required|integer|exists:hotels,id',
             'id_type'  => 'required|integer|exists:types,id',
         ]);
@@ -37,7 +37,7 @@ class ChambreController extends Controller
         $chambre = Chambre::findOrFail($id);
 
         $validated = $request->validate([
-            'numero'   => 'sometimes|required|string|max:50',
+            'numero'   => 'sometimes|required|string|max:50|unique:chambres,numero,' . $id,
             'id_hotel' => 'sometimes|required|integer|exists:hotels,id',
             'id_type'  => 'sometimes|required|integer|exists:types,id',
         ]);
