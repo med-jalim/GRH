@@ -3,35 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tarif;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class TarifController extends Controller
 {
-    /**
-     * Display a listing of tariffs, optionally filtered by hotel or type.
-     */
-    public function index(Request $request): JsonResponse
+    public function index()
     {
-        $query = Tarif::with(['hotel', 'type']);
-
-        if ($request->has('id_hotel')) {
-            $query->where('id_hotel', $request->id_hotel);
-        }
-
-        if ($request->has('id_type')) {
-            $query->where('id_type', $request->id_type);
-        }
-
-        $tarifs = $query->orderBy('date_debut')->get();
-
-        return $this->sendResponse($tarifs, 'Liste des tarifs récupérée avec succès.');
+        return redirect()->route('admin.hotels.index');
     }
 
-    /**
-     * Store a newly created tariff.
-     */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'id_hotel'   => 'required|integer|exists:hotels,id',
@@ -41,39 +23,19 @@ class TarifController extends Controller
             'date_fin'   => 'required|date|after_or_equal:date_debut',
         ]);
 
-        $tarif = Tarif::create($validated);
-        $tarif->load(['hotel', 'type']);
+        Tarif::create($validated);
 
-        return $this->sendResponse($tarif, 'Tarif créé avec succès.', 201);
+        return redirect()->back()->with('success', 'Tarif défini avec succès.');
     }
 
-    /**
-     * Display the specified tariff.
-     */
-    public function show(string $id): JsonResponse
+    public function show(string $id)
     {
-        $tarif = Tarif::with(['hotel', 'type'])->find($id);
-
-        if (! $tarif) {
-            return $this->sendError('Tarif introuvable.');
-        }
-
-        return $this->sendResponse($tarif, 'Tarif récupéré avec succès.');
+        return redirect()->back();
     }
 
-    /**
-     * Update the specified tariff.
-     */
-    public function update(Request $request, string $id): JsonResponse
+    public function update(Request $request, string $id): RedirectResponse
     {
-        $tarif = Tarif::find($id);
-
-        if (! $tarif) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tarif introuvable.',
-            ], 404);
-        }
+        $tarif = Tarif::findOrFail($id);
 
         $validated = $request->validate([
             'id_hotel'   => 'sometimes|required|integer|exists:hotels,id',
@@ -84,28 +46,15 @@ class TarifController extends Controller
         ]);
 
         $tarif->update($validated);
-        $tarif->load(['hotel', 'type']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tarif mis à jour avec succès.',
-            'data'    => $tarif,
-        ]);
+        return redirect()->back()->with('success', 'Tarif modifié avec succès.');
     }
 
-    /**
-     * Remove the specified tariff.
-     */
-    public function destroy(string $id): JsonResponse
+    public function destroy(string $id): RedirectResponse
     {
-        $tarif = Tarif::find($id);
-
-        if (! $tarif) {
-            return $this->sendError('Tarif introuvable.');
-        }
-
+        $tarif = Tarif::findOrFail($id);
         $tarif->delete();
 
-        return $this->sendResponse(null, 'Tarif supprimé avec succès.');
+        return redirect()->back()->with('success', 'Tarif supprimé avec succès.');
     }
 }

@@ -32,7 +32,6 @@ export function AdminLayout({ children }: Props) {
     { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Réservations", href: "/admin/reservations", icon: CalendarCheck },
     { name: "Hôtels", href: "/admin/hotels", icon: Building2 },
-    { name: "Chambres", href: "/admin/chambres", icon: BedDouble },
   ];
 
   return (
