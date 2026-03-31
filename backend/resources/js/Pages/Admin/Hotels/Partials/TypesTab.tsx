@@ -9,6 +9,7 @@ export function TypesTab({ types }: { types: any[] }) {
   const { data, setData, post, put, processing, errors, reset } = useForm({
     nom: "",
     description: "",
+    color: "#6366f1",
   });
 
   function openCreate() {
@@ -22,6 +23,7 @@ export function TypesTab({ types }: { types: any[] }) {
     setData({
       nom: t.nom,
       description: t.description || "",
+      color: t.color || "#6366f1",
     });
     setShowModal(true);
   }
@@ -70,6 +72,7 @@ export function TypesTab({ types }: { types: any[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/50">
+              <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Couleur</th>
               <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Nom</th>
               <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Description</th>
               <th className="text-right px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Actions</th>
@@ -78,11 +81,14 @@ export function TypesTab({ types }: { types: any[] }) {
           <tbody className="divide-y divide-slate-50">
             {types.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-slate-400">Aucun type de chambre enregistré.</td>
+                <td colSpan={4} className="px-6 py-8 text-center text-slate-400">Aucun type de chambre enregistré.</td>
               </tr>
             ) : (
               types.map((t) => (
                 <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="w-6 h-6 rounded-lg border border-slate-200 shadow-sm" style={{ backgroundColor: t.color || "#6366f1" }} />
+                  </td>
                   <td className="px-6 py-4 font-bold text-slate-700">{t.nom}</td>
                   <td className="px-6 py-4 text-slate-500 text-xs w-1/2">{t.description || "-"}</td>
                   <td className="px-6 py-4 text-right">
@@ -121,6 +127,13 @@ export function TypesTab({ types }: { types: any[] }) {
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Description</label>
                 <textarea value={data.description} onChange={(e) => setData("description", e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Couleur Calendrier</label>
+                <div className="flex items-center gap-3">
+                  <input type="color" value={data.color} onChange={(e) => setData("color", e.target.value)} className="w-12 h-12 rounded-xl border border-slate-200 cursor-pointer bg-white p-1" />
+                  <input type="text" value={data.color} onChange={(e) => setData("color", e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 outline-none font-mono" placeholder="#000000" />
+                </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={processing} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors disabled:opacity-50">

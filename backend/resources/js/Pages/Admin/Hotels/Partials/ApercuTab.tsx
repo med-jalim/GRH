@@ -1,5 +1,5 @@
 import { Link } from "@inertiajs/react";
-import { BedDouble, Building2, CalendarCheck, CheckCircle, Clock, Tag, XCircle } from "lucide-react";
+import { BedDouble, Building2, CalendarCheck, CheckCircle, Clock, Tag, XCircle, Phone, Mail, Map, Wallet } from "lucide-react";
 
 const STATUT_CONFIG = {
   en_attente: { label: "En attente", icon: Clock, cls: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -51,6 +51,49 @@ export function ApercuTab({ hotel, chambresByType }: any) {
             <p className="text-sm text-slate-600 leading-relaxed">{hotel.description}</p>
           </Section>
         )}
+
+        {/* Coordonnées */}
+        <Section title="Coordonnées & Contacts" icon={Map}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-slate-50 rounded-lg"><Phone className="w-4 h-4 text-slate-500" /></div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Téléphone</p>
+                <p className="text-sm font-semibold text-slate-700 mt-0.5">{hotel.telephone || "Non renseigné"}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-slate-50 rounded-lg"><Mail className="w-4 h-4 text-slate-500" /></div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Email</p>
+                <p className="text-sm font-semibold text-slate-700 mt-0.5">{hotel.email || "Non renseigné"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 md:col-span-2">
+              <div className="p-2 bg-slate-50 rounded-lg"><Map className="w-4 h-4 text-slate-500" /></div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Adresse</p>
+                <p className="text-sm font-semibold text-slate-700 mt-0.5">{hotel.adresse || "Non renseignée"}</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 md:col-span-2 border-t border-slate-100 pt-5 mt-1">
+              <div className="p-2 bg-amber-50 rounded-lg flex-shrink-0"><Wallet className="w-4 h-4 text-amber-600" /></div>
+              <div className="w-full">
+                <p className="text-xs font-bold text-amber-600/70 uppercase tracking-wide mb-1.5">Informations Bancaires (RIB)</p>
+                {hotel.rib ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 flex items-center justify-between">
+                    <span className="font-mono text-sm tracking-widest text-slate-800">{hotel.rib.match(/.{1,4}/g)?.join(' ')}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm text-slate-500">Non renseigné</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </Section>
 
         {/* Chambres Snapshot */}
         <Section title="Aperçu des Chambres" icon={BedDouble} count={hotel.chambres?.length || 0}>

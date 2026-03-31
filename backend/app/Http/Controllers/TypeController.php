@@ -18,6 +18,7 @@ class TypeController extends Controller
         $validated = $request->validate([
             'nom'         => 'required|string|max:100',
             'description' => 'nullable|string',
+            'color'       => 'nullable|string|max:20',
         ]);
 
         Type::create($validated);
@@ -37,6 +38,7 @@ class TypeController extends Controller
         $validated = $request->validate([
             'nom'         => 'sometimes|required|string|max:100',
             'description' => 'nullable|string',
+            'color'       => 'nullable|string|max:20',
         ]);
 
         $type->update($validated);

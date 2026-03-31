@@ -64,6 +64,10 @@ class HotelController extends Controller
             'ville'       => 'nullable|string|max:255',
             'stars'       => 'nullable|integer|min:1|max:5',
             'description' => 'nullable|string',
+            'telephone'   => 'nullable|string|max:20',
+            'email'       => 'nullable|email|max:255',
+            'adresse'     => 'nullable|string|max:1000',
+            'rib'         => 'nullable|digits:24',
         ]);
 
         $hotel = Hotel::create($validated);
@@ -127,6 +131,10 @@ class HotelController extends Controller
             'ville'       => 'nullable|string|max:255',
             'stars'       => 'nullable|integer|min:1|max:5',
             'description' => 'nullable|string',
+            'telephone'   => 'nullable|string|max:20',
+            'email'       => 'nullable|email|max:255',
+            'adresse'     => 'nullable|string|max:1000',
+            'rib'         => 'nullable|digits:24',
         ]);
 
         $hotel->update($validated);

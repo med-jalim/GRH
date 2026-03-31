@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Type extends Model
 {
-    protected $fillable = ['nom', 'description'];
+    protected $fillable = ['nom', 'description', 'color'];
 
     public function chambres(): HasMany
     {
