@@ -2,18 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ReservationStatusUpdated;
 use App\Models\ItemReservation;
 use App\Models\Reservation;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 
 class ReservationController extends Controller
 {
     /**
      * Display a listing of reservations, optionally filtered by hotel or status.
      */
-    public function index(Request $request): \Inertia\Response|\Illuminate\Http\JsonResponse
+    public function index(Request $request): InertiaResponse|JsonResponse
     {
         $baseQuery = Reservation::query();
 
@@ -41,7 +47,7 @@ class ReservationController extends Controller
             return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
         }
 
-        return \Inertia\Inertia::render('Admin/Reservations/Index', [
+        return Inertia::render('Admin/Reservations/Index', [
             'reservations' => $reservations,
             'filters'      => $request->only(['id_hotel', 'statut']),
             'stats'        => $stats,
@@ -51,7 +57,7 @@ class ReservationController extends Controller
     /**
      * Store a newly created reservation with its line items.
      */
-    public function store(Request $request): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
             'nom_agence'          => 'nullable|string|max:255',
@@ -113,7 +119,7 @@ class ReservationController extends Controller
     /**
      * Display the specified reservation with all details.
      */
-    public function show(string $id): \Inertia\Response|\Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+    public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
         $reservation = Reservation::with(['hotel', 'details.type'])->find($id);
 
@@ -128,7 +134,7 @@ class ReservationController extends Controller
             return $this->sendResponse($reservation, 'Détails de la réservation récupérés avec succès.');
         }
 
-        return \Inertia\Inertia::render('Admin/Reservations/Show', [
+        return Inertia::render('Admin/Reservations/Show', [
             'reservation' => $reservation,
         ]);
     }
@@ -175,9 +181,9 @@ class ReservationController extends Controller
     /**
      * Update only the status of a reservation.
      */
-    public function updateStatut(Request $request, string $id): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+    public function updateStatut(Request $request, string $id): JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::find($id);
+        $reservation = Reservation::with('hotel')->find($id);
 
         if (! $reservation) {
             if ($request->wantsJson() && ! $request->header('X-Inertia')) {
@@ -193,7 +199,26 @@ class ReservationController extends Controller
             'statut' => 'required|string|in:en_attente,confirme,annule',
         ]);
 
+
+        // Capture old status before update
+        $previousStatut = $reservation->statut;
+        $newStatut      = $validated['statut'];
+
         $reservation->update($validated);
+
+        // Send email notification only if status actually changed
+        if ($previousStatut !== $newStatut) {
+            try {
+                Mail::to($reservation->email)
+                    ->send(new ReservationStatusUpdated($reservation, $previousStatut));
+            } catch (\Throwable $e) {
+                // Log the failure but don't block the response
+                Log::error('Failed to send status email', [
+                    'reservation_id' => $reservation->id,
+                    'error'          => $e->getMessage(),
+                ]);
+            }
+        }
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return response()->json([
@@ -209,7 +234,7 @@ class ReservationController extends Controller
     /**
      * Remove the specified reservation along with its line items.
      */
-    public function destroy(string $id): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+    public function destroy(string $id): JsonResponse|RedirectResponse
     {
         $reservation = Reservation::find($id);
 
