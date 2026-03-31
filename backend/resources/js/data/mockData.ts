@@ -22,9 +22,9 @@ export const HOTELS: Hotel[] = [
 ];
 
 export const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('fr-DZ', {
+  return new Intl.NumberFormat('fr-MA', {
     style: 'currency',
-    currency: 'DZD',
+    currency: 'MAD',
     maximumFractionDigits: 0,
   }).format(price);
 };

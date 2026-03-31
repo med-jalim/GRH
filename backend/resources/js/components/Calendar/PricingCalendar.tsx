@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 function formatPrice(n: number) {
-    return new Intl.NumberFormat("fr-ML").format(n);
+    return new Intl.NumberFormat("fr-MA").format(n);
 }
 
 export interface PricingCalendarProps {

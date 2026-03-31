@@ -29,7 +29,7 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
 
   const fmt = (d: string) => {
     if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('fr-DZ', {
+    return new Date(d + 'T00:00:00').toLocaleDateString('fr-MA', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
   };

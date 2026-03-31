@@ -86,7 +86,7 @@ function formatDate(dateStr: string) {
 
 function formatPrice(amount: number) {
     return (
-        new Intl.NumberFormat("fr-DZ", {
+        new Intl.NumberFormat("fr-MA", {
             style: "decimal",
             minimumFractionDigits: 0,
         }).format(amount) + " MAD"
