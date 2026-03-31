@@ -8,6 +8,8 @@ export interface Tarif {
   id_type: number;
   id_hotel: number;
   prix: number;
+  date_debut: string;
+  date_fin: string;
 }
 
 export interface Chambre {
