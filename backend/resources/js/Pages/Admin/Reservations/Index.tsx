@@ -1,21 +1,17 @@
 import { AdminLayout } from "@/Layouts/AdminLayout";
-import { Link, router, usePage } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import {
     CalendarCheck,
     Search,
-    Filter,
     Eye,
     Trash2,
-    CheckCircle,
-    Clock,
-    XCircle,
     ChevronLeft,
     ChevronRight,
     Building2,
     Users,
-    ArrowUpDown,
 } from "lucide-react";
-import { useState, FormEvent } from "react";
+import { useState } from "react";
+import { StatusSelect } from "@/components/ui/status-select";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -79,38 +75,6 @@ interface Props {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const STATUT_CONFIG = {
-    en_attente: {
-        label: "En attente",
-        icon: Clock,
-        className: "bg-amber-50 text-amber-700 border border-amber-200",
-    },
-    confirme: {
-        label: "Confirmée",
-        icon: CheckCircle,
-        className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-    },
-    annule: {
-        label: "Annulée",
-        icon: XCircle,
-        className: "bg-red-50 text-red-700 border border-red-200",
-    },
-} as const;
-
-function StatusBadge({ statut }: { statut: Reservation["statut"] }) {
-    const cfg =
-        STATUT_CONFIG[statut as keyof typeof STATUT_CONFIG] ??
-        STATUT_CONFIG["en_attente"];
-    const Icon = cfg.icon;
-    return (
-        <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.className}`}
-        >
-            <Icon className="w-3 h-3" />
-            {cfg.label}
-        </span>
-    );
-}
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("fr-FR", {
@@ -421,35 +385,16 @@ export default function ReservationsIndex({
 
                                         {/* Statut */}
                                         <td className="px-5 py-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <StatusBadge
-                                                    statut={r.statut}
-                                                />
-                                                {/* Quick status change */}
-                                                <select
-                                                    disabled={
-                                                        updatingId === r.id
-                                                    }
-                                                    value={r.statut}
-                                                    onChange={(e) =>
-                                                        handleStatusChange(
-                                                            r.id,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className="text-xs border border-slate-200 rounded-lg px-1.5 py-1 text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white cursor-pointer disabled:opacity-50"
-                                                >
-                                                    <option value="en_attente">
-                                                        En attente
-                                                    </option>
-                                                    <option value="confirme">
-                                                        Confirmée
-                                                    </option>
-                                                    <option value="annule">
-                                                        Annulée
-                                                    </option>
-                                                </select>
-                                            </div>
+                                            <StatusSelect
+                                                value={r.statut}
+                                                loading={updatingId === r.id}
+                                                onChange={(newStatut) =>
+                                                    handleStatusChange(
+                                                        r.id,
+                                                        newStatut,
+                                                    )
+                                                }
+                                            />
                                         </td>
 
                                         {/* Actions */}
