@@ -13,21 +13,28 @@ class ReservationController extends Controller
     /**
      * Display a listing of reservations, optionally filtered by hotel or status.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): \Inertia\Response|\Illuminate\Http\JsonResponse
     {
         $query = Reservation::with(['hotel', 'details.type']);
 
-        if ($request->has('id_hotel')) {
+        if ($request->has('id_hotel') && $request->id_hotel !== null && $request->id_hotel !== '') {
             $query->where('id_hotel', $request->id_hotel);
         }
 
-        if ($request->has('statut')) {
+        if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
             $query->where('statut', $request->statut);
         }
 
         $reservations = $query->orderByDesc('created_at')->paginate(15);
 
-        return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
+        }
+
+        return \Inertia\Inertia::render('Admin/Reservations/Index', [
+            'reservations' => $reservations,
+            'filters' => $request->only(['id_hotel', 'statut']),
+        ]);
     }
 
     /**
@@ -95,15 +102,24 @@ class ReservationController extends Controller
     /**
      * Display the specified reservation with all details.
      */
-    public function show(string $id): JsonResponse
+    public function show(string $id): \Inertia\Response|\Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $reservation = Reservation::with(['hotel', 'details.type'])->find($id);
 
         if (! $reservation) {
-            return $this->sendError('Réservation introuvable.');
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
+                return $this->sendError('Réservation introuvable.');
+            }
+            return redirect()->route('admin.reservations.index')->with('error', 'Réservation introuvable.');
         }
 
-        return $this->sendResponse($reservation, 'Détails de la réservation récupérés avec succès.');
+        if (request()->wantsJson() && ! request()->header('X-Inertia')) {
+            return $this->sendResponse($reservation, 'Détails de la réservation récupérés avec succès.');
+        }
+
+        return \Inertia\Inertia::render('Admin/Reservations/Show', [
+            'reservation' => $reservation,
+        ]);
     }
 
     /**
@@ -148,15 +164,18 @@ class ReservationController extends Controller
     /**
      * Update only the status of a reservation.
      */
-    public function updateStatut(Request $request, string $id): JsonResponse
+    public function updateStatut(Request $request, string $id): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $reservation = Reservation::find($id);
 
         if (! $reservation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Réservation introuvable.',
-            ], 404);
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Réservation introuvable.',
+                ], 404);
+            }
+            return redirect()->back()->with('error', 'Réservation introuvable.');
         }
 
         $validated = $request->validate([
@@ -165,28 +184,39 @@ class ReservationController extends Controller
 
         $reservation->update($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Statut mis à jour avec succès.',
-            'data'    => $reservation,
-        ]);
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Statut mis à jour avec succès.',
+                'data'    => $reservation,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Statut mis à jour avec succès.');
     }
 
     /**
      * Remove the specified reservation along with its line items.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(string $id): \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
     {
         $reservation = Reservation::find($id);
 
         if (! $reservation) {
-            return $this->sendError('Réservation introuvable.');
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
+                return $this->sendError('Réservation introuvable.');
+            }
+            return redirect()->back()->with('error', 'Réservation introuvable.');
         }
 
         // Delete line items first
         $reservation->details()->delete();
         $reservation->delete();
 
-        return $this->sendResponse(null, 'Réservation supprimée avec succès.');
+        if (request()->wantsJson() && ! request()->header('X-Inertia')) {
+            return $this->sendResponse(null, 'Réservation supprimée avec succès.');
+        }
+
+        return redirect()->route('admin.reservations.index')->with('success', 'Réservation supprimée avec succès.');
     }
 }

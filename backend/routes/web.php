@@ -13,18 +13,20 @@ Route::get('/', function () {
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
 
-// ----- Hotel -----
-Route::resource('hotels', HotelController::class);
+// ----- Espace Administrateur (Back-Office) -----
+Route::prefix('admin')->name('admin.')->group(function () {
+    // Tableau de bord
+    Route::get('/dashboard', function () {
+        return \Inertia\Inertia::render('Admin/Dashboard');
+    })->name('dashboard');
 
-// ----- Chambre -----
-Route::resource('chambres', ChambreController::class);
+    // Réservations
+    Route::resource('reservations', ReservationController::class);
+    Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut'])->name('reservations.updateStatut');
 
-// ----- Type de chambre -----
-Route::resource('types', TypeController::class);
-
-// ----- Tarif -----
-Route::resource('tarifs', TarifController::class);
-
-// ----- Réservation -----
-Route::resource('reservations', ReservationController::class);
-Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut']);
+    // Gestion de l'Hôtel
+    Route::resource('hotels', HotelController::class);
+    Route::resource('chambres', ChambreController::class);
+    Route::resource('types', TypeController::class);
+    Route::resource('tarifs', TarifController::class);
+});
