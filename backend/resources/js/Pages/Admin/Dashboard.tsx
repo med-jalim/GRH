@@ -10,6 +10,7 @@ import {
     Calendar,
     MoreHorizontal,
 } from "lucide-react";
+import { useEffect } from "react";
 import {
     LineChart,
     Line,
@@ -96,6 +97,13 @@ export default function Dashboard({
             </div>
         </div>
     );
+
+    useEffect(() => {
+        console.log(stats);
+        console.log(chartData);
+        console.log(topHotels);
+        console.log(statusDistribution);
+    }, []);
 
     return (
         <AdminLayout>
