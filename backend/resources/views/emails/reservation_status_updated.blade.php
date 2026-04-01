@@ -24,6 +24,14 @@
             'badge_text'  => '#be123c',
             'icon'        => '❌',
         ],
+        'en_attente_paiement' => [
+            'bg'          => '#eef2ff',
+            'border'      => '#c7d2fe',
+            'text'        => '#3730a3',
+            'badge_bg'    => '#e0e7ff',
+            'badge_text'  => '#4338ca',
+            'icon'        => '💳',
+        ],
     ];
     $c = $colors[(string)($newStatut ?? 'en_attente')] ?? $colors['en_attente'];
 @endphp
@@ -137,6 +145,8 @@
                     Votre réservation a été <strong>confirmée</strong>. Nous vous attendons avec impatience !
                 @elseif($newStatut === 'annule')
                     Votre réservation a été <strong>annulée</strong>. N'hésitez pas à nous contacter pour plus d'information.
+                @elseif($newStatut === 'en_attente_paiement')
+                    Nous avons bien reçu votre demande. Veuillez procéder au <strong>paiement</strong> via le lien ci-dessous pour confirmer définitivement votre séjour.
                 @else
                     Votre réservation est <strong>en cours de traitement</strong>. Nous vous tiendrons informé(e) de toute évolution.
                 @endif
@@ -189,6 +199,26 @@
         </table>
 
         <div class="divider"></div>
+
+        @if(!empty($lien_paiement) && $newStatut === 'en_attente_paiement')
+        {{-- Payment CTA --}}
+        <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1.5px solid #86efac; border-radius: 16px; padding: 24px 28px; margin-bottom: 24px;">
+            <p style="font-size:13px; font-weight:700; color:#14532d; margin-bottom:8px;">
+                💳 Lien de paiement
+            </p>
+            <p style="font-size:13px; color:#166534; line-height:1.6; margin-bottom:16px;">
+                Veuillez effectuer le paiement en cliquant sur le bouton ci-dessous. Après avoir réglé le montant, envoyez-nous une <strong>capture d'écran ou une photo du reçu de paiement</strong> en réponse à cet e-mail.
+            </p>
+            <a href="{{ $lien_paiement }}"
+               target="_blank"
+               style="display:inline-block; background: #16a34a; color: #ffffff; font-size:14px; font-weight:700; padding:12px 28px; border-radius:10px; text-decoration:none; letter-spacing:-0.2px;">
+                Payer maintenant →
+            </a>
+            <p style="font-size:11px; color:#4ade80; margin-top:12px;">
+                Si le bouton ne fonctionne pas, copiez ce lien : <span style="font-family: monospace; word-break:break-all;">{{ $lien_paiement }}</span>
+            </p>
+        </div>
+        @endif
 
         <p style="font-size:13px; color:#64748b; line-height:1.65;">
             Pour toute question, répondez à cet e-mail ou contactez notre équipe.

@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -29,10 +30,11 @@ class ReservationController extends Controller
 
         // Stats counts (always across the full unfiltered-by-status scope)
         $stats = [
-            'total'       => (clone $baseQuery)->count(),
-            'en_attente'  => (clone $baseQuery)->where('statut', 'en_attente')->count(),
-            'confirme'    => (clone $baseQuery)->where('statut', 'confirme')->count(),
-            'annule'      => (clone $baseQuery)->where('statut', 'annule')->count(),
+            'total'               => (clone $baseQuery)->count(),
+            'en_attente'          => (clone $baseQuery)->where('statut', 'en_attente')->count(),
+            'en_attente_paiement' => (clone $baseQuery)->where('statut', 'en_attente_paiement')->count(),
+            'confirme'            => (clone $baseQuery)->where('statut', 'confirme')->count(),
+            'annule'              => (clone $baseQuery)->where('statut', 'annule')->count(),
         ];
 
         if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
@@ -69,8 +71,9 @@ class ReservationController extends Controller
             'date_arrivee'        => 'required|date',
             'date_depart'         => 'required|date|after:date_arrivee',
             'nb_personnes'        => 'required|integer|min:1',
+            'prix_total'          => 'required|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
-            'statut'              => 'nullable|string|in:en_attente,confirme,annule',
+            'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
 
             // Line items
             'details'                  => 'nullable|array',
@@ -83,14 +86,23 @@ class ReservationController extends Controller
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
 
-        // Calculate total price from details
-        $prixTotal = 0;
+        // Calculate nights
+        $checkIn = new \DateTime($validated['date_arrivee']);
+        $checkOut = new \DateTime($validated['date_depart']);
+        $nights = $checkOut->diff($checkIn)->days;
+        $nights = max(1, $nights);
+
+        // Calculate total price from details (verifying against nights)
+        $prixTotalCalculated = 0;
         if (! empty($validated['details'])) {
             foreach ($validated['details'] as $detail) {
-                $prixTotal += $detail['quantite'] * $detail['prix_unitaire'];
+                $prixTotalCalculated += $detail['quantite'] * $detail['prix_unitaire'] * $nights;
             }
         }
-        $validated['prix_total'] = $prixTotal;
+
+        // We use the calculated price to ensure integrity, 
+        // but we could also validate that $validated['prix_total'] matches $prixTotalCalculated
+        $validated['prix_total'] = $prixTotalCalculated;
 
         $details = $validated['details'] ?? [];
         unset($validated['details']);
@@ -165,7 +177,7 @@ class ReservationController extends Controller
             'nb_personnes'        => 'sometimes|required|integer|min:1',
             'prix_total'          => 'sometimes|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
-            'statut'              => 'nullable|string|in:en_attente,confirme,annule',
+            'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
         ]);
 
         $reservation->update($validated);
@@ -196,7 +208,7 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut' => 'required|string|in:en_attente,confirme,annule',
+            'statut' => 'required|string|in:en_attente,en_attente_paiement,confirme,annule',
         ]);
 
 
@@ -205,6 +217,7 @@ class ReservationController extends Controller
         $newStatut      = $validated['statut'];
 
         $reservation->update($validated);
+        $reservation->refresh();
 
         // Send email notification only if status actually changed
         if ($previousStatut !== $newStatut) {
@@ -254,5 +267,129 @@ class ReservationController extends Controller
         }
 
         return redirect()->route('admin.reservations.index')->with('success', 'Réservation supprimée avec succès.');
+    }
+
+    /**
+     * Admin: Update payment info (link, amount confirmed, payment status).
+     */
+    public function updatePaymentInfo(Request $request, string $id): RedirectResponse
+    {
+        $reservation = Reservation::with('hotel')->findOrFail($id);
+
+        $validated = $request->validate([
+            'lien_paiement'   => 'nullable|string|max:2000',
+            'montant_paye'    => 'nullable|numeric|min:0',
+            'statut_paiement' => 'nullable|string|in:non_paye,en_attente_verification,paye',
+        ]);
+
+        $updateData = array_filter($validated, fn($v) => $v !== null);
+
+        // Automation: If payment status is 'paye', set reservation status to 'confirme'
+        if (isset($validated['statut_paiement']) && $validated['statut_paiement'] === 'paye') {
+            $updateData['statut'] = 'confirme';
+        }
+
+        $reservation->update($updateData);
+
+        return redirect()->back()->with('success', 'Informations de paiement mises à jour.');
+    }
+
+    /**
+     * Admin: Explicitly send payment link and change status to 'en_attente_paiement'.
+     */
+    public function sendPaymentLink(Request $request, string $id): RedirectResponse
+    {
+        $reservation = Reservation::with('hotel')->findOrFail($id);
+
+        $validated = $request->validate([
+            'lien_paiement' => 'required|string|max:2000',
+        ]);
+
+        $previousStatut = $reservation->statut;
+
+        $reservation->update([
+            'lien_paiement' => $validated['lien_paiement'],
+            'statut'        => 'en_attente_paiement',
+        ]);
+
+        $reservation->refresh();
+
+        try {
+            Mail::to($reservation->email)
+                ->send(new ReservationStatusUpdated($reservation, $previousStatut));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send payment link email', [
+                'reservation_id' => $reservation->id,
+                'error'          => $e->getMessage(),
+            ]);
+            return redirect()->back()->with('error', 'Lien enregistré mais échec lors de l\'envoi de l\'email.');
+        }
+
+        return redirect()->back()->with('success', 'Lien de paiement envoyé avec succès. Le statut est passé à "En attente de paiement".');
+    }
+
+    /**
+     * Admin: Add a partial payment to a reservation.
+     * Increments montant_paye and appends a new receipt to preuve_paiement array.
+     */
+    public function addPayment(Request $request, string $id): RedirectResponse
+    {
+        $reservation = Reservation::findOrFail($id);
+
+        $validated = $request->validate([
+            'montant'         => 'required|numeric|min:0.01',
+            'preuve_paiement' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:8192',
+            'notes'           => 'nullable|string|max:500',
+        ]);
+
+        // 1. Calculate new total
+        $currentPaid = (float) $reservation->montant_paye;
+        $newAmount   = (float) $validated['montant'];
+        $totalPaid   = $currentPaid + $newAmount;
+
+        // 2. Check if total exceeds prix_total
+        if ($totalPaid > $reservation->prix_total + 0.01) { // Small epsilon for float comparison
+            return redirect()->back()->with('error', 'Le montant total payé ne peut pas dépasser le prix total de la réservation.');
+        }
+
+        // 3. Upload new proof
+        $path = $request->file('preuve_paiement')->store('proofs', 'public');
+
+        // 4. Update array of proofs
+        $proofs = $reservation->preuve_paiement ?? [];
+        if (!is_array($proofs)) $proofs = [];
+        $proofs[] = $path;
+
+        // 5. Determine payment status
+        $statutPaiement = 'en_attente_verification';
+        $previousStatut = $reservation->statut;
+        $statut = $reservation->statut;
+
+        if (abs($totalPaid - $reservation->prix_total) < 0.01) {
+            $statutPaiement = 'paye';
+            $statut         = 'confirme';
+        }
+
+        $reservation->update([
+            'montant_paye'    => $totalPaid,
+            'preuve_paiement' => $proofs,
+            'statut_paiement' => $statutPaiement,
+            'statut'          => $statut,
+        ]);
+        if($statut == 'confirme') {
+            $reservation->refresh();
+            try {
+                Mail::to($reservation->email)
+                    ->send(new ReservationStatusUpdated($reservation, $previousStatut));
+            } catch (\Throwable $e) {
+                // Log the failure but don't block the response
+                Log::error('Failed to send status email', [
+                    'reservation_id' => $reservation->id,
+                    'error'          => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Paiement de ' . $newAmount . ' MAD enregistré avec succès.');
     }
 }

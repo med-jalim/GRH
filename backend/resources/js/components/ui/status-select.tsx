@@ -1,6 +1,13 @@
 import * as React from "react";
 import { Select } from "@base-ui/react/select";
-import { CheckCircle, Clock, XCircle, ChevronDown, Loader2 } from "lucide-react";
+import {
+    CheckCircle,
+    Clock,
+    XCircle,
+    ChevronDown,
+    Loader2,
+    CreditCard,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Status config ──────────────────────────────────────────────────────────
@@ -23,6 +30,14 @@ const STATUS_OPTIONS = [
         dot: "bg-emerald-400",
     },
     {
+        value: "en_attente_paiement",
+        label: "En attente de paiement",
+        Icon: CreditCard,
+        badge: "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100/80",
+        item: "text-indigo-700",
+        dot: "bg-indigo-400",
+    },
+    {
         value: "annule",
         label: "Annulée",
         Icon: XCircle,
@@ -41,6 +56,7 @@ interface StatusSelectProps {
     onChange: (value: StatusValue) => void;
     disabled?: boolean;
     loading?: boolean;
+    size?: "sm" | "lg";
 }
 
 export function StatusSelect({
@@ -48,8 +64,10 @@ export function StatusSelect({
     onChange,
     disabled = false,
     loading = false,
+    size = "sm",
 }: StatusSelectProps) {
-    const current = STATUS_OPTIONS.find((o) => o.value === value) ?? STATUS_OPTIONS[0];
+    const current =
+        STATUS_OPTIONS.find((o) => o.value === value) ?? STATUS_OPTIONS[0];
     const Icon = current.Icon;
 
     return (
@@ -63,8 +81,11 @@ export function StatusSelect({
                 aria-label="Changer le statut"
                 className={cn(
                     // badge style
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border",
-                    "text-xs font-semibold transition-all duration-150",
+                    "inline-flex items-center gap-1.5 rounded-full border",
+                    size === "sm"
+                        ? "px-2.5 py-1 text-xs"
+                        : "px-4 py-1.5 text-sm",
+                    "font-semibold transition-all duration-150",
                     // interaction
                     "cursor-pointer select-none focus:outline-none",
                     "focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-amber-400/50",
@@ -75,15 +96,23 @@ export function StatusSelect({
                 )}
             >
                 {loading ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Loader2
+                        className={cn(
+                            "animate-spin",
+                            size === "sm" ? "w-3 h-3" : "w-4 h-4",
+                        )}
+                    />
                 ) : (
-                    <Icon className="w-3 h-3" />
+                    <Icon
+                        className={cn(size === "sm" ? "w-3 h-3" : "w-4 h-4")}
+                    />
                 )}
                 {/* Shows the current status label */}
-                <Select.Value />
+                {current.label}
                 <ChevronDown
                     className={cn(
-                        "w-3 h-3 opacity-50 transition-transform duration-200",
+                        "opacity-50 transition-transform duration-200",
+                        size === "sm" ? "w-3 h-3" : "w-4 h-4",
                         "group-data-[popup-open]:rotate-180",
                     )}
                 />

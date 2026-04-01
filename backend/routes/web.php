@@ -22,6 +22,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Réservations
     Route::resource('reservations', ReservationController::class);
     Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut'])->name('reservations.updateStatut');
+    Route::patch('reservations/{id}/payment-info', [ReservationController::class, 'updatePaymentInfo'])->name('reservations.updatePaymentInfo');
+    Route::post('reservations/{id}/payment-link', [ReservationController::class, 'sendPaymentLink'])->name('reservations.sendPaymentLink');
+    Route::post('reservations/{id}/add-payment', [ReservationController::class, 'addPayment'])->name('reservations.addPayment');
+    Route::post('reservations/{id}/payment-proof', [ReservationController::class, 'uploadPaymentProof'])->name('reservations.uploadPaymentProof');
 
     // Gestion de l'Hôtel
     Route::resource('hotels', HotelController::class);

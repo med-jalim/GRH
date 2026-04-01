@@ -138,7 +138,7 @@ export default function BookingFormPage({ hotels }: Props) {
 
         try {
             const res = await axios.post("/admin/reservations", payload, {
-                headers: { Accept: "application/json" }
+                headers: { Accept: "application/json" },
             });
             setSuccessData({
                 reference: res.data.data.code_reference,

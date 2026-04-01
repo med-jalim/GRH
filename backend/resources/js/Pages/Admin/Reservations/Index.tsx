@@ -33,7 +33,8 @@ interface Reservation {
     date_depart: string;
     nb_personnes: number;
     prix_total: number;
-    statut: "en_attente" | "confirme" | "annule";
+    statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule";
+    statut_paiement: "non_paye" | "en_attente_verification" | "paye";
     created_at: string;
     hotel: Hotel | null;
 }
@@ -63,6 +64,7 @@ interface Filters {
 interface Stats {
     total: number;
     en_attente: number;
+    en_attente_paiement: number;
     confirme: number;
     annule: number;
 }
@@ -74,7 +76,6 @@ interface Props {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
 
 function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("fr-FR", {
@@ -94,6 +95,8 @@ function formatPrice(amount: number) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
+
+
 
 export default function ReservationsIndex({
     reservations,
@@ -159,6 +162,7 @@ export default function ReservationsIndex({
     const statuts: { value: string; label: string }[] = [
         { value: "all", label: "Tous" },
         { value: "en_attente", label: "En attente" },
+        { value: "en_attente_paiement", label: "Attente paiement" },
         { value: "confirme", label: "Confirmées" },
         { value: "annule", label: "Annulées" },
     ];
@@ -179,7 +183,7 @@ export default function ReservationsIndex({
             </div>
 
             {/* ── Stats strip ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                 {[
                     {
                         label: "Total",
@@ -192,6 +196,12 @@ export default function ReservationsIndex({
                         value: stats.en_attente,
                         color: "text-amber-700",
                         bg: "bg-amber-50",
+                    },
+                    {
+                        label: "Paiement en attente",
+                        value: stats.en_attente_paiement,
+                        color: "text-indigo-700",
+                        bg: "bg-indigo-50",
                     },
                     {
                         label: "Confirmées",
@@ -293,6 +303,7 @@ export default function ReservationsIndex({
                                     <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                         Total
                                     </th>
+
                                     <th className="text-left px-5 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                         Statut
                                     </th>
@@ -383,7 +394,9 @@ export default function ReservationsIndex({
                                             </span>
                                         </td>
 
-                                        {/* Statut */}
+
+
+                                        {/* Statut Reservation */}
                                         <td className="px-5 py-4">
                                             <StatusSelect
                                                 value={r.statut}
@@ -405,7 +418,6 @@ export default function ReservationsIndex({
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
                                                 >
                                                     <Eye className="w-3.5 h-3.5" />
-                                                    Détails
                                                 </Link>
                                                 <button
                                                     disabled={
@@ -420,9 +432,6 @@ export default function ReservationsIndex({
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
-                                                    {deletingId === r.id
-                                                        ? "..."
-                                                        : "Suppr."}
                                                 </button>
                                             </div>
                                         </td>
