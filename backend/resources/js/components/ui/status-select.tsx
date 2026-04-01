@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Select } from "@base-ui/react/select";
-import { CheckCircle, Clock, XCircle, ChevronDown, Loader2, CreditCard } from "lucide-react";
+import { CheckCircle, Clock, XCircle, ChevronDown, Loader2, CreditCard, ClipboardCheck, UserCheck, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Status config ──────────────────────────────────────────────────────────
@@ -31,12 +31,36 @@ const STATUS_OPTIONS = [
         dot: "bg-red-400",
     },
     {
+        value: "en_validation",
+        label: "Vérification requise",
+        Icon: ClipboardCheck,
+        badge: "text-yellow-700 bg-yellow-50 border-yellow-200 hover:bg-yellow-100/80",
+        item: "text-yellow-700",
+        dot: "bg-yellow-400",
+    },
+    {
+        value: "valide",
+        label: "Confirmée par client",
+        Icon: UserCheck,
+        badge: "text-cyan-700 bg-cyan-50 border-cyan-200 hover:bg-cyan-100/80",
+        item: "text-cyan-700",
+        dot: "bg-cyan-400",
+    },
+    {
         value: "en_attente_paiement",
         label: "En attente de paiement",
         Icon: CreditCard,
         badge: "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100/80",
         item: "text-indigo-700",
         dot: "bg-indigo-400",
+    },
+    {
+        value: "partiellement_paye",
+        label: "Partiellement payée",
+        Icon: Wallet,
+        badge: "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100/80",
+        item: "text-blue-700",
+        dot: "bg-blue-400",
     },
 ] as const;
 

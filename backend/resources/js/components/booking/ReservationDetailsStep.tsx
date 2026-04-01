@@ -11,9 +11,10 @@ interface Props {
     hotels: Hotel[];
     nights: number;
     totalPrice: number;
+    disabledHotel?: boolean;
 }
 
-export function ReservationDetailsStep({ hotels, nights, totalPrice }: Props) {
+export function ReservationDetailsStep({ hotels, nights, totalPrice, disabledHotel = false }: Props) {
     const {
         register,
         watch,
@@ -116,13 +117,14 @@ export function ReservationDetailsStep({ hotels, nights, totalPrice }: Props) {
                     </Label>
                     <select
                         id="hotel"
+                        disabled={disabledHotel}
                         {...register("hotelId", { valueAsNumber: true })}
                         onChange={(e) =>
                             handleHotelChange(
                                 e.target.value ? Number(e.target.value) : null,
                             )
                         }
-                        className={`w-full h-10 rounded-lg border bg-white px-3 text-sm text-slate-700 transition-all ${errors.hotelId ? "border-red-400" : "border-slate-200"}`}
+                        className={`w-full h-10 rounded-lg border bg-white px-3 text-sm text-slate-700 transition-all ${errors.hotelId ? "border-red-400" : "border-slate-200"} ${disabledHotel ? "bg-slate-100 cursor-not-allowed opacity-75" : ""}`}
                     >
                         <option value="">— Sélectionner un hôtel —</option>
                         {hotels.map((h) => (

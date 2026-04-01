@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Mail\ReservationStatusUpdated;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class PaymentVerificationController extends Controller
 {
@@ -49,18 +50,34 @@ class PaymentVerificationController extends Controller
         $reservation->load('payments', 'hotel');
         $totalPaid = $reservation->payments->sum('amount');
 
-        // Automatic confirmation if paid in full
-        if ($totalPaid >= $reservation->prix_total && $reservation->statut !== 'confirme') {
-            $previousStatut      = $reservation->statut;
-            $reservation->statut = 'confirme';
-            $reservation->save();
+        // Handle status update based on total paid
+        if ($totalPaid >= $reservation->prix_total) {
+            if ($reservation->statut !== 'confirme') {
+                $previousStatut      = $reservation->statut;
+                $reservation->statut = 'confirme';
+                $reservation->save();
 
-            // Send confirmation email
-            Mail::to($reservation->email)->send(new ReservationStatusUpdated(
-                $reservation,
-                $previousStatut,
-                'Le montant total a été atteint via vos justificatifs versés. Votre réservation est officiellement confirmée.'
-            ));
+                // Send confirmation email
+                Mail::to($reservation->email)->send(new ReservationStatusUpdated(
+                    $reservation,
+                    $previousStatut,
+                    'Le montant total a été atteint via vos justificatifs versés. Votre réservation est officiellement confirmée.'
+                ));
+            }
+        } elseif ($totalPaid > 0) {
+            // Partial payment logic
+            if ($reservation->statut !== 'partiellement_paye' && $reservation->statut !== 'confirme') {
+                $previousStatut      = $reservation->statut;
+                $reservation->statut = 'partiellement_paye';
+                $reservation->save();
+
+                // Send notification for partial payment
+                Mail::to($reservation->email)->send(new ReservationStatusUpdated(
+                    $reservation,
+                    $previousStatut,
+                    "Acompte reçu. Montant restant : " . ($reservation->prix_total - $totalPaid) . " MAD."
+                ));
+            }
         }
 
         return redirect()->back()->with('success', 'Justificatif de paiement ajouté avec succès.');
@@ -72,12 +89,47 @@ class PaymentVerificationController extends Controller
     public function destroy($id)
     {
         $payment = PaymentVerification::findOrFail($id);
+        $reservationId = $payment->id_reservation;
 
         // Delete the file from storage
         Storage::disk('public')->delete($payment->document_path);
 
         $payment->delete();
 
-        return redirect()->back()->with('success', 'Justificatif supprimé.');
+        // Refresh and check total paid
+        $reservation = Reservation::with('payments')->findOrFail($reservationId);
+        $totalPaid = $reservation->payments->sum('amount');
+        $previousStatut = $reservation->statut;
+
+        $newStatut = $previousStatut;
+
+        if ($totalPaid >= $reservation->prix_total) {
+            $newStatut = 'confirme';
+        } elseif ($totalPaid > 0) {
+            $newStatut = 'partiellement_paye';
+        } else {
+            // No payments left
+            // Only downgrade to 'en_attente_paiement' if it was already in a payment-related status
+            if (in_array($previousStatut, ['confirme', 'partiellement_paye', 'valide'])) {
+                $newStatut = 'en_attente_paiement';
+            }
+        }
+
+        if ($newStatut !== $previousStatut) {
+            $reservation->update(['statut' => $newStatut]);
+            
+            // Optionally notify client that status was downgraded
+            try {
+                Mail::to($reservation->email)->send(new ReservationStatusUpdated(
+                    $reservation,
+                    $previousStatut,
+                    'Note : Un justificatif de paiement a été supprimé par l\'administrateur, le statut de votre réservation a été mis à jour.'
+                ));
+            } catch (\Throwable $e) {
+                \Log::error("Failed to send status update email on payment deletion: " . $e->getMessage());
+            }
+        }
+
+        return redirect()->back()->with('success', 'Justificatif supprimé et statut mis à jour.');
     }
 }

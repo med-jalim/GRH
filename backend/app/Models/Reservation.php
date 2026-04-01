@@ -22,13 +22,38 @@ class Reservation extends Model
         'remarques_speciales',
         'statut',
         'code_reference',
-        'payment_link'
+        'payment_link',
+        'token',
+        'paid_amount',
+        'total_amount'
     ];
 
     protected $casts = [
         'date_arrivee' => 'date',
         'date_depart'  => 'date',
+        'paid_amount'  => 'float',
+        'total_amount' => 'float',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($reservation) {
+            if (!$reservation->token) {
+                $reservation->token = \Illuminate\Support\Str::random(64);
+            }
+            // Sync total_amount with prix_total on creation
+            if (!$reservation->total_amount && $reservation->prix_total) {
+                $reservation->total_amount = $reservation->prix_total;
+            }
+        });
+
+        static::updating(function ($reservation) {
+            // Keep total_amount in sync with prix_total if prix_total changes
+            if ($reservation->isDirty('prix_total')) {
+                $reservation->total_amount = $reservation->prix_total;
+            }
+        });
+    }
 
     public function hotel(): BelongsTo
     {

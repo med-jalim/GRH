@@ -31,7 +31,10 @@ class ReservationController extends Controller
         $stats = [
             'total'               => (clone $baseQuery)->count(),
             'en_attente'          => (clone $baseQuery)->where('statut', 'en_attente')->count(),
+            'en_validation'       => (clone $baseQuery)->where('statut', 'en_validation')->count(),
+            'valide'              => (clone $baseQuery)->where('statut', 'valide')->count(),
             'en_attente_paiement' => (clone $baseQuery)->where('statut', 'en_attente_paiement')->count(),
+            'partiellement_paye'  => (clone $baseQuery)->where('statut', 'partiellement_paye')->count(),
             'confirme'            => (clone $baseQuery)->where('statut', 'confirme')->count(),
             'annule'              => (clone $baseQuery)->where('statut', 'annule')->count(),
         ];
@@ -197,7 +200,7 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut'       => 'required|string|in:en_attente,en_attente_paiement,confirme,annule',
+            'statut'       => 'required|string|in:en_attente,en_attente_paiement,confirme,annule,en_validation,valide,partiellement_paye',
             'message'      => 'required_if:statut,annule|nullable|string',
             'payment_link' => 'required_if:statut,en_attente_paiement|nullable|string|url',
         ]);
@@ -217,8 +220,14 @@ class ReservationController extends Controller
         // Send email notification only if status actually changed
         if ($previousStatut !== $newStatut) {
             try {
-                Mail::to($reservation->email)
-                    ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
+                if ($newStatut === 'en_validation') {
+                    // Specific email for validation request
+                    Mail::to($reservation->email)->send(new \App\Mail\ReservationValidationRequest($reservation));
+                } else {
+                    // Standard notification for other statuses
+                    Mail::to($reservation->email)
+                        ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
+                }
             } catch (\Throwable $e) {
                 // Log the failure but don't block the response
                 Log::error('Failed to send status email', [

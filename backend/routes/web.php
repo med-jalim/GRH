@@ -7,6 +7,7 @@ use App\Http\Controllers\TarifController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TypeController;
 use App\Http\Controllers\PaymentVerificationController;
+use App\Http\Controllers\ClientReservationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -14,6 +15,12 @@ Route::get('/', function () {
 });
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
+
+// ----- Public Reservation Actions (via Token) -----
+Route::get('/reservation/{token}/confirm', [ClientReservationController::class, 'confirm'])->name('reservation.confirm');
+Route::get('/reservation/{token}/cancel', [ClientReservationController::class, 'cancel'])->name('reservation.cancel');
+Route::get('/reservation/{token}/edit', [ClientReservationController::class, 'edit'])->name('reservation.edit');
+Route::post('/reservation/{token}/update', [ClientReservationController::class, 'update'])->name('reservation.update');
 
 // ----- Espace Administrateur (Back-Office) -----
 Route::prefix('admin')->name('admin.')->group(function () {

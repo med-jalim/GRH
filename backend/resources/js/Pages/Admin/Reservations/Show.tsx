@@ -23,6 +23,8 @@ import {
   FileUp,
   ExternalLink,
   Wallet,
+  ClipboardCheck,
+  UserCheck,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StatusSelect, StatusValue } from "@/components/ui/status-select";
@@ -71,8 +73,11 @@ interface Reservation {
   nb_personnes: number;
   prix_total: number;
   remarques_speciales: string | null;
-  statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule";
+  statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule" | "en_validation" | "valide" | "partiellement_paye";
   payment_link: string | null;
+  token: string | null;
+  paid_amount: number;
+  total_amount: number;
   code_reference_: string;
   created_at: string;
   updated_at: string;
@@ -115,6 +120,27 @@ const STATUT_CONFIG = {
     badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
     ring: "ring-indigo-300",
     dot: "bg-indigo-400",
+  },
+  en_validation: {
+    label: "Vérification requise",
+    icon: ClipboardCheck,
+    badge: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+    ring: "ring-yellow-300",
+    dot: "bg-yellow-400",
+  },
+  valide: {
+    label: "Confirmée par client",
+    icon: UserCheck,
+    badge: "bg-cyan-50 text-cyan-700 border border-cyan-200",
+    ring: "ring-cyan-300",
+    dot: "bg-cyan-400",
+  },
+  partiellement_paye: {
+    label: "Partiellement payée",
+    icon: Wallet,
+    badge: "bg-blue-50 text-blue-700 border border-blue-200",
+    ring: "ring-blue-300",
+    dot: "bg-blue-400",
   },
 } as const;
 

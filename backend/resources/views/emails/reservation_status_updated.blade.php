@@ -32,6 +32,30 @@
             'badge_text'  => '#4338ca',
             'icon'        => '💳',
         ],
+        'en_validation' => [
+            'bg'          => '#fefce8',
+            'border'      => '#fef08a',
+            'text'        => '#854d0e',
+            'badge_bg'    => '#fef9c3',
+            'badge_text'  => '#a16207',
+            'icon'        => '📝',
+        ],
+        'valide' => [
+            'bg'          => '#f0fdf4',
+            'border'      => '#86efac',
+            'text'        => '#14532d',
+            'badge_bg'    => '#dcfce7',
+            'badge_text'  => '#15803d',
+            'icon'        => '🤝',
+        ],
+        'partiellement_paye' => [
+            'bg'          => '#f0f9ff',
+            'border'      => '#bae6fd',
+            'text'        => '#075985',
+            'badge_bg'    => '#e0f2fe',
+            'badge_text'  => '#0369a1',
+            'icon'        => '💰',
+        ],
     ];
     $c = $colors[(string)($newStatut ?? 'en_attente')] ?? $colors['en_attente'];
 @endphp

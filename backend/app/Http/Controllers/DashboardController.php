@@ -13,12 +13,12 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // 1. إحصائيات علوية (Top Level Stats)
-        $bookedRooms = Reservation::where('statut', 'confirme')->count();
+        // 1. Top Level Stats
+        $bookedRooms = Reservation::whereIn('statut', ['confirme', 'valide', 'partiellement_paye'])->count();
         $cancelledRooms = Reservation::where('statut', 'annule')->count();
         
-        $totalRevenue = Reservation::where('statut', 'confirme')->sum('prix_total');
-        $pendingReservations = Reservation::where('statut', 'en_attente')->count();
+        $totalRevenue = Reservation::whereIn('statut', ['confirme', 'valide', 'partiellement_paye'])->sum('prix_total');
+        $pendingReservations = Reservation::whereIn('statut', ['en_attente', 'en_validation', 'en_attente_paiement'])->count();
 
         // 2. نظرة عامة شهرية (Campaign Overview) - إحصائية الحجوزات 
         $months = [];
