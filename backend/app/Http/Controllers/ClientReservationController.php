@@ -17,14 +17,14 @@ class ClientReservationController extends Controller
     {
         $reservation = Reservation::where('token', $token)->firstOrFail();
 
-        // if ($reservation->statut !== 'en_validation') {
+        if (!$reservation) {
 
-        //     return Inertia::render('PublicReservationAction', [
-        //         'success' => false,
-        //         'message' => $reservation->statut,
-        //         // 'message' => 'Cette action n\'est plus possible ou la réservation a déjà été traitée.',
-        //     ]);
-        // }
+            return Inertia::render('PublicReservationAction', [
+                'success' => false,
+                'message' =>  "Réservation non trouvée",
+                // 'message' => 'Cette action n\'est plus possible ou la réservation a déjà été traitée.',
+            ]);
+        }
 
         $reservation->update(['statut' => 'valide']);
 
@@ -89,13 +89,13 @@ class ClientReservationController extends Controller
             'details.*.prix_unitaire' => 'required|numeric|min:0',
         ]);
 
-        // Reset status to en_attente
-        $validated['statut'] = 'en_attente';
-
         $details = $validated['details'];
         unset($validated['details']);
 
-        $reservation->update($validated);
+        // Reset status to en_attente and save
+        $reservation->statut = 'en_attente';
+        $reservation->fill($validated);
+        $reservation->save();
 
         // Update line items
         $reservation->details()->delete();
@@ -107,6 +107,7 @@ class ClientReservationController extends Controller
         return Inertia::render('PublicReservationAction', [
             'success' => true,
             'message' => 'Vos modifications ont été enregistrées. Notre équipe va les examiner.',
+            'reservation' => $reservation,
         ]);
     }
 }

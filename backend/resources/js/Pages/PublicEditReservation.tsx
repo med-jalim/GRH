@@ -135,16 +135,14 @@ export default function PublicEditReservation({ reservation, hotels }: Props) {
             }),
         };
 
-        try {
-            await axios.post(`/reservation/${reservation.token}/update`, payload);
-            console.log(payload);
-            router.visit(`/reservation/${reservation.token}/confirm`); // Just a way to show success
-        } catch (error) {
-            console.error("API Error:", error);
-            alert("Une erreur est survenue lors de la mise à jour.");
-        } finally {
-            setSubmitting(false);
-        }
+        router.post(`/reservation/${reservation.token}/update`, payload, {
+            onStart: () => setSubmitting(true),
+            onFinish: () => setSubmitting(false),
+            onError: (errors) => {
+                console.error("Inertia Error:", errors);
+                alert("Une erreur est survenue lors de la mise à jour.");
+            }
+        });
     };
 
     return (
