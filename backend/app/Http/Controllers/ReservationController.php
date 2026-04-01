@@ -121,7 +121,7 @@ class ReservationController extends Controller
      */
     public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::with(['hotel', 'details.type'])->find($id);
+        $reservation = Reservation::with(['hotel', 'details.type', 'payments'])->find($id);
 
         if (! $reservation) {
             if (request()->wantsJson() && ! request()->header('X-Inertia')) {
@@ -196,7 +196,8 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut' => 'required|string|in:en_attente,confirme,annule',
+            'statut'  => 'required|string|in:en_attente,confirme,annule',
+            'message' => 'nullable|string',
         ]);
 
 
@@ -204,13 +205,13 @@ class ReservationController extends Controller
         $previousStatut = $reservation->statut;
         $newStatut      = $validated['statut'];
 
-        $reservation->update($validated);
+        $reservation->update(['statut' => $newStatut]);
 
         // Send email notification only if status actually changed
         if ($previousStatut !== $newStatut) {
             try {
                 Mail::to($reservation->email)
-                    ->send(new ReservationStatusUpdated($reservation, $previousStatut));
+                    ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
             } catch (\Throwable $e) {
                 // Log the failure but don't block the response
                 Log::error('Failed to send status email', [

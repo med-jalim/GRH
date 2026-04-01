@@ -6,6 +6,7 @@ use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\TarifController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TypeController;
+use App\Http\Controllers\PaymentVerificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -22,6 +23,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // Réservations
     Route::resource('reservations', ReservationController::class);
     Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut'])->name('reservations.updateStatut');
+    Route::post('reservations/{id}/payments', [PaymentVerificationController::class, 'store'])->name('reservations.payments.store');
+    Route::delete('payments/{id}', [PaymentVerificationController::class, 'destroy'])->name('reservations.payments.destroy');
 
     // Gestion de l'Hôtel
     Route::resource('hotels', HotelController::class);

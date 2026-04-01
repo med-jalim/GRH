@@ -29,6 +29,7 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
     public function __construct(
         public readonly Reservation $reservation,
         public readonly string $previousStatut,
+        public readonly ?string $cancellationReason = null,
     ) {}
 
     /**
@@ -51,11 +52,12 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
         return new Content(
             view: 'emails.reservation_status_updated',
             with: [
-                'reservation'    => $this->reservation,
-                'previousStatut' => $this->previousStatut,
-                'newStatut'      => $this->reservation->statut,
-                'statusLabel'    => self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut,
-                'prevLabel'      => self::$statusLabels[$this->previousStatut] ?? $this->previousStatut,
+                'reservation'        => $this->reservation,
+                'previousStatut'     => $this->previousStatut,
+                'newStatut'          => $this->reservation->statut,
+                'statusLabel'        => self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut,
+                'prevLabel'          => self::$statusLabels[$this->previousStatut] ?? $this->previousStatut,
+                'cancellationReason' => $this->cancellationReason,
             ],
         );
     }

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
+import { X, CheckCircle as CheckCircleIcon, XCircle } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,11 @@ export default function ReservationsIndex({
     const [updatingId, setUpdatingId] = useState<number | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
+    // Cancellation modal state
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [cancelMessage, setCancelMessage] = useState("");
+    const [currentCancelId, setCurrentCancelId] = useState<number | null>(null);
+
     // Filter by status (client-side quick filter on top of server filter)
     const filtered = reservations.data.filter((r) => {
         const q = search.toLowerCase();
@@ -132,6 +138,13 @@ export default function ReservationsIndex({
     }
 
     function handleStatusChange(id: number, newStatut: string) {
+        if (newStatut === "annule") {
+            setCurrentCancelId(id);
+            setCancelMessage("");
+            setIsCancelModalOpen(true);
+            return;
+        }
+
         setUpdatingId(id);
         router.patch(
             `/admin/reservations/${id}/statut`,
@@ -142,6 +155,25 @@ export default function ReservationsIndex({
             },
         );
     }
+
+    const confirmCancellation = () => {
+        if (!currentCancelId) return;
+
+        setUpdatingId(currentCancelId);
+        setIsCancelModalOpen(false);
+
+        router.patch(
+            `/admin/reservations/${currentCancelId}/statut`,
+            { statut: "annule", message: cancelMessage },
+            {
+                preserveState: true,
+                onFinish: () => {
+                    setUpdatingId(null);
+                    setCurrentCancelId(null);
+                },
+            },
+        );
+    };
 
     function handleDelete(id: number, ref: string) {
         if (
@@ -504,6 +536,77 @@ export default function ReservationsIndex({
                     </div>
                 )}
             </div>
+
+            {/* ── Cancellation Reason Modal ── */}
+            {isCancelModalOpen && (
+                <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+                        {/* Header */}
+                        <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                    <XCircle className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                                        Annulation
+                                    </h3>
+                                    <p className="text-sm text-slate-500 font-medium">
+                                        Expliquez la raison au client
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsCancelModalOpen(false)}
+                                className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-100"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-8">
+                            <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-700 tracking-tight">
+                                    Message à envoyer dans l'email :
+                                </label>
+                                <textarea
+                                    value={cancelMessage}
+                                    onChange={(e) => setCancelMessage(e.target.value)}
+                                    placeholder="Indiquez pourquoi la réservation est annulée... ex: Indisponibilité, Erreur de tarif, etc."
+                                    className="w-full h-40 rounded-2xl border-2 border-slate-100 bg-slate-50/50 p-5 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-400/50 transition-all resize-none shadow-inner"
+                                    autoFocus
+                                />
+                                <div className="flex gap-2.5 items-start bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
+                                    <svg className="w-4 h-4 text-amber-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
+                                        Ce message sera directement visible par le client dans l'email de notification automatique. Soyez clair et courtois.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+                            <button
+                                onClick={() => setIsCancelModalOpen(false)}
+                                className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                            >
+                                Ignorer
+                            </button>
+                            <button
+                                onClick={confirmCancellation}
+                                className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Confirmer l'annulation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 }

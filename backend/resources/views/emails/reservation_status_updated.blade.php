@@ -135,8 +135,32 @@
             <div class="status-message" style="color: {{ $c['text'] }};">
                 @if($newStatut === 'confirme')
                     Votre réservation a été <strong>confirmée</strong>. Nous vous attendons avec impatience !
+                    
+                    @if($reservation->hotel && !empty($reservation->hotel->rib))
+                        <div style="margin-top: 15px; padding: 15px; background: rgba(5, 150, 105, 0.05); border-left: 3px solid #059669; border-radius: 8px; text-align: left;">
+                            <p style="font-weight: 700; color: #065f46; font-size: 13px; margin-bottom: 6px;">Coordonnées Bancaires (RIB) :</p>
+                            <p style="color: #047857; font-size: 14px; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px;">
+                                {{ $reservation->hotel->rib }}
+                            </p>
+                        </div>
+                    @endif
+
+                    <div style="margin-top: 20px;">
+                        <a href="{{ url('/paiement/' . $reservation->code_reference) }}" 
+                           style="display: inline-block; padding: 12px 24px; background: #059669; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);">
+                            Procéder au Paiement (Payzone)
+                        </a>
+                    </div>
                 @elseif($newStatut === 'annule')
-                    Votre réservation a été <strong>annulée</strong>. N'hésitez pas à nous contacter pour plus d'information.
+                    Votre réservation a été <strong>annulée</strong>.
+                    @if(!empty($cancellationReason))
+                        <div style="margin-top: 15px; padding: 12px; background: rgba(190, 18, 60, 0.05); border-left: 3px solid #be123c; border-radius: 4px; text-align: left;">
+                            <p style="font-weight: 700; color: #be123c; font-size: 13px; margin-bottom: 4px;">Raison de l'annulation :</p>
+                            <p style="color: #881337; font-size: 13px; line-height: 1.5; margin: 0;">{{ $cancellationReason }}</p>
+                        </div>
+                    @else
+                        N'hésitez pas à nous contacter pour plus d'information.
+                    @endif
                 @else
                     Votre réservation est <strong>en cours de traitement</strong>. Nous vous tiendrons informé(e) de toute évolution.
                 @endif

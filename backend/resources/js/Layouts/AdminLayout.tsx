@@ -48,7 +48,7 @@ export function AdminLayout({ children }: Props) {
               <span className="text-gray-900 font-bold text-xl">GRH Hôtels</span>
             </div>
 
-            <div className="mt-8 relative">
+            {/* <div className="mt-8 relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
                 type="text" 
@@ -58,7 +58,7 @@ export function AdminLayout({ children }: Props) {
               <div className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-white border border-gray-200 rounded text-[10px] text-gray-400 font-medium">
                 ⌘K
               </div>
-            </div>
+            </div> */}
           </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-2 custom-scrollbar">
@@ -85,7 +85,7 @@ export function AdminLayout({ children }: Props) {
           
           <div className="p-4 border-t border-gray-100 isolate">
             <Link
-              href="/"
+              href="/booking"
               className="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-900 transition-colors"
             >
               <LogOut className="w-5 h-5" />
@@ -102,7 +102,7 @@ export function AdminLayout({ children }: Props) {
               Tableau de Bord
             </div>
             
-            <div className="flex items-center gap-6">
+            {/* <div className="flex items-center gap-6">
               <div className="relative hidden md:flex items-center text-gray-400">
                 <Search className="w-4 h-4 absolute left-3" />
                 <input 
@@ -128,7 +128,7 @@ export function AdminLayout({ children }: Props) {
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </div>
-            </div>
+            </div> */}
           </header>
 
           {/* Page Content */}
