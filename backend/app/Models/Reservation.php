@@ -21,7 +21,8 @@ class Reservation extends Model
         'prix_total',
         'remarques_speciales',
         'statut',
-        'code_reference'
+        'code_reference',
+        'payment_link'
     ];
 
     protected $casts = [

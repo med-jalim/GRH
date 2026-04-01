@@ -24,6 +24,14 @@
             'badge_text'  => '#be123c',
             'icon'        => '❌',
         ],
+        'en_attente_paiement' => [
+            'bg'          => '#eef2ff',
+            'border'      => '#c7d2fe',
+            'text'        => '#3730a3',
+            'badge_bg'    => '#e0e7ff',
+            'badge_text'  => '#4338ca',
+            'icon'        => '💳',
+        ],
     ];
     $c = $colors[(string)($newStatut ?? 'en_attente')] ?? $colors['en_attente'];
 @endphp
@@ -136,21 +144,11 @@
                 @if($newStatut === 'confirme')
                     Votre réservation a été <strong>confirmée</strong>. Nous vous attendons avec impatience !
                     
-                    @if($reservation->hotel && !empty($reservation->hotel->rib))
-                        <div style="margin-top: 15px; padding: 15px; background: rgba(5, 150, 105, 0.05); border-left: 3px solid #059669; border-radius: 8px; text-align: left;">
-                            <p style="font-weight: 700; color: #065f46; font-size: 13px; margin-bottom: 6px;">Coordonnées Bancaires (RIB) :</p>
-                            <p style="color: #047857; font-size: 14px; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px;">
-                                {{ $reservation->hotel->rib }}
-                            </p>
+                    @if(!empty($cancellationReason))
+                        <div style="margin-top: 15px; padding: 12px; background: rgba(5, 150, 105, 0.05); border-left: 3px solid #059669; border-radius: 4px; text-align: left;">
+                            <p style="color: #065f46; font-size: 13px; line-height: 1.5; margin: 0;">{{ $cancellationReason }}</p>
                         </div>
                     @endif
-
-                    <div style="margin-top: 20px;">
-                        <a href="{{ url('/paiement/' . $reservation->code_reference) }}" 
-                           style="display: inline-block; padding: 12px 24px; background: #059669; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);">
-                            Procéder au Paiement (Payzone)
-                        </a>
-                    </div>
                 @elseif($newStatut === 'annule')
                     Votre réservation a été <strong>annulée</strong>.
                     @if(!empty($cancellationReason))
@@ -160,6 +158,31 @@
                         </div>
                     @else
                         N'hésitez pas à nous contacter pour plus d'information.
+                    @endif
+                @elseif($newStatut === 'en_attente_paiement')
+                    Votre réservation est maintenant <strong>en attente de paiement</strong>.
+                    
+                    <p style="margin-top: 15px; font-size: 14px; color: #4b5563;">
+                        Pour finaliser votre réservation et garantir vos dates, nous vous invitons à effectuer le règlement.
+                        Vous pouvez payer instantanément via notre lien sécurisé ou par virement bancaire.
+                    </p>
+
+                    @if($reservation->payment_link)
+                        <div style="margin-top: 25px; margin-bottom: 25px; text-align: center;">
+                            <a href="{{ $reservation->payment_link }}" 
+                               style="display: inline-block; padding: 14px 30px; background: #4338ca; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 700; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(67, 56, 202, 0.3);">
+                                💳 Payer en ligne (Payzone)
+                            </a>
+                        </div>
+                    @endif
+
+                    @if($reservation->hotel && !empty($reservation->hotel->rib))
+                        <div style="margin-top: 15px; padding: 15px; background: rgba(55, 48, 163, 0.05); border-left: 3px solid #4338ca; border-radius: 8px; text-align: left;">
+                            <p style="font-weight: 700; color: #312e81; font-size: 13px; margin-bottom: 6px;">Coordonnées Bancaires (RIB) :</p>
+                            <p style="color: #3730a3; font-size: 14px; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px;">
+                                {{ $reservation->hotel->rib }}
+                            </p>
+                        </div>
                     @endif
                 @else
                     Votre réservation est <strong>en cours de traitement</strong>. Nous vous tiendrons informé(e) de toute évolution.

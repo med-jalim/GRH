@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Select } from "@base-ui/react/select";
-import { CheckCircle, Clock, XCircle, ChevronDown, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, XCircle, ChevronDown, Loader2, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Status config ──────────────────────────────────────────────────────────
@@ -29,6 +29,14 @@ const STATUS_OPTIONS = [
         badge: "text-red-600 bg-red-50 border-red-200 hover:bg-red-100/80",
         item: "text-red-600",
         dot: "bg-red-400",
+    },
+    {
+        value: "en_attente_paiement",
+        label: "En attente de paiement",
+        Icon: CreditCard,
+        badge: "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100/80",
+        item: "text-indigo-700",
+        dot: "bg-indigo-400",
     },
 ] as const;
 

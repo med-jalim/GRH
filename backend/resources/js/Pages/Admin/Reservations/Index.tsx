@@ -9,10 +9,11 @@ import {
     ChevronRight,
     Building2,
     Users,
+    Clock
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
-import { X, CheckCircle as CheckCircleIcon, XCircle } from "lucide-react";
+import { X, CheckCircle as CheckCircleIcon, XCircle, CreditCard, ExternalLink, Info, RefreshCw, Mail, AlertTriangle } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,8 @@ interface Reservation {
     date_depart: string;
     nb_personnes: number;
     prix_total: number;
-    statut: "en_attente" | "confirme" | "annule";
+    statut: "en_attente" | "confirme" | "annule" | "en_attente_paiement";
+    payment_link: string | null;
     created_at: string;
     hotel: Hotel | null;
 }
@@ -64,6 +66,7 @@ interface Filters {
 interface Stats {
     total: number;
     en_attente: number;
+    en_attente_paiement: number;
     confirme: number;
     annule: number;
 }
@@ -113,6 +116,35 @@ export default function ReservationsIndex({
     const [cancelMessage, setCancelMessage] = useState("");
     const [currentCancelId, setCurrentCancelId] = useState<number | null>(null);
 
+    // Status Confirmation state
+    const [isStatusConfirmModalOpen, setIsStatusConfirmModalOpen] = useState(false);
+    const [pendingStatusUpdate, setPendingStatusUpdate] = useState<{id: number, statut: string} | null>(null);
+
+    // Delete Confirmation state
+    const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+    const [pendingDeleteRef, setPendingDeleteRef] = useState("");
+
+    // Payment link modal state
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [tempPaymentLink, setTempPaymentLink] = useState("");
+    const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null);
+
+    // Countdown state for modals
+    const [countdown, setCountdown] = useState(0);
+
+    useEffect(() => {
+        if (isStatusConfirmModalOpen || isDeleteConfirmModalOpen) {
+            setCountdown(5);
+            const timer = setInterval(() => {
+                setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+            }, 1000);
+            return () => clearInterval(timer);
+        } else {
+            setCountdown(0);
+        }
+    }, [isStatusConfirmModalOpen, isDeleteConfirmModalOpen]);
+
     // Filter by status (client-side quick filter on top of server filter)
     const filtered = reservations.data.filter((r) => {
         const q = search.toLowerCase();
@@ -138,6 +170,14 @@ export default function ReservationsIndex({
     }
 
     function handleStatusChange(id: number, newStatut: string) {
+        if (newStatut === "en_attente_paiement") {
+            const res = filtered.find(r => r.id === id);
+            setCurrentPaymentId(id);
+            setTempPaymentLink(res?.payment_link || "");
+            setIsPaymentModalOpen(true);
+            return;
+        }
+
         if (newStatut === "annule") {
             setCurrentCancelId(id);
             setCancelMessage("");
@@ -145,16 +185,29 @@ export default function ReservationsIndex({
             return;
         }
 
+        setPendingStatusUpdate({ id, statut: newStatut });
+        setIsStatusConfirmModalOpen(true);
+    }
+
+    const confirmStatusChange = () => {
+        if (!pendingStatusUpdate) return;
+        const { id, statut } = pendingStatusUpdate;
+
         setUpdatingId(id);
+        setIsStatusConfirmModalOpen(false);
+
         router.patch(
             `/admin/reservations/${id}/statut`,
-            { statut: newStatut },
+            { statut },
             {
                 preserveState: true,
-                onFinish: () => setUpdatingId(null),
+                onFinish: () => {
+                    setUpdatingId(null);
+                    setPendingStatusUpdate(null);
+                },
             },
         );
-    }
+    };
 
     const confirmCancellation = () => {
         if (!currentCancelId) return;
@@ -175,22 +228,76 @@ export default function ReservationsIndex({
         );
     };
 
+    const confirmPaymentLink = () => {
+        if (!currentPaymentId || !tempPaymentLink.trim()) return;
+
+        setUpdatingId(currentPaymentId);
+        setIsPaymentModalOpen(false);
+
+        router.patch(
+            `/admin/reservations/${currentPaymentId}/statut`,
+            { statut: "en_attente_paiement", payment_link: tempPaymentLink },
+            {
+                preserveState: true,
+                onFinish: () => {
+                    setUpdatingId(null);
+                    setCurrentPaymentId(null);
+                },
+            },
+        );
+    };
+
     function handleDelete(id: number, ref: string) {
-        if (
-            !confirm(
-                `Supprimer la réservation ${ref} ? Cette action est irréversible.`,
-            )
-        )
-            return;
-        setDeletingId(id);
-        router.delete(`/admin/reservations/${id}`, {
-            onFinish: () => setDeletingId(null),
-        });
+        setPendingDeleteId(id);
+        setPendingDeleteRef(ref);
+        setIsDeleteConfirmModalOpen(true);
     }
+
+    const confirmDelete = () => {
+        if (!pendingDeleteId) return;
+        setDeletingId(pendingDeleteId);
+        setIsDeleteConfirmModalOpen(false);
+
+        router.delete(`/admin/reservations/${pendingDeleteId}`, {
+            onFinish: () => {
+                setDeletingId(null);
+                setPendingDeleteId(null);
+                setPendingDeleteRef("");
+            },
+        });
+    };
+
+    const STATUT_CONFIG = {
+        en_attente: {
+            label: "En attente",
+            icon: Clock,
+            badge: "bg-amber-50 text-amber-700 border border-amber-200",
+            dot: "bg-amber-400",
+        },
+        confirme: {
+            label: "Confirmée",
+            icon: CheckCircleIcon,
+            badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+            dot: "bg-emerald-400",
+        },
+        annule: {
+            label: "Annulée",
+            icon: XCircle,
+            badge: "bg-red-50 text-red-700 border border-red-200",
+            dot: "bg-red-400",
+        },
+        en_attente_paiement: {
+            label: "En attente de paiement",
+            icon: CreditCard,
+            badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+            dot: "bg-indigo-400",
+        },
+    } as any;
 
     const statuts: { value: string; label: string }[] = [
         { value: "all", label: "Tous" },
         { value: "en_attente", label: "En attente" },
+        { value: "en_attente_paiement", label: "Paiement" },
         { value: "confirme", label: "Confirmées" },
         { value: "annule", label: "Annulées" },
     ];
@@ -211,7 +318,7 @@ export default function ReservationsIndex({
             </div>
 
             {/* ── Stats strip ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
                 {[
                     {
                         label: "Total",
@@ -224,6 +331,12 @@ export default function ReservationsIndex({
                         value: stats.en_attente,
                         color: "text-amber-700",
                         bg: "bg-amber-50",
+                    },
+                    {
+                        label: "Att. Paiement",
+                        value: stats.en_attente_paiement,
+                        color: "text-indigo-700",
+                        bg: "bg-indigo-50",
                     },
                     {
                         label: "Confirmées",
@@ -240,16 +353,16 @@ export default function ReservationsIndex({
                 ].map((s) => (
                     <div
                         key={s.label}
-                        className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] p-4 flex items-center gap-3"
+                        className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] p-4 flex flex-col sm:flex-row items-center gap-3"
                     >
                         <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.bg}`}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${s.bg}`}
                         >
                             <span className={`text-lg font-bold ${s.color}`}>
                                 {s.value}
                             </span>
                         </div>
-                        <span className="text-sm font-medium text-slate-600">
+                        <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-tight">
                             {s.label}
                         </span>
                     </div>
@@ -437,7 +550,6 @@ export default function ReservationsIndex({
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
                                                 >
                                                     <Eye className="w-3.5 h-3.5" />
-                                                    Détails
                                                 </Link>
                                                 <button
                                                     disabled={
@@ -452,9 +564,6 @@ export default function ReservationsIndex({
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
-                                                    {deletingId === r.id
-                                                        ? "..."
-                                                        : "Suppr."}
                                                 </button>
                                             </div>
                                         </td>
@@ -598,10 +707,192 @@ export default function ReservationsIndex({
                             </button>
                             <button
                                 onClick={confirmCancellation}
-                                className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                disabled={!cancelMessage.trim()}
+                                className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                             >
                                 <CheckCircleIcon className="w-4 h-4" />
                                 Confirmer l'annulation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Payment Link Modal ── */}
+            {isPaymentModalOpen && (
+                <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+                        {/* Header */}
+                        <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                    <CreditCard className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                                        Lien de paiement
+                                    </h3>
+                                    <p className="text-sm text-slate-500 font-medium">
+                                        Requis pour ce statut
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsPaymentModalOpen(false)}
+                                className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 focus:outline-none"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-8">
+                            <div className="space-y-4">
+                                <label className="block text-sm font-bold text-slate-700 tracking-tight">
+                                    URL de paiement sécurisée :
+                                </label>
+                                <div className="relative">
+                                    <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="url"
+                                        value={tempPaymentLink}
+                                        onChange={(e) => setTempPaymentLink(e.target.value)}
+                                        placeholder="https://payzone.ma/..."
+                                        className="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 transition-all font-mono"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex gap-2.5 items-start bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
+                                    <Info className="w-4 h-4 text-indigo-600 mt-1 flex-shrink-0" />
+                                    <p className="text-[11px] text-indigo-700 leading-relaxed font-medium">
+                                        Le client recevra ce lien par e-mail avec les instructions de règlement.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+                            <button
+                                onClick={() => setIsPaymentModalOpen(false)}
+                                className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={confirmPaymentLink}
+                                disabled={!tempPaymentLink.trim()}
+                                className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <CheckCircleIcon className="w-4 h-4" />
+                                Affecter & Envoyer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Status Change Confirmation Modal ── */}
+            {isStatusConfirmModalOpen && pendingStatusUpdate && (
+                <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+                        <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                    <RefreshCw className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 leading-tight">Confirmation</h3>
+                                    <p className="text-sm text-slate-500 font-medium">Changement de statut requis</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsStatusConfirmModalOpen(false)} className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-8">
+                            <div className="flex flex-col items-center gap-8 py-4">
+                                <div className="flex items-center gap-6 w-full justify-between">
+                                    <div className="flex-1 flex flex-col items-center gap-3">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actuel</p>
+                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as any]?.badge}`}>
+                                            {STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as any]?.label}
+                                        </div>
+                                    </div>
+                                    <div className="pt-6">
+                                        <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center border border-slate-100 shadow-inner">
+                                            <RefreshCw className="w-5 h-5 text-slate-400" />
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 flex flex-col items-center gap-3">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nouveau</p>
+                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[pendingStatusUpdate.statut as any]?.badge}`}>
+                                            {STATUT_CONFIG[pendingStatusUpdate.statut as any]?.label}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="w-full space-y-4">
+                                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex gap-4">
+                                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm shadow-amber-200/50">
+                                            <Mail className="w-5 h-5 text-amber-600" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-bold text-amber-900">Notification Automatique</p>
+                                            <p className="text-xs text-amber-700/80 font-medium leading-relaxed">
+                                                Le client recevra un e-mail avec les nouveaux détails.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+                            <button onClick={() => setIsStatusConfirmModalOpen(false)} className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">Annuler</button>
+                            <button disabled={countdown > 0} onClick={confirmStatusChange} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <CheckCircleIcon className="w-4 h-4" /> {countdown > 0 ? `Confirmer (${countdown}s)` : "Confirmer"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Reservation Delete Confirmation Modal ── */}
+            {isDeleteConfirmModalOpen && (
+                <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+                        <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                                    <Trash2 className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 leading-tight">Supprimer</h3>
+                                    <p className="text-sm text-slate-500 font-medium">Cette réservation</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsDeleteConfirmModalOpen(false)} className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 focus:outline-none">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-8 text-center">
+                            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                <Trash2 className="w-10 h-10 text-red-500" />
+                            </div>
+                            <h4 className="text-lg font-bold text-slate-900 mb-2">Attention !</h4>
+                            <p className="text-slate-600 text-sm font-medium leading-relaxed px-4">
+                                Voulez-vous supprimer définitivement la réservation <span className="font-bold text-red-600">{pendingDeleteRef}</span> ?
+                                Cette action est irréversible.
+                            </p>
+                        </div>
+
+                        <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+                            <button onClick={() => setIsDeleteConfirmModalOpen(false)} className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">Annuler</button>
+                            <button disabled={countdown > 0} onClick={confirmDelete} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <Trash2 className="w-4 h-4" /> {countdown > 0 ? `Confirmer (${countdown}s)` : "Confirmer"}
                             </button>
                         </div>
                     </div>

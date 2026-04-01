@@ -18,9 +18,10 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
      * Status labels for the email body.
      */
     public static array $statusLabels = [
-        'en_attente' => 'En attente',
-        'confirme'   => 'Confirmée',
-        'annule'     => 'Annulée',
+        'en_attente'          => 'En attente',
+        'en_attente_paiement' => 'En attente de paiement',
+        'confirme'            => 'Confirmée',
+        'annule'              => 'Annulée',
     ];
 
     /**

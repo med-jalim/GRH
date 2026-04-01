@@ -29,10 +29,11 @@ class ReservationController extends Controller
 
         // Stats counts (always across the full unfiltered-by-status scope)
         $stats = [
-            'total'       => (clone $baseQuery)->count(),
-            'en_attente'  => (clone $baseQuery)->where('statut', 'en_attente')->count(),
-            'confirme'    => (clone $baseQuery)->where('statut', 'confirme')->count(),
-            'annule'      => (clone $baseQuery)->where('statut', 'annule')->count(),
+            'total'               => (clone $baseQuery)->count(),
+            'en_attente'          => (clone $baseQuery)->where('statut', 'en_attente')->count(),
+            'en_attente_paiement' => (clone $baseQuery)->where('statut', 'en_attente_paiement')->count(),
+            'confirme'            => (clone $baseQuery)->where('statut', 'confirme')->count(),
+            'annule'              => (clone $baseQuery)->where('statut', 'annule')->count(),
         ];
 
         if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
@@ -196,8 +197,9 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut'  => 'required|string|in:en_attente,confirme,annule',
-            'message' => 'nullable|string',
+            'statut'       => 'required|string|in:en_attente,en_attente_paiement,confirme,annule',
+            'message'      => 'required_if:statut,annule|nullable|string',
+            'payment_link' => 'required_if:statut,en_attente_paiement|nullable|string|url',
         ]);
 
 
@@ -205,7 +207,12 @@ class ReservationController extends Controller
         $previousStatut = $reservation->statut;
         $newStatut      = $validated['statut'];
 
-        $reservation->update(['statut' => $newStatut]);
+        $updateData = ['statut' => $newStatut];
+        if (isset($validated['payment_link'])) {
+            $updateData['payment_link'] = $validated['payment_link'];
+        }
+
+        $reservation->update($updateData);
 
         // Send email notification only if status actually changed
         if ($previousStatut !== $newStatut) {
