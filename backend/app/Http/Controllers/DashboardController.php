@@ -14,10 +14,10 @@ class DashboardController extends Controller
     public function index()
     {
         // 1. إحصائيات علوية (Top Level Stats)
-        $bookedRooms = Reservation::where('statut', 'confirmée')->count();
-        $cancelledRooms = Reservation::where('statut', 'annulée')->count();
+        $bookedRooms = Reservation::where('statut', 'confirme')->count();
+        $cancelledRooms = Reservation::where('statut', 'annule')->count();
         
-        $totalRevenue = Reservation::where('statut', 'confirmée')->sum('prix_total');
+        $totalRevenue = Reservation::where('statut', 'confirme')->sum('prix_total');
         $pendingReservations = Reservation::where('statut', 'en_attente')->count();
 
         // 2. نظرة عامة شهرية (Campaign Overview) - إحصائية الحجوزات 
@@ -30,7 +30,7 @@ class DashboardController extends Controller
         $monthlyData = Reservation::select(
                 DB::raw('MONTH(created_at) as month'),
                 DB::raw('COUNT(id) as total_booked'),
-                DB::raw('SUM(CASE WHEN statut = "confirmée" THEN 1 ELSE 0 END) as total_confirmed')
+                DB::raw('SUM(CASE WHEN statut = "confirme" THEN 1 ELSE 0 END) as total_confirmed')
             )
             ->where('created_at', '>=', Carbon::now()->subMonths(6))
             ->groupBy('month')
