@@ -258,6 +258,10 @@ export default function ReservationShow({ reservation }: Props) {
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // New states for status-change payment link
+  const [isPaymentLinkModalOpen, setIsPaymentLinkModalOpen] = useState(false);
+  const [tempPaymentLink, setTempPaymentLink] = useState(reservation.payment_link || "");
+
   const [activeTab, setActiveTab] = useState<"general" | "payment">("general");
   const { errors } = usePage().props;
 
@@ -291,6 +295,12 @@ export default function ReservationShow({ reservation }: Props) {
     if (nextStatut === "annule") {
       setCancelMessage("");
       setIsCancelModalOpen(true);
+      return;
+    }
+
+    if (nextStatut === "en_attente_paiement") {
+      setTempPaymentLink(reservation.payment_link || "");
+      setIsPaymentLinkModalOpen(true);
       return;
     }
 
@@ -332,6 +342,23 @@ export default function ReservationShow({ reservation }: Props) {
     router.patch(
       `/admin/reservations/${reservation.id}/statut`,
       { statut: "annule", message: cancelMessage },
+      {
+        onFinish: () => {
+          setUpdating(false);
+        },
+      }
+    );
+  };
+
+  const confirmPaymentLinkChange = () => {
+    if (!tempPaymentLink.trim()) return;
+
+    setUpdating(true);
+    setIsPaymentLinkModalOpen(false);
+
+    router.patch(
+      `/admin/reservations/${reservation.id}/statut`,
+      { statut: "en_attente_paiement", payment_link: tempPaymentLink },
       {
         onFinish: () => {
           setUpdating(false);
@@ -656,6 +683,7 @@ export default function ReservationShow({ reservation }: Props) {
             </div>
 
             <div className="flex flex-col gap-6">
+              {/* reservation.statut === "en_attente" || reservation.statut === "en_attente_paiement"  */}
               {(reservation.statut === "en_attente" || reservation.statut === "en_attente_paiement") && (
                 <Section title="Lien de paiement" icon={CreditCard}>
                   <div className="flex flex-col gap-3">
@@ -1065,6 +1093,81 @@ export default function ReservationShow({ reservation }: Props) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── Payment Link Modal ── */}
+      {isPaymentLinkModalOpen && (
+        <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+            {/* Header */}
+            <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                    Lien de paiement
+                  </h3>
+                  <p className="text-sm text-slate-500 font-medium">
+                    Requis pour ce statut
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPaymentLinkModalOpen(false)}
+                className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 focus:outline-none"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-8">
+              <div className="space-y-4">
+                <label className="block text-sm font-bold text-slate-700 tracking-tight">
+                  URL de paiement sécurisée :
+                </label>
+                <div className="relative">
+                  <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="url"
+                    value={tempPaymentLink}
+                    onChange={(e) => setTempPaymentLink(e.target.value)}
+                    placeholder="https://payzone.ma/..."
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400/50 transition-all font-mono"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-2.5 items-start bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
+                  <svg className="w-4 h-4 text-indigo-600 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-[11px] text-indigo-700 leading-relaxed font-medium">
+                    Le client recevra ce lien par e-mail avec les instructions de règlement.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+              <button
+                onClick={() => setIsPaymentLinkModalOpen(false)}
+                className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmPaymentLinkChange}
+                disabled={!tempPaymentLink.trim()}
+                className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle className="w-4 h-4" />
+                Affecter & Envoyer
+              </button>
+            </div>
           </div>
         </div>
       )}
