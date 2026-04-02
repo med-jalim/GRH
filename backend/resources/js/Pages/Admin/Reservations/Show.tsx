@@ -1,11 +1,6 @@
 import { AdminLayout } from "@/Layouts/AdminLayout";
 import { Link, router, useForm } from "@inertiajs/react";
-import {
-    ArrowLeft,
-    CreditCard,
-    FileText,
-    Trash2,
-} from "lucide-react";
+import { ArrowLeft, CreditCard, FileText, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
 
@@ -50,11 +45,22 @@ export interface Reservation {
     nb_personnes: number;
     prix_total: number;
     remarques_speciales: string | null;
-    statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule";
+    statut:
+        | "en_attente"
+        | "en_verification"
+        | "valide"
+        | "en_attente_paiement"
+        | "paye_partiellement"
+        | "confirme"
+        | "annule";
     lien_paiement: string | null;
-    preuve_paiement: string[] | null; 
+    preuve_paiement: string[] | null;
     montant_paye: number | null;
-    statut_paiement: "non_paye" | "en_attente_verification" | "paye";
+    statut_paiement:
+        | "non_paye"
+        | "en_attente_verification"
+        | "paye_partiellement"
+        | "paye";
     created_at: string;
     updated_at: string;
     hotel: Hotel | null;
@@ -95,13 +101,18 @@ function nightsBetween(d1: string, d2: string) {
 // ── Main Page Component ─────────────────────────────────────────────────────
 
 export default function ReservationShow({ reservation }: Props) {
-    const [activeTab, setActiveTab] = useState<"details" | "payments">("details");
+    const [activeTab, setActiveTab] = useState<"details" | "payments">(
+        "details",
+    );
     const [updating, setUpdating] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const nights = nightsBetween(reservation.date_arrivee, reservation.date_depart);
+    const nights = nightsBetween(
+        reservation.date_arrivee,
+        reservation.date_depart,
+    );
 
     const sendLinkForm = useForm({
         lien_paiement: reservation.lien_paiement ?? "",
@@ -120,30 +131,44 @@ export default function ReservationShow({ reservation }: Props) {
     function handleStatusChange(newStatut: string) {
         if (newStatut === reservation.statut) return;
         setUpdating(true);
-        router.patch(`/admin/reservations/${reservation.id}/statut`, { statut: newStatut }, {
-            preserveState: true,
-            onFinish: () => setUpdating(false),
-        });
+        router.patch(
+            `/admin/reservations/${reservation.id}/statut`,
+            { statut: newStatut },
+            {
+                preserveState: true,
+                onFinish: () => setUpdating(false),
+            },
+        );
     }
 
     function handleSendLink(e: React.FormEvent) {
         e.preventDefault();
-        sendLinkForm.post(`/admin/reservations/${reservation.id}/payment-link`, {
-            preserveScroll: true,
-        });
+        sendLinkForm.post(
+            `/admin/reservations/${reservation.id}/payment-link`,
+            {
+                preserveScroll: true,
+            },
+        );
     }
 
     function handleAddPayment(e: React.FormEvent) {
         e.preventDefault();
-        if (!addPaymentForm.data.montant || !addPaymentForm.data.preuve_paiement) return;
-        addPaymentForm.post(`/admin/reservations/${reservation.id}/add-payment`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                addPaymentForm.reset();
-                setPreviewUrl(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
+        if (
+            !addPaymentForm.data.montant ||
+            !addPaymentForm.data.preuve_paiement
+        )
+            return;
+        addPaymentForm.post(
+            `/admin/reservations/${reservation.id}/add-payment`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    addPaymentForm.reset();
+                    setPreviewUrl(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                },
             },
-        });
+        );
     }
 
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -157,7 +182,12 @@ export default function ReservationShow({ reservation }: Props) {
     }
 
     function handleDelete() {
-        if (!confirm(`Supprimer définitivement la réservation ${reservation.code_reference} ?`)) return;
+        if (
+            !confirm(
+                `Supprimer définitivement la réservation ${reservation.code_reference} ?`,
+            )
+        )
+            return;
         setDeleting(true);
         router.delete(`/admin/reservations/${reservation.id}`);
     }
@@ -185,7 +215,14 @@ export default function ReservationShow({ reservation }: Props) {
                             </span>
                         </div>
                         <p className="text-slate-500 text-sm">
-                            Créée le {new Date(reservation.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+                            Créée le{" "}
+                            {new Date(
+                                reservation.created_at,
+                            ).toLocaleDateString("fr-FR", {
+                                day: "2-digit",
+                                month: "long",
+                                year: "numeric",
+                            })}
                         </p>
                     </div>
 
@@ -222,12 +259,24 @@ export default function ReservationShow({ reservation }: Props) {
                     Détails du séjour
                 </button>
                 <button
+                    disabled={
+                        reservation.statut === "en_attente" ||
+                        reservation.statut === "en_verification" ||
+                        reservation.statut === "annule"
+                    }
                     onClick={() => setActiveTab("payments")}
                     className={`flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${
                         activeTab === "payments"
                             ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
                             : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                    }`}
+                    }
+                        ${
+                            reservation.statut === "en_attente" ||
+                            reservation.statut === "en_verification" ||
+                            reservation.statut === "annule"
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                        }`}
                 >
                     <CreditCard className="w-4 h-4" />
                     Paiements & Suivi
@@ -240,14 +289,14 @@ export default function ReservationShow({ reservation }: Props) {
             {/* Tab Content */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {activeTab === "details" ? (
-                    <DetailsTab 
+                    <DetailsTab
                         reservation={reservation}
                         nights={nights}
                         formatDate={formatDate}
                         formatPrice={formatPrice}
                     />
                 ) : (
-                    <PaymentsTab 
+                    <PaymentsTab
                         reservation={reservation}
                         formatPrice={formatPrice}
                         sendLinkForm={sendLinkForm}

@@ -8,6 +8,38 @@
             'badge_text'  => '#b45309',
             'icon'        => '⏳',
         ],
+        'en_verification' => [
+            'bg'          => '#eff6ff',
+            'border'      => '#93c5fd',
+            'text'        => '#1e40af',
+            'badge_bg'    => '#dbeafe',
+            'badge_text'  => '#1d4ed8',
+            'icon'        => '🔍',
+        ],
+        'valide' => [
+            'bg'          => '#f5f3ff',
+            'border'      => '#c4b5fd',
+            'text'        => '#4c1d95',
+            'badge_bg'    => '#ede9fe',
+            'badge_text'  => '#6d28d9',
+            'icon'        => '🛡️',
+        ],
+        'en_attente_paiement' => [
+            'bg'          => '#eef2ff',
+            'border'      => '#c7d2fe',
+            'text'        => '#3730a3',
+            'badge_bg'    => '#e0e7ff',
+            'badge_text'  => '#4338ca',
+            'icon'        => '💳',
+        ],
+        'paye_partiellement' => [
+            'bg'          => '#ecfeff',
+            'border'      => '#67e8f9',
+            'text'        => '#164e63',
+            'badge_bg'    => '#cffafe',
+            'badge_text'  => '#0e7490',
+            'icon'        => '📊',
+        ],
         'confirme' => [
             'bg'          => '#f0fdf4',
             'border'      => '#86efac',
@@ -23,14 +55,6 @@
             'badge_bg'    => '#ffe4e6',
             'badge_text'  => '#be123c',
             'icon'        => '❌',
-        ],
-        'en_attente_paiement' => [
-            'bg'          => '#eef2ff',
-            'border'      => '#c7d2fe',
-            'text'        => '#3730a3',
-            'badge_bg'    => '#e0e7ff',
-            'badge_text'  => '#4338ca',
-            'icon'        => '💳',
         ],
     ];
     $c = $colors[(string)($newStatut ?? 'en_attente')] ?? $colors['en_attente'];
@@ -145,13 +169,59 @@
                     Votre réservation a été <strong>confirmée</strong>. Nous vous attendons avec impatience !
                 @elseif($newStatut === 'annule')
                     Votre réservation a été <strong>annulée</strong>. N'hésitez pas à nous contacter pour plus d'information.
+                @elseif($newStatut === 'en_verification')
+                    Votre réservation est en <strong>cours de vérification</strong>. Veuillez consulter le devis détaillé ci-dessous.
+                @elseif($newStatut === 'valide')
+                    Votre réservation a été <strong>validée</strong> par notre équipe. Elle est maintenant prête pour le règlement.
                 @elseif($newStatut === 'en_attente_paiement')
                     Nous avons bien reçu votre demande. Veuillez procéder au <strong>paiement</strong> via le lien ci-dessous pour confirmer définitivement votre séjour.
+                @elseif($newStatut === 'paye_partiellement')
+                    Nous avons bien reçu votre <strong>premier virement</strong>. Votre réservation est maintenant partiellement payée.
                 @else
                     Votre réservation est <strong>en cours de traitement</strong>. Nous vous tiendrons informé(e) de toute évolution.
                 @endif
             </div>
         </div>
+
+        @if($newStatut === 'en_verification' && $reservation->details->count() > 0)
+        <div style="margin-bottom: 32px;">
+            <p class="details-title">Détail des prestations (Devis)</p>
+            <table style="width:100%; border-collapse:collapse; font-size:12px; border: 1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+                <thead style="background:#f8fafc;">
+                    <tr>
+                        <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0; color:#64748b;">Type</th>
+                        <th style="padding:10px 12px; text-align:center; border-bottom:1px solid #e2e8f0; color:#64748b;">Qté</th>
+                        <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0; color:#64748b;">Prix Unit.</th>
+                        <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0; color:#64748b;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($reservation->details as $item)
+                    <tr>
+                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; font-weight:600; color:#1e293b;">{{ $item->type?->nom ?? 'Type inconnu' }}</td>
+                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:center; color:#475569;">{{ $item->quantite }}</td>
+                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:right; color:#475569;">{{ number_format($item->prix_unitaire, 0, ',', ' ') }} MAD</td>
+                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700; color:#0f172a;">{{ number_format($item->quantite * $item->prix_unitaire, 0, ',', ' ') }} MAD</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+                <tfoot style="background:#f8fafc;">
+                    <tr>
+                        <td colspan="3" style="padding:10px 12px; text-align:right; font-weight:700; color:#64748b;">Montant Total H.T</td>
+                        <td style="padding:10px 12px; text-align:right; font-weight:800; color:#1e293b; font-size:14px;">{{ number_format($reservation->prix_total, 0, ',', ' ') }} MAD</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="{{ $verify_url }}" 
+                   style="display:inline-block; background: #2563eb; color: #ffffff; font-size:13px; font-weight:700; padding:10px 24px; border-radius:10px; text-decoration:none; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);">
+                    🔍 Vérifier et Confirmer mes détails →
+                </a>
+            </div>
+            <div class="divider"></div>
+        </div>
+        @endif
 
         {{-- Greeting --}}
         <p class="greeting">Bonjour {{ $reservation->nom_contact }},</p>

@@ -33,8 +33,8 @@ interface Reservation {
     date_depart: string;
     nb_personnes: number;
     prix_total: number;
-    statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule";
-    statut_paiement: "non_paye" | "en_attente_verification" | "paye";
+    statut: "en_attente" | "en_verification" | "valide" | "en_attente_paiement" | "paye_partiellement" | "confirme" | "annule";
+    statut_paiement: "non_paye" | "en_attente_verification" | "paye_partiellement" | "paye";
     created_at: string;
     hotel: Hotel | null;
 }
@@ -64,7 +64,10 @@ interface Filters {
 interface Stats {
     total: number;
     en_attente: number;
+    en_verification: number;
+    valide: number;
     en_attente_paiement: number;
+    paye_partiellement: number;
     confirme: number;
     annule: number;
 }
@@ -162,7 +165,10 @@ export default function ReservationsIndex({
     const statuts: { value: string; label: string }[] = [
         { value: "all", label: "Tous" },
         { value: "en_attente", label: "En attente" },
+        { value: "en_verification", label: "Vérification" },
+        { value: "valide", label: "Validées" },
         { value: "en_attente_paiement", label: "Attente paiement" },
+        { value: "paye_partiellement", label: "Partielles" },
         { value: "confirme", label: "Confirmées" },
         { value: "annule", label: "Annulées" },
     ];
@@ -198,10 +204,28 @@ export default function ReservationsIndex({
                         bg: "bg-amber-50",
                     },
                     {
-                        label: "Paiement en attente",
-                        value: stats.en_attente_paiement,
+                        label: "Vérification",
+                        value: stats.en_verification,
+                        color: "text-blue-700",
+                        bg: "bg-blue-50",
+                    },
+                    {
+                        label: "Validées",
+                        value: stats.valide,
                         color: "text-indigo-700",
                         bg: "bg-indigo-50",
+                    },
+                    {
+                        label: "Paiement",
+                        value: stats.en_attente_paiement,
+                        color: "text-violet-700",
+                        bg: "bg-violet-50",
+                    },
+                    {
+                        label: "Partielles",
+                        value: stats.paye_partiellement,
+                        color: "text-cyan-700",
+                        bg: "bg-cyan-50",
                     },
                     {
                         label: "Confirmées",

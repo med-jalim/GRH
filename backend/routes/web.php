@@ -13,6 +13,15 @@ Route::get('/', function () {
 });
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
+Route::get('/booking/verify/{reference}', [ReservationController::class, 'publicVerify'])
+    ->name('booking.verify')
+    ->middleware('signed');
+Route::post('/booking/verify/{reference}/confirm', [ReservationController::class, 'publicConfirm'])
+    ->name('booking.confirm')
+    ->middleware('signed');
+Route::put('/booking/verify/{reference}/update', [ReservationController::class, 'publicUpdate'])
+    ->name('booking.update')
+    ->middleware('signed');
 
 // ----- Espace Administrateur (Back-Office) -----
 Route::prefix('admin')->name('admin.')->group(function () {

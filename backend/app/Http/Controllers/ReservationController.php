@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -32,7 +33,10 @@ class ReservationController extends Controller
         $stats = [
             'total'               => (clone $baseQuery)->count(),
             'en_attente'          => (clone $baseQuery)->where('statut', 'en_attente')->count(),
+            'en_verification'     => (clone $baseQuery)->where('statut', 'en_verification')->count(),
+            'valide'              => (clone $baseQuery)->where('statut', 'valide')->count(),
             'en_attente_paiement' => (clone $baseQuery)->where('statut', 'en_attente_paiement')->count(),
+            'paye_partiellement'  => (clone $baseQuery)->where('statut', 'paye_partiellement')->count(),
             'confirme'            => (clone $baseQuery)->where('statut', 'confirme')->count(),
             'annule'              => (clone $baseQuery)->where('statut', 'annule')->count(),
         ];
@@ -74,7 +78,7 @@ class ReservationController extends Controller
             'prix_total'          => 'required|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
             'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
-
+                                                                                                                                                                                        
             // Line items
             'details'                  => 'nullable|array',
             'details.*.id_type'        => 'required_with:details|integer|exists:types,id',
@@ -85,20 +89,9 @@ class ReservationController extends Controller
         // Auto-generate a unique reference code
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
-
-        // Calculate nights
-        $checkIn = new \DateTime($validated['date_arrivee']);
-        $checkOut = new \DateTime($validated['date_depart']);
-        $nights = $checkOut->diff($checkIn)->days;
-        $nights = max(1, $nights);
-
+        $nights = $this->calculateNights($validated['date_arrivee'], $validated['date_depart']);
         // Calculate total price from details (verifying against nights)
-        $prixTotalCalculated = 0;
-        if (! empty($validated['details'])) {
-            foreach ($validated['details'] as $detail) {
-                $prixTotalCalculated += $detail['quantite'] * $detail['prix_unitaire'] * $nights;
-            }
-        }
+        $prixTotalCalculated = $this->calculateTotalPrice($validated['details'], $nights);
 
         // We use the calculated price to ensure integrity, 
         // but we could also validate that $validated['prix_total'] matches $prixTotalCalculated
@@ -178,7 +171,18 @@ class ReservationController extends Controller
             'prix_total'          => 'sometimes|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
             'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
+            'lien_paiement'       => 'nullable|string|max:2000',
         ]);
+
+        $newStatut = $validated['statut'] ?? $reservation->statut;
+        $newLien   = $validated['lien_paiement'] ?? $reservation->lien_paiement;
+
+        if ($newStatut === 'en_attente_paiement' && empty($newLien)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Veuillez d\'abord définir un lien de paiement pour cette réservation.',
+            ], 422);
+        }
 
         $reservation->update($validated);
         $reservation->load(['hotel', 'details.type']);
@@ -208,13 +212,22 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'statut' => 'required|string|in:en_attente,en_attente_paiement,confirme,annule',
+            'statut' => 'required|string|in:en_attente,en_verification,valide,en_attente_paiement,paye_partiellement,confirme,annule',
         ]);
 
 
         // Capture old status before update
         $previousStatut = $reservation->statut;
         $newStatut      = $validated['statut'];
+
+        // Strict Enforcement: Cannot move to payment without a link
+        if ($newStatut === 'en_attente_paiement' && empty($reservation->lien_paiement)) {
+            $msg = 'Veuillez d\'abord définir un lien de paiement pour cette réservation.';
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
 
         $reservation->update($validated);
         $reservation->refresh();
@@ -361,13 +374,17 @@ class ReservationController extends Controller
         $proofs[] = $path;
 
         // 5. Determine payment status
-        $statutPaiement = 'en_attente_verification';
         $previousStatut = $reservation->statut;
         $statut = $reservation->statut;
+        $statutPaiement = 'en_attente_verification'; // Default for the new payment being verified
 
         if (abs($totalPaid - $reservation->prix_total) < 0.01) {
             $statutPaiement = 'paye';
             $statut         = 'confirme';
+        } elseif ($totalPaid > 0) {
+            $statutPaiement = 'paye_partiellement';
+            // We also update the main status to partially paid to reflect progress
+            $statut         = 'paye_partiellement';
         }
 
         $reservation->update([
@@ -391,5 +408,127 @@ class ReservationController extends Controller
         }
 
         return redirect()->back()->with('success', 'Paiement de ' . $newAmount . ' MAD enregistré avec succès.');
+    }
+
+    /**
+     * Public: Verify reservation via encrypted token.
+     */
+    public function publicVerify(string $reference): InertiaResponse|RedirectResponse
+    {
+        $reservation = $this->getReservationFromReference($reference);
+
+        if (!$reservation) {
+            return redirect()->route('booking')->with('error', 'Réservation introuvable ou lien expiré.');
+        }
+
+        // Load necessary relations including available tarifs/types for modification
+        $reservation->load(['hotel.tarifs.type', 'details.type']);
+
+        return Inertia::render('Booking/Verify', [
+            'reservation' => $reservation,
+            'token'       => $reference,
+            'confirm_url' => \Illuminate\Support\Facades\URL::signedRoute('booking.confirm', ['reference' => $reference]),
+            'update_url'  => \Illuminate\Support\Facades\URL::signedRoute('booking.update',  ['reference' => $reference]),
+        ]);
+    }
+
+    /**
+     * Public: Client confirms the reservation as is.
+     */
+    public function publicConfirm(string $reference): RedirectResponse
+    {
+        $reservation = $this->getReservationFromReference($reference);
+
+        if (!$reservation) {
+            return redirect()->route('booking')->with('error', 'Action impossible.');
+        }
+
+        if ($reservation->statut !== 'en_verification') {
+            return redirect()->back()->with('error', 'Cette réservation ne peut plus être confirmée.');
+        }
+
+        $reservation->update(['statut' => 'valide']);
+
+        return redirect()->back()->with('success', 'Votre réservation a été validée avec succès. Nous vous contacterons bientôt pour le paiement.');
+    }
+
+    /**
+     * Public: Client modifies the reservation.
+     */
+    public function publicUpdate(Request $request, string $reference): JsonResponse|RedirectResponse
+    {
+        $reservation = $this->getReservationFromReference($reference);
+
+        if (!$reservation) {
+            return response()->json(['success' => false, 'message' => 'Réservation introuvable.'], 404);
+        }
+
+        $validated = $request->validate([
+            'date_arrivee' => 'required|date',
+            'date_depart'  => 'required|date|after:date_arrivee',
+            'nb_personnes' => 'required|integer|min:1',
+            'details'      => 'required|array|min:1',
+            'details.*.id_type'       => 'required|integer|exists:types,id',
+            'details.*.quantite'      => 'required|integer|min:1',
+            'details.*.prix_unitaire' => 'required|numeric|min:0',
+        ]);
+
+        // Calculate nights
+        $nights = $this->calculateNights($validated['date_arrivee'], $validated['date_depart']);
+
+        // Recalculate price
+        $prixTotalCalculated = $this->calculateTotalPrice($validated['details'], $nights);
+
+        // Update reservation
+        $reservation->update([
+            'date_arrivee' => $validated['date_arrivee'],
+            'date_depart'  => $validated['date_depart'],
+            'nb_personnes' => $validated['nb_personnes'],
+            'prix_total'   => $prixTotalCalculated,
+            'statut'       => 'en_attente', // Reset cycle
+        ]);
+
+        // Sync details
+        $reservation->details()->delete();
+        foreach ($validated['details'] as $detail) {
+            $detail['id_reservation'] = $reservation->id;
+            ItemReservation::create($detail);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Modifications enregistrées. Votre réservation est repassée en cours de traitement par l\'administrateur.',
+            'redirect' => route('booking.verify', ['reference' => $reference])
+        ]);
+    }
+
+    /**
+     * Helper to decrypt token and find reservation.
+     */
+    private function getReservationFromReference(string $reference): ?Reservation
+    {
+        return Reservation::where('code_reference', $reference)->first();
+    }
+
+    /**
+     * Helper to calculate total price.
+     */
+    private function calculateTotalPrice(array $details, int $nights): float
+    {
+        $total = 0;
+        foreach ($details as $detail) {
+            $total += $detail['quantite'] * $detail['prix_unitaire'] * $nights;
+        }
+        return (float) $total;
+    }
+
+    /**
+     * Helper to calculate nights.
+     */
+    private function calculateNights(string $dateArrivee, string $dateDepart): int
+    {
+        $checkIn = new \DateTime($dateArrivee);
+        $checkOut = new \DateTime($dateDepart);
+        return max(1, $checkOut->diff($checkIn)->days);
     }
 }

@@ -20,6 +20,10 @@ const PAYMENT_STATUT_CONFIG = {
         label: "Vérif. en attente",
         badge: "bg-amber-50 text-amber-600 border-amber-200 shadow-sm shadow-amber-100/50",
     },
+    paye_partiellement: {
+        label: "Payé Partiellement",
+        badge: "bg-cyan-50 text-cyan-600 border-cyan-200 shadow-sm shadow-cyan-100/50",
+    },
     paye: {
         label: "Payé ✓",
         badge: "bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm shadow-emerald-100/50",

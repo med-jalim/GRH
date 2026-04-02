@@ -50,7 +50,7 @@ interface Reservation {
   nom_contact: string;
   date_arrivee: string;
   date_depart: string;
-  statut: "en_attente" | "confirme" | "annule";
+  statut: "en_attente" | "en_verification" | "valide" | "en_attente_paiement" | "paye_partiellement" | "confirme" | "annule";
   prix_total: number;
 }
 

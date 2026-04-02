@@ -19,7 +19,10 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
      */
     public static array $statusLabels = [
         'en_attente'          => 'En attente',
+        'en_verification'     => 'En cours de vérification (Devis)',
+        'valide'              => 'Validée',
         'en_attente_paiement' => 'En attente de paiement',
+        'paye_partiellement'  => 'Payée partiellement',
         'confirme'            => 'Confirmée',
         'annule'              => 'Annulée',
     ];
@@ -58,6 +61,9 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
                 'statusLabel'    => self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut,
                 'prevLabel'      => self::$statusLabels[$this->previousStatut] ?? $this->previousStatut,
                 'lien_paiement'  => $this->reservation->lien_paiement,
+                'verify_url'     => \Illuminate\Support\Facades\URL::signedRoute('booking.verify', [
+                    'reference' => $this->reservation->code_reference
+                ]),
             ],
         );
     }
