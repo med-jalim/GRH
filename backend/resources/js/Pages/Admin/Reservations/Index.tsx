@@ -13,7 +13,8 @@ import {
     CheckCircle,
     ClipboardCheck,
     UserCheck,
-    Wallet
+    Wallet,
+    ShieldAlert
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
@@ -39,7 +40,7 @@ interface Reservation {
     date_depart: string;
     nb_personnes: number;
     prix_total: number;
-    statut: "en_attente" | "confirme" | "annule" | "en_attente_paiement";
+    statut: "en_attente" | "confirme" | "annule" | "en_attente_paiement" | "valide" | "en_validation" | "partiellement_paye";
     payment_link: string | null;
     created_at: string;
     hotel: Hotel | null;
@@ -82,6 +83,44 @@ interface Props {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+const STATUT_CONFIG = {
+    en_attente: {
+        label: "En attente",
+        icon: Clock,
+        badge: "bg-amber-100 text-amber-700 border-amber-200",
+    },
+    en_validation: {
+        label: "Requiert vérification",
+        icon: ShieldAlert,
+        badge: "bg-orange-100 text-orange-700 border-orange-200",
+    },
+    en_attente_paiement: {
+        label: "Attente paiement",
+        icon: CreditCard,
+        badge: "bg-indigo-100 text-indigo-700 border-indigo-200",
+    },
+    partiellement_paye: {
+        label: "Partiellement Payée",
+        icon: Wallet,
+        badge: "bg-blue-100 text-blue-700 border-blue-200",
+    },
+    confirme: {
+        label: "Confirmée",
+        icon: CheckCircle,
+        badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    },
+    valide: {
+        label: "Validée",
+        icon: UserCheck,
+        badge: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    },
+    annule: {
+        label: "Annulée",
+        icon: XCircle,
+        badge: "bg-red-100 text-red-700 border-red-200",
+    },
+};
 
 
 function formatDate(dateStr: string) {
@@ -309,33 +348,6 @@ export default function ReservationsIndex({
       },
     } as const;
 
-
-    // const STATUT_CONFIG = {
-    //     en_attente: {
-    //         label: "En attente",
-    //         icon: Clock,
-    //         badge: "bg-amber-50 text-amber-700 border border-amber-200",
-    //         dot: "bg-amber-400",
-    //     },
-    //     confirme: {
-    //         label: "Confirmée",
-    //         icon: CheckCircleIcon,
-    //         badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-    //         dot: "bg-emerald-400",
-    //     },
-    //     annule: {
-    //         label: "Annulée",
-    //         icon: XCircle,
-    //         badge: "bg-red-50 text-red-700 border border-red-200",
-    //         dot: "bg-red-400",
-    //     },
-    //     en_attente_paiement: {
-    //         label: "En attente de paiement",
-    //         icon: CreditCard,
-    //         badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
-    //         dot: "bg-indigo-400",
-    //     },
-    // } as any;
 
     const statuts: { value: string; label: string }[] = [
         { value: "all", label: "Tous" },
@@ -573,21 +585,38 @@ export default function ReservationsIndex({
 
                                         {/* Statut */}
                                         <td className="px-5 py-4">
-                                            <StatusSelect
-                                                value={r.statut}
-                                                loading={updatingId === r.id}
-                                                onChange={(newStatut) =>
-                                                    handleStatusChange(
-                                                        r.id,
-                                                        newStatut,
-                                                    )
-                                                }
-                                            />
+                                            <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shadow-sm ${STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.badge || 'bg-slate-50 text-slate-700'}`}>
+                                                {(() => {
+                                                    const Icon = STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.icon || Clock;
+                                                    return <Icon className="w-3.5 h-3.5" />;
+                                                })()}
+                                                <span className="text-xs font-bold tracking-wide">
+                                                    {STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.label || r.statut}
+                                                </span>
+                                            </div>
                                         </td>
 
                                         {/* Actions */}
                                         <td className="px-5 py-4">
                                             <div className="flex items-center justify-end gap-2">
+                                                {r.statut === 'en_attente' && (
+                                                    <button onClick={() => handleStatusChange(r.id, 'en_validation')} title="Valider" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-yellow-500 hover:bg-yellow-600 transition-colors disabled:opacity-50">
+                                                        <ClipboardCheck className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Valider</span>
+                                                    </button>
+                                                )}
+
+                                                {r.statut === 'valide' && (
+                                                    <button onClick={() => handleStatusChange(r.id, 'en_attente_paiement')} title="Add paiement" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                                                        <CreditCard className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Paiement</span>
+                                                    </button>
+                                                )}
+
+                                                {r.statut !== 'annule' && (
+                                                    <button onClick={() => handleStatusChange(r.id, 'annule')} title="Annuler" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 transition-colors border border-red-200 disabled:opacity-50">
+                                                        <XCircle className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Annuler</span>
+                                                    </button>
+                                                )}
+
                                                 <Link
                                                     href={`/admin/reservations/${r.id}`}
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"

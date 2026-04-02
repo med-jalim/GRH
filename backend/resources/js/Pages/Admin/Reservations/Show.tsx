@@ -482,7 +482,7 @@ export default function ReservationShow({ reservation }: Props) {
                 </button>
             )}
 
-            {reservation.statut !== 'annule' && reservation.statut !== 'confirme' && (
+            {reservation.statut !== 'annule' && (
                 <button onClick={() => handleStatusUpdate('annule')} disabled={updating} className="flex items-center gap-2 px-4 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-sm font-bold shadow-inner border border-red-200 active:scale-95 disabled:opacity-50 transition-all">
                     <XCircle className="w-4 h-4" />
                     {updating ? "..." : "Annuler"}
@@ -690,7 +690,15 @@ export default function ReservationShow({ reservation }: Props) {
                                       {p.statut === 'valide' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Validé</span>}
                                       {p.statut === 'en_attente' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">En attente</span>}
                                       {p.statut === 'refuse' && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Refusé</span>}
-                                      <span className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleDateString()}</span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(p.created_at).toLocaleString("fr-FR", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit"
+                                        }).replace(',', ' à')}
+                                      </span>
                                   </div>
                                 </div>
                               </div>
@@ -854,7 +862,7 @@ export default function ReservationShow({ reservation }: Props) {
                       {STATUT_CONFIG[candidateStatus]?.label}
                     </div>
                   </div>
-                </div>isPaymentLinkModalOpen 
+                </div>
 
                 <div className="w-full space-y-4">
                   <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex gap-4">

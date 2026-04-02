@@ -18,7 +18,13 @@ interface Props {
 
 export default function PublicReservationPortal({ reservation, hotels }: Props) {
     const [isEditing, setIsEditing] = useState(false);
-    const [activeTab, setActiveTab] = useState<"general" | "payment">("general");
+    const [activeTab, setActiveTab] = useState<"general" | "payment">(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('tab') === 'payment') return 'payment';
+        }
+        return 'general';
+    });
 
     // Edit Form State
     const [step, setStep] = useState(1);
@@ -221,9 +227,11 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                     <div className="flex gap-2">
                                         {reservation.statut !== 'confirme' && reservation.statut !== 'annule' && (
                                             <>
-                                                <button onClick={() => { if(confirm("Confirmer la réservation ?")) router.get(`/reservation/${reservation.token}/confirm`) }} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5">
-                                                    <CheckCircle className="w-4 h-4" /> Valider
-                                                </button>
+                                                {reservation.statut === 'en_validation' && (
+                                                    <button onClick={() => { if(confirm("Confirmer la réservation ?")) router.get(`/reservation/${reservation.token}/confirm`) }} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5">
+                                                        <CheckCircle className="w-4 h-4" /> Valider
+                                                    </button>
+                                                )}
                                                 <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
                                                     Modifier
                                                 </button>

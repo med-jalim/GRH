@@ -208,6 +208,14 @@
                             </p>
                         </div>
                     @endif
+
+                    <div style="margin-top: 25px; margin-bottom: 25px; text-align: center;">
+                        <p style="font-size: 14px; color: #475569; margin-bottom: 15px; line-height: 1.5;">Si vous avez effectué un virement, ou pour consulter votre dossier, veuillez utiliser votre espace client :</p>
+                        <a href="{{ url('reservation/' . $reservation->token) }}" 
+                           style="display: inline-block; padding: 12px 24px; background: #ffffff; color: #4338ca; text-decoration: none; font-size: 14px; font-weight: 700; border-radius: 10px; border: 2px solid #4338ca; transition: all 0.2s;">
+                            📄 Joindre mon reçu
+                        </a>
+                    </div>
                 @else
                     Votre réservation est <strong>en cours de traitement</strong>. Nous vous tiendrons informé(e) de toute évolution.
                 @endif

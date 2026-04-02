@@ -223,7 +223,7 @@ class ReservationController extends Controller
                 if ($newStatut === 'en_validation') {
                     // Specific email for validation request
                     Mail::to($reservation->email)->send(new \App\Mail\ReservationValidationRequest($reservation));
-                } else {
+                } elseif ($newStatut !== 'valide' && $newStatut !== 'en_attente') {
                     // Standard notification for other statuses
                     Mail::to($reservation->email)
                         ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
