@@ -821,7 +821,7 @@ export default function ReservationShow({ reservation }: Props) {
                       {STATUT_CONFIG[candidateStatus]?.label}
                     </div>
                   </div>
-                </div>
+                </div>isPaymentLinkModalOpen 
 
                 <div className="w-full space-y-4">
                   <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 flex gap-4">
