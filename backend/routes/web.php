@@ -17,10 +17,11 @@ Route::get('/', function () {
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
 
 // ----- Public Reservation Actions (via Token) -----
+Route::get('/reservation/{token}', [ClientReservationController::class, 'show'])->name('reservation.show');
 Route::get('/reservation/{token}/confirm', [ClientReservationController::class, 'confirm'])->name('reservation.confirm');
 Route::get('/reservation/{token}/cancel', [ClientReservationController::class, 'cancel'])->name('reservation.cancel');
-Route::get('/reservation/{token}/edit', [ClientReservationController::class, 'edit'])->name('reservation.edit');
 Route::post('/reservation/{token}/update', [ClientReservationController::class, 'update'])->name('reservation.update');
+Route::post('/reservation/{token}/payments', [ClientReservationController::class, 'addPayment'])->name('reservation.addPayment');
 
 // ----- Espace Administrateur (Back-Office) -----
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -31,6 +32,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::resource('reservations', ReservationController::class);
     Route::patch('reservations/{id}/statut', [ReservationController::class, 'updateStatut'])->name('reservations.updateStatut');
     Route::post('reservations/{id}/payments', [PaymentVerificationController::class, 'store'])->name('reservations.payments.store');
+    Route::patch('payments/{id}/statut', [PaymentVerificationController::class, 'updateStatut'])->name('reservations.payments.updateStatut');
     Route::delete('payments/{id}', [PaymentVerificationController::class, 'destroy'])->name('reservations.payments.destroy');
 
     // Gestion de l'Hôtel

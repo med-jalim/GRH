@@ -97,17 +97,11 @@
 
         <div class="divider"></div>
 
-        <p style="font-weight: 700; color: #0f172a; margin-bottom: 16px; text-align: center;">Quelle action souhaitez-vous effectuer ?</p>
+        <p style="font-weight: 700; color: #0f172a; margin-bottom: 16px; text-align: center;">Cliquez ci-dessous pour accéder à votre espace de réservation :</p>
         
         <div class="actions">
-            <a href="{{ $confirmUrl }}" class="btn btn-confirm">✓ Confirmer ma réservation</a>
-            <a href="{{ $editUrl }}" class="btn btn-edit">✎ Modifier les détails</a>
-            <a href="{{ $cancelUrl }}" class="btn btn-cancel">✕ Annuler la demande</a>
+            <a href="{{ $portalUrl }}" class="btn btn-edit">🔍 Accéder à ma réservation</a>
         </div>
-
-        <p style="font-size:12px; color:#64748b; text-align: center; font-style: italic;">
-            Note : Si vous choisissez de modifier la réservation, votre demande sera de nouveau soumise à validation par nos administrateurs.
-        </p>
     </div>
     <div class="footer">
         <p>© {{ date('Y') }} GRH Hôtels. Tous droits réservés.</p>

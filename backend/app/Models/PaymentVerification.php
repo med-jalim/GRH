@@ -11,7 +11,8 @@ class PaymentVerification extends Model
     protected $fillable = [
         'id_reservation',
         'document_path',
-        'amount'
+        'amount',
+        'statut'
     ];
 
     public function reservation(): BelongsTo

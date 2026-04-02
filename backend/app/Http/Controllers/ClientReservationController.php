@@ -51,17 +51,17 @@ class ClientReservationController extends Controller
     }
 
     /**
-     * Show the edit form for the reservation via token.
+     * Show the reservation portal via token.
      */
-    public function edit($token)
+    public function show($token)
     {
-        $reservation = Reservation::with(['hotel', 'details.type'])->where('token', $token)->firstOrFail();
+        $reservation = Reservation::with(['hotel', 'details.type', 'payments'])->where('token', $token)->firstOrFail();
 
         // We fetch all hotels only to show the selected one as locked, 
         // or we just fetch the selected hotel to keep it simple.
         $hotels = Hotel::with(['chambres.type', 'tarifs.type'])->get();
 
-        return Inertia::render('PublicEditReservation', [
+        return Inertia::render('PublicReservationPortal', [
             'reservation' => $reservation,
             'hotels' => $hotels,
         ]);
@@ -109,5 +109,29 @@ class ClientReservationController extends Controller
             'message' => 'Vos modifications ont été enregistrées. Notre équipe va les examiner.',
             'reservation' => $reservation,
         ]);
+    }
+
+    /**
+     * Add a payment proof via token.
+     */
+    public function addPayment(Request $request, $token)
+    {
+        $reservation = Reservation::where('token', $token)->firstOrFail();
+
+        $request->validate([
+            'document' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'amount'   => 'required|numeric|min:0',
+        ]);
+
+        $path = $request->file('document')->store('payments', 'public');
+
+        \App\Models\PaymentVerification::create([
+            'id_reservation' => $reservation->id,
+            'document_path'  => $path,
+            'amount'         => $request->amount,
+            'statut'         => 'en_attente',
+        ]);
+
+        return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès et est en attente de vérification par notre équipe.');
     }
 }

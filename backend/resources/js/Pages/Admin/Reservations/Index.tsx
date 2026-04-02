@@ -9,7 +9,11 @@ import {
     ChevronRight,
     Building2,
     Users,
-    Clock
+    Clock,
+    CheckCircle,
+    ClipboardCheck,
+    UserCheck,
+    Wallet
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
@@ -130,20 +134,6 @@ export default function ReservationsIndex({
     const [tempPaymentLink, setTempPaymentLink] = useState("");
     const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null);
 
-    // Countdown state for modals
-    const [countdown, setCountdown] = useState(0);
-
-    useEffect(() => {
-        if (isStatusConfirmModalOpen || isDeleteConfirmModalOpen) {
-            setCountdown(5);
-            const timer = setInterval(() => {
-                setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-            }, 1000);
-            return () => clearInterval(timer);
-        } else {
-            setCountdown(0);
-        }
-    }, [isStatusConfirmModalOpen, isDeleteConfirmModalOpen]);
 
     // Filter by status (client-side quick filter on top of server filter)
     const filtered = reservations.data.filter((r) => {
@@ -268,31 +258,84 @@ export default function ReservationsIndex({
     };
 
     const STATUT_CONFIG = {
-        en_attente: {
-            label: "En attente",
-            icon: Clock,
-            badge: "bg-amber-50 text-amber-700 border border-amber-200",
-            dot: "bg-amber-400",
-        },
-        confirme: {
-            label: "Confirmée",
-            icon: CheckCircleIcon,
-            badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-            dot: "bg-emerald-400",
-        },
-        annule: {
-            label: "Annulée",
-            icon: XCircle,
-            badge: "bg-red-50 text-red-700 border border-red-200",
-            dot: "bg-red-400",
-        },
-        en_attente_paiement: {
-            label: "En attente de paiement",
-            icon: CreditCard,
-            badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
-            dot: "bg-indigo-400",
-        },
-    } as any;
+      en_attente: {
+        label: "En attente",
+        icon: Clock,
+        badge: "bg-amber-50 text-amber-700 border border-amber-200",
+        ring: "ring-amber-300",
+        dot: "bg-amber-400",
+      },
+      confirme: {
+        label: "Confirmée",
+        icon: CheckCircle,
+        badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+        ring: "ring-emerald-300",
+        dot: "bg-emerald-400",
+      },
+      annule: {
+        label: "Annulée",
+        icon: XCircle,
+        badge: "bg-red-50 text-red-700 border border-red-200",
+        ring: "ring-red-300",
+        dot: "bg-red-400",
+      },
+      en_attente_paiement: {
+        label: "En attente de paiement",
+        icon: CreditCard,
+        badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+        ring: "ring-indigo-300",
+        dot: "bg-indigo-400",
+      },
+      en_validation: {
+        label: "Vérification requise",
+        icon: ClipboardCheck,
+        badge: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+        ring: "ring-yellow-300",
+        dot: "bg-yellow-400",
+      },
+      valide: {
+        label: "Confirmée par client",
+        icon: UserCheck,
+        badge: "bg-cyan-50 text-cyan-700 border border-cyan-200",
+        ring: "ring-cyan-300",
+        dot: "bg-cyan-400",
+      },
+      partiellement_paye: {
+        label: "Partiellement payée",
+        icon: Wallet,
+        badge: "bg-blue-50 text-blue-700 border border-blue-200",
+        ring: "ring-blue-300",
+        dot: "bg-blue-400",
+      },
+    } as const;
+
+
+    // const STATUT_CONFIG = {
+    //     en_attente: {
+    //         label: "En attente",
+    //         icon: Clock,
+    //         badge: "bg-amber-50 text-amber-700 border border-amber-200",
+    //         dot: "bg-amber-400",
+    //     },
+    //     confirme: {
+    //         label: "Confirmée",
+    //         icon: CheckCircleIcon,
+    //         badge: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    //         dot: "bg-emerald-400",
+    //     },
+    //     annule: {
+    //         label: "Annulée",
+    //         icon: XCircle,
+    //         badge: "bg-red-50 text-red-700 border border-red-200",
+    //         dot: "bg-red-400",
+    //     },
+    //     en_attente_paiement: {
+    //         label: "En attente de paiement",
+    //         icon: CreditCard,
+    //         badge: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+    //         dot: "bg-indigo-400",
+    //     },
+    // } as any;
 
     const statuts: { value: string; label: string }[] = [
         { value: "all", label: "Tous" },
@@ -710,7 +753,7 @@ export default function ReservationsIndex({
                                 disabled={!cancelMessage.trim()}
                                 className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                             >
-                                <CheckCircleIcon className="w-4 h-4" />
+                                <CheckCircle className="w-4 h-4" />
                                 Confirmer l'annulation
                             </button>
                         </div>
@@ -784,7 +827,7 @@ export default function ReservationsIndex({
                                 disabled={!tempPaymentLink.trim()}
                                 className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <CheckCircleIcon className="w-4 h-4" />
+                                <CheckCircle className="w-4 h-4" />
                                 Affecter & Envoyer
                             </button>
                         </div>
@@ -816,8 +859,8 @@ export default function ReservationsIndex({
                                 <div className="flex items-center gap-6 w-full justify-between">
                                     <div className="flex-1 flex flex-col items-center gap-3">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actuel</p>
-                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as any]?.badge}`}>
-                                            {STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as any]?.label}
+                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as keyof typeof STATUT_CONFIG]?.badge}`}>
+                                            {STATUT_CONFIG[filtered.find(r => r.id === pendingStatusUpdate.id)?.statut as keyof typeof STATUT_CONFIG]?.label}
                                         </div>
                                     </div>
                                     <div className="pt-6">
@@ -827,8 +870,8 @@ export default function ReservationsIndex({
                                     </div>
                                     <div className="flex-1 flex flex-col items-center gap-3">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nouveau</p>
-                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[pendingStatusUpdate.statut as any]?.badge}`}>
-                                            {STATUT_CONFIG[pendingStatusUpdate.statut as any]?.label}
+                                        <div className={`px-4 py-3 rounded-2xl text-[10px] font-bold w-full text-center border shadow-sm ${STATUT_CONFIG[pendingStatusUpdate.statut as keyof typeof STATUT_CONFIG]?.badge}`}>
+                                            {STATUT_CONFIG[pendingStatusUpdate.statut as keyof typeof STATUT_CONFIG]?.label}
                                         </div>
                                     </div>
                                 </div>
@@ -851,8 +894,8 @@ export default function ReservationsIndex({
 
                         <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
                             <button onClick={() => setIsStatusConfirmModalOpen(false)} className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">Annuler</button>
-                            <button disabled={countdown > 0} onClick={confirmStatusChange} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <CheckCircleIcon className="w-4 h-4" /> {countdown > 0 ? `Confirmer (${countdown}s)` : "Confirmer"}
+                            <button onClick={confirmStatusChange} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <CheckCircle className="w-4 h-4" /> Confirmer
                             </button>
                         </div>
                     </div>
@@ -891,8 +934,8 @@ export default function ReservationsIndex({
 
                         <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
                             <button onClick={() => setIsDeleteConfirmModalOpen(false)} className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">Annuler</button>
-                            <button disabled={countdown > 0} onClick={confirmDelete} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <Trash2 className="w-4 h-4" /> {countdown > 0 ? `Confirmer (${countdown}s)` : "Confirmer"}
+                            <button onClick={confirmDelete} className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <Trash2 className="w-4 h-4" /> Confirmer
                             </button>
                         </div>
                     </div>

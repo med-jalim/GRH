@@ -56,6 +56,7 @@ interface PaymentVerification {
   id_reservation: number;
   document_path: string;
   amount: number;
+  statut: "en_attente" | "valide" | "refuse";
   created_at: string;
 }
 
@@ -231,7 +232,7 @@ export default function ReservationShow({ reservation }: Props) {
   const [deleting, setDeleting] = useState(false);
 
   // Payments logic
-  const totalPaid = reservation.payments.reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = reservation.payments.filter((p) => p.statut === 'valide').reduce((sum, p) => sum + p.amount, 0);
   const remaining = Math.max(0, reservation.prix_total - totalPaid);
   const paidPercent = Math.min(100, (totalPaid / reservation.prix_total) * 100);
 
@@ -265,20 +266,6 @@ export default function ReservationShow({ reservation }: Props) {
   const [activeTab, setActiveTab] = useState<"general" | "payment">("general");
   const { errors } = usePage().props;
 
-  // Countdown state for modals
-  const [countdown, setCountdown] = useState(0);
-
-  useEffect(() => {
-    if (isStatusConfirmModalOpen || isDeletePaymentConfirmModalOpen || isDeleteModalOpen) {
-      setCountdown(5);
-      const timer = setInterval(() => {
-        setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
-    } else {
-      setCountdown(0);
-    }
-  }, [isStatusConfirmModalOpen, isDeletePaymentConfirmModalOpen, isDeleteModalOpen]);
 
   // Reset payment amount to remaining each time the modal opens
   useEffect(() => {
@@ -429,6 +416,15 @@ export default function ReservationShow({ reservation }: Props) {
     });
   }
 
+  function handlePaymentStatut(id: number, statut: "valide" | "refuse") {
+    setUpdating(true);
+    router.patch(
+      `/admin/payments/${id}/statut`,
+      { statut },
+      { onFinish: () => setUpdating(false) }
+    );
+  }
+
   return (
     <AdminLayout>
       {/* ── Breadcrumb / Header ── */}
@@ -461,12 +457,37 @@ export default function ReservationShow({ reservation }: Props) {
             </p>
           </div>
 
-          <div>
-            <StatusSelect 
-              value={reservation.statut as StatusValue}
-              loading={updating}
-              onChange={handleStatusUpdate}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm ${STATUT_CONFIG[reservation.statut as keyof typeof STATUT_CONFIG]?.badge || 'bg-slate-50 text-slate-700'}`}>
+              {(() => {
+                const Icon = STATUT_CONFIG[reservation.statut as keyof typeof STATUT_CONFIG]?.icon || Clock;
+                return <Icon className="w-4 h-4" />;
+              })()}
+              <span className="text-sm font-bold tracking-wide">
+                {STATUT_CONFIG[reservation.statut as keyof typeof STATUT_CONFIG]?.label || reservation.statut}
+              </span>
+            </div>
+
+            {reservation.statut === 'en_attente' && (
+                <button onClick={() => handleStatusUpdate('en_validation')} disabled={updating} className="flex items-center gap-2 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-95 disabled:opacity-50 transition-all">
+                    <ClipboardCheck className="w-4 h-4" />
+                    {updating ? "..." : "Valider"}
+                </button>
+            )}
+
+            {reservation.statut === 'valide' && (
+                <button onClick={() => handleStatusUpdate('en_attente_paiement')} disabled={updating} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/20 active:scale-95 disabled:opacity-50 transition-all">
+                    <CreditCard className="w-4 h-4" />
+                    {updating ? "..." : "Add paiement"}
+                </button>
+            )}
+
+            {reservation.statut !== 'annule' && reservation.statut !== 'confirme' && (
+                <button onClick={() => handleStatusUpdate('annule')} disabled={updating} className="flex items-center gap-2 px-4 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl text-sm font-bold shadow-inner border border-red-200 active:scale-95 disabled:opacity-50 transition-all">
+                    <XCircle className="w-4 h-4" />
+                    {updating ? "..." : "Annuler"}
+                </button>
+            )}
           </div>
         </div>
         {/* Tab Switcher */}
@@ -657,7 +678,7 @@ export default function ReservationShow({ reservation }: Props) {
                         Aucun document pour le moment
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         {reservation.payments.map((p) => (
                           <div key={p.id} className="bg-white border border-slate-100 rounded-2xl p-4 group hover:shadow-xl transition-all duration-300">
                             <div className="flex items-center justify-between mb-3">
@@ -665,10 +686,23 @@ export default function ReservationShow({ reservation }: Props) {
                                 <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600"><CreditCard className="w-5 h-5" /></div>
                                 <div>
                                   <p className="text-xs font-bold text-slate-900">{formatPrice(p.amount)}</p>
-                                  <p className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleDateString()}</p>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                      {p.statut === 'valide' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Validé</span>}
+                                      {p.statut === 'en_attente' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">En attente</span>}
+                                      {p.statut === 'refuse' && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Refusé</span>}
+                                      <span className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleDateString()}</span>
+                                  </div>
                                 </div>
                               </div>
-                              <button onClick={() => handleDeletePayment(p.id)} className="p-1.5 text-slate-300 hover:text-red-500 group-hover:opacity-100 opacity-0 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
+                              <div className="flex gap-2 items-center">
+                                  {p.statut === 'en_attente' && (
+                                     <>
+                                        <button onClick={() => handlePaymentStatut(p.id, 'valide')} className="p-1.5 text-slate-400 hover:text-emerald-600 bg-slate-50 hover:bg-emerald-50 rounded transition-colors" title="Valider"><CheckCircle className="w-4 h-4" /></button>
+                                        <button onClick={() => handlePaymentStatut(p.id, 'refuse')} className="p-1.5 text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded transition-colors" title="Refuser"><XCircle className="w-4 h-4" /></button>
+                                     </>
+                                  )}
+                                  <button onClick={() => handleDeletePayment(p.id)} className="p-1.5 text-slate-300 hover:text-red-500 group-hover:opacity-100 opacity-0 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                              </div>
                             </div>
                             <a href={`/storage/${p.document_path}`} target="_blank" className="w-full flex items-center justify-center gap-2 py-2 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
                               <ExternalLink className="w-3 h-3" /> Ouvrir le document
@@ -757,11 +791,10 @@ export default function ReservationShow({ reservation }: Props) {
               </button>
               <button
                 onClick={confirmDelete}
-                disabled={deleting || countdown > 0}
                 className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                {countdown > 0 ? `Confirmer la suppression (${countdown}s)` : "Confirmer la suppression"}
+                Confirmer la suppression
               </button>
             </div>
           </div>
@@ -853,11 +886,10 @@ export default function ReservationShow({ reservation }: Props) {
               </button>
               <button
                 onClick={confirmStatusUpdate}
-                disabled={updating || countdown > 0}
                 className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <CheckCircle className="w-4 h-4" />
-                {countdown > 0 ? `Confirmer le changement (${countdown}s)` : "Confirmer le changement"}
+                Confirmer le changement
               </button>
             </div>
           </div>
@@ -912,11 +944,10 @@ export default function ReservationShow({ reservation }: Props) {
               </button>
               <button
                 onClick={confirmPaymentDeletion}
-                disabled={countdown > 0}
                 className="flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
-                {countdown > 0 ? `Oui, supprimer (${countdown}s)` : "Oui, supprimer"}
+                Oui, supprimer
               </button>
             </div>
           </div>

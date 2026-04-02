@@ -39,9 +39,7 @@ class ReservationValidationRequest extends Mailable
             view: 'emails.reservation_validation_request',
             with: [
                 'reservation' => $this->reservation,
-                'confirmUrl' => "{$baseUrl}/reservation/{$this->reservation->token}/confirm",
-                'cancelUrl'  => "{$baseUrl}/reservation/{$this->reservation->token}/cancel",
-                'editUrl'    => "{$baseUrl}/reservation/{$this->reservation->token}/edit",
+                'portalUrl' => "{$baseUrl}/reservation/{$this->reservation->token}",
             ],
         );
     }
