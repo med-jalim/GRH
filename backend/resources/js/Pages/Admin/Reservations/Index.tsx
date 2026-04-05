@@ -599,24 +599,6 @@ export default function ReservationsIndex({
                                         {/* Actions */}
                                         <td className="px-5 py-4">
                                             <div className="flex items-center justify-end gap-2">
-                                                {r.statut === 'en_attente' && (
-                                                    <button onClick={() => handleStatusChange(r.id, 'en_validation')} title="Valider" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-yellow-500 hover:bg-yellow-600 transition-colors disabled:opacity-50">
-                                                        <ClipboardCheck className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Valider</span>
-                                                    </button>
-                                                )}
-
-                                                {r.statut === 'valide' && (
-                                                    <button onClick={() => handleStatusChange(r.id, 'en_attente_paiement')} title="Add paiement" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                                                        <CreditCard className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Paiement</span>
-                                                    </button>
-                                                )}
-
-                                                {r.statut !== 'annule' && (
-                                                    <button onClick={() => handleStatusChange(r.id, 'annule')} title="Annuler" disabled={updatingId === r.id} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-700 bg-red-100 hover:bg-red-200 transition-colors border border-red-200 disabled:opacity-50">
-                                                        <XCircle className="w-3.5 h-3.5" /> <span className="hidden xl:inline">Annuler</span>
-                                                    </button>
-                                                )}
-
                                                 <Link
                                                     href={`/admin/reservations/${r.id}`}
                                                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
