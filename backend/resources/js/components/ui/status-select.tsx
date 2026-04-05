@@ -16,7 +16,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "confirme",
-        label: "Confirmée",
+        label: "Confirmer la réservation",
         Icon: CheckCircle,
         badge: "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100/80",
         item: "text-emerald-700",
@@ -24,7 +24,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "annule",
-        label: "Annulée",
+        label: "Annuler la réservation",
         Icon: XCircle,
         badge: "text-red-600 bg-red-50 border-red-200 hover:bg-red-100/80",
         item: "text-red-600",
@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "en_validation",
-        label: "Vérification requise",
+        label: "Valider la réservation",
         Icon: ClipboardCheck,
         badge: "text-yellow-700 bg-yellow-50 border-yellow-200 hover:bg-yellow-100/80",
         item: "text-yellow-700",
@@ -40,7 +40,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "valide",
-        label: "Confirmée par client",
+        label: "Validée par le client",
         Icon: UserCheck,
         badge: "text-cyan-700 bg-cyan-50 border-cyan-200 hover:bg-cyan-100/80",
         item: "text-cyan-700",
@@ -48,7 +48,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "en_attente_paiement",
-        label: "En attente de paiement",
+        label: "Envoyer lien de paiement",
         Icon: CreditCard,
         badge: "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100/80",
         item: "text-indigo-700",
@@ -56,7 +56,7 @@ const STATUS_OPTIONS = [
     },
     {
         value: "partiellement_paye",
-        label: "Partiellement payée",
+        label: "Paiement partiel effectué",
         Icon: Wallet,
         badge: "text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100/80",
         item: "text-blue-700",
@@ -73,6 +73,7 @@ interface StatusSelectProps {
     onChange: (value: StatusValue) => void;
     disabled?: boolean;
     loading?: boolean;
+    allowedValues?: StatusValue[];
 }
 
 export function StatusSelect({
@@ -80,9 +81,14 @@ export function StatusSelect({
     onChange,
     disabled = false,
     loading = false,
+    allowedValues,
 }: StatusSelectProps) {
     const current = STATUS_OPTIONS.find((o) => o.value === value) ?? STATUS_OPTIONS[0];
     const Icon = current.Icon;
+
+    const options = allowedValues 
+        ? STATUS_OPTIONS.filter(opt => allowedValues.includes(opt.value as StatusValue))
+        : STATUS_OPTIONS;
 
     return (
         <Select.Root
@@ -111,8 +117,10 @@ export function StatusSelect({
                 ) : (
                     <Icon className="w-3 h-3" />
                 )}
-                {/* Shows the current status label */}
-                <Select.Value />
+
+                {/* Affiche toujours le libellé humanisé au lieu de la valeur brute */}
+                <span className="truncate">{current.label}</span>
+
                 <ChevronDown
                     className={cn(
                         "w-3 h-3 opacity-50 transition-transform duration-200",
@@ -140,7 +148,7 @@ export function StatusSelect({
                             Modifier le statut
                         </p>
 
-                        {STATUS_OPTIONS.map((opt) => {
+                        {options.map((opt) => {
                             const OptionIcon = opt.Icon;
                             const isSelected = opt.value === value;
                             return (

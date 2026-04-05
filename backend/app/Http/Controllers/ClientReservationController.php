@@ -28,6 +28,18 @@ class ClientReservationController extends Controller
 
         $reservation->update(['statut' => 'valide']);
 
+        // Notify admins about the confirmation
+        try {
+            $admins = \App\Models\User::all();
+            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+                'Réservation Confirmée',
+                'Le client ' . $reservation->nom_contact . ' a confirmé sa réservation (' . $reservation->code_reference . ').',
+                route('admin.reservations.show', $reservation->id)
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation confirmation: ' . $e->getMessage());
+        }
+
         return Inertia::render('PublicReservationAction', [
             'success' => true,
             'message' => 'Votre réservation a été confirmée avec succès. Nous reviendrons vers vous pour la suite.',
@@ -43,6 +55,18 @@ class ClientReservationController extends Controller
         $reservation = Reservation::where('token', $token)->firstOrFail();
 
         $reservation->update(['statut' => 'annule']);
+
+        // Notify admins about the cancellation
+        try {
+            $admins = \App\Models\User::all();
+            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+                'Réservation Annulée par le client',
+                'Le client ' . $reservation->nom_contact . ' a annulé sa réservation (' . $reservation->code_reference . ').',
+                route('admin.reservations.show', $reservation->id)
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation cancellation: ' . $e->getMessage());
+        }
 
         return Inertia::render('PublicReservationAction', [
             'success' => true,
@@ -104,6 +128,18 @@ class ClientReservationController extends Controller
             ItemReservation::create($detail);
         }
 
+        // Notify admins about the modification
+        try {
+            $admins = \App\Models\User::all();
+            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+                'Réservation Modifiée',
+                'Le client ' . $reservation->nom_contact . ' a modifié les détails de sa réservation (' . $reservation->code_reference . ').',
+                route('admin.reservations.show', $reservation->id)
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation modification: ' . $e->getMessage());
+        }
+
         return Inertia::render('PublicReservationAction', [
             'success' => true,
             'message' => 'Vos modifications ont été enregistrées. Notre équipe va les examiner.',
@@ -125,12 +161,24 @@ class ClientReservationController extends Controller
 
         $path = $request->file('document')->store('payments', 'public');
 
-        \App\Models\PaymentVerification::create([
+        $payment = \App\Models\PaymentVerification::create([
             'id_reservation' => $reservation->id,
             'document_path'  => $path,
             'amount'         => $request->amount,
             'statut'         => 'en_attente',
         ]);
+
+        // Notify admins about the new payment
+        try {
+            $admins = \App\Models\User::all();
+            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+                'Nouveau Paiement',
+                'Un nouveau paiement (' . number_format($request->amount, 2) . ' DH) a été soumis pour la réservation ' . $reservation->code_reference . '.',
+                route('admin.reservations.show', $reservation->id)
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for new payment: ' . $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès et est en attente de vérification par notre équipe.');
     }

@@ -42,6 +42,20 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'auth' => [
+                'user' => $request->user(),
+                'notifications' => $request->user() ? [
+                    'unread_count' => $request->user()->unreadNotifications->count(),
+                    'latest' => $request->user()->notifications()->latest()->limit(10)->get()->map(function ($n) {
+                        return [
+                            'id' => $n->id,
+                            'data' => $n->data,
+                            'read_at' => $n->read_at,
+                            'created_at' => $n->created_at->diffForHumans(),
+                        ];
+                    }),
+                ] : null,
+            ],
             'csrf_token' => csrf_token(),
         ];
     }

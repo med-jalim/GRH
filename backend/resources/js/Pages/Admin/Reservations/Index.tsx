@@ -357,6 +357,29 @@ export default function ReservationsIndex({
         { value: "annule", label: "Annulées" },
     ];
 
+    const getAllowedStatuses = (current: string): any[] => {
+        switch (current) {
+            case 'en_attente':
+                return ['en_attente', 'en_validation', 'annule'];
+            case 'en_validation':
+                return ['en_validation', 'valide', 'annule'];
+            case 'valide':
+                return ['valide', 'en_attente_paiement', 'annule'];
+            case 'en_attente_paiement':
+                // Les statuts 'partiellement_paye' et 'confirme' sont gérés automatiquement par le système
+                return ['en_attente_paiement', 'annule'];
+            case 'partiellement_paye':
+                // Le passage à 'confirme' est géré automatiquement lors du règlement final
+                return ['partiellement_paye', 'annule'];
+            case 'confirme':
+                return ['confirme', 'annule'];
+            case 'annule':
+                return ['annule'];
+            default:
+                return [current, 'annule'];
+        }
+    };
+
     return (
         <AdminLayout>
             {/* ── Header ── */}
@@ -585,15 +608,13 @@ export default function ReservationsIndex({
 
                                         {/* Statut */}
                                         <td className="px-5 py-4">
-                                            <div className={`inline-flex w-max items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shadow-sm ${STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.badge || 'bg-slate-50 text-slate-700'}`}>
-                                                {(() => {
-                                                    const Icon = STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.icon || Clock;
-                                                    return <Icon className="w-3.5 h-3.5" />;
-                                                })()}
-                                                <span className="text-xs font-bold tracking-wide">
-                                                    {STATUT_CONFIG[r.statut as keyof typeof STATUT_CONFIG]?.label || r.statut}
-                                                </span>
-                                            </div>
+                                            <StatusSelect
+                                                value={r.statut}
+                                                onChange={(v) => handleStatusChange(r.id, v)}
+                                                disabled={updatingId === r.id}
+                                                loading={updatingId === r.id}
+                                                allowedValues={getAllowedStatuses(r.statut)}
+                                            />
                                         </td>
 
                                         {/* Actions */}

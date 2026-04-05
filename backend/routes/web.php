@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\TypeController;
 use App\Http\Controllers\PaymentVerificationController;
 use App\Http\Controllers\ClientReservationController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -23,8 +24,15 @@ Route::get('/reservation/{token}/cancel', [ClientReservationController::class, '
 Route::post('/reservation/{token}/update', [ClientReservationController::class, 'update'])->name('reservation.update');
 Route::post('/reservation/{token}/payments', [ClientReservationController::class, 'addPayment'])->name('reservation.addPayment');
 
-// ----- Espace Administrateur (Back-Office) -----
-Route::prefix('admin')->name('admin.')->group(function () {
+// ----- Espace Authentification -----
+Route::prefix('admin')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
+});
+
+// ----- Espace Administrateur (Interdit aux non-connectés) -----
+Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     // Tableau de bord
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard'); 
 
@@ -40,4 +48,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::resource('chambres', ChambreController::class);
     Route::resource('types', TypeController::class);
     Route::resource('tarifs', TarifController::class);
+
+    // Notifications
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
 });

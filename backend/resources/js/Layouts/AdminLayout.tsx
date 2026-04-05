@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, usePage } from "@inertiajs/react";
+import { Link, usePage, router } from "@inertiajs/react";
 import { 
   Building2, 
   LayoutDashboard, 
@@ -12,9 +12,11 @@ import {
   BedDouble,
   HelpCircle,
   LogOut,
+  Eye,
 } from "lucide-react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useFlash } from "@/lib/hooks";
+import NotificationDropdown from "@/components/NotificationDropdown";
 
 interface Props {
   children: ReactNode;
@@ -26,7 +28,14 @@ function FlashListener() {
 }
 
 export function AdminLayout({ children }: Props) {
-  const { url } = usePage();
+  const { url, props } = usePage();
+  const { auth } = props as any;
+
+  const handleLogout = () => {
+    if (confirm("Voulez-vous vraiment vous déconnecter ?")) {
+      router.post('/admin/logout');
+    }
+  };
 
   const primaryNav = [
     { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -83,52 +92,70 @@ export function AdminLayout({ children }: Props) {
             </nav>
           </div>
           
-          <div className="p-4 border-t border-gray-100 isolate">
+          <div className="p-4 border-t border-gray-100 space-y-1">
             <Link
               href="/booking"
-              className="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-900 transition-colors rounded-lg hover:bg-gray-50"
             >
-              <LogOut className="w-5 h-5" />
+              <Eye className="w-5 h-5" />
               <span className="font-medium text-sm">Vue Client</span>
             </Link>
+
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-3 py-2 text-red-500 hover:text-red-700 transition-colors rounded-lg hover:bg-red-50 w-full text-left"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="font-medium text-sm">Déconnexion</span>
+            </button>
           </div>
         </aside>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa]">
           {/* Top Header */}
-          <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 flex-shrink-0">
+          <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-40">
             <div className="flex items-center text-xl font-bold text-gray-900">
               Tableau de Bord
             </div>
             
-            {/* <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6">
               <div className="relative hidden md:flex items-center text-gray-400">
                 <Search className="w-4 h-4 absolute left-3" />
                 <input 
                   type="text" 
                   placeholder="Rechercher des réservations..." 
-                  className="w-64 pl-9 pr-4 py-2 bg-gray-50 border-none rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-green-500/20 transition-all text-gray-700"
+                  className="w-64 pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#54b172]/20 focus:border-[#54b172] transition-all text-gray-700"
                 />
               </div>
               
-              <div className="flex items-center gap-4 text-gray-500">
-                <button className="hover:text-gray-900 transition-colors"><Bell className="w-5 h-5" /></button>
-                <button className="hover:text-gray-900 transition-colors"><MessageCircle className="w-5 h-5" /></button>
+              <div className="flex items-center gap-4">
+                <NotificationDropdown />
+                <button className="p-2 text-gray-500 hover:text-gray-900 transition-colors bg-white rounded-lg border border-gray-100"><MessageCircle className="w-5 h-5" /></button>
               </div>
 
-              <div className="flex items-center gap-3 pl-4 border-l border-gray-200 cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
-                <img 
-                  src="https://i.pravatar.cc/150?img=32" 
-                  alt="Profile" 
-                  className="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover" 
-                />
-                <div className="hidden sm:block text-sm">
-                  <span className="font-semibold text-gray-900 block leading-tight">Admin Hotel</span>
+              <div className="flex items-center gap-3 pl-4 border-l border-gray-200 group">
+                <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-xl transition-colors">
+                  <img 
+                    src={`https://ui-avatars.com/api/?name=${auth?.user?.name || 'Admin'}&background=random`} 
+                    alt="Profile" 
+                    className="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover" 
+                  />
+                  <div className="hidden sm:block text-sm">
+                    <span className="font-semibold text-gray-900 block leading-tight">{auth?.user?.name || 'Admin'}</span>
+                    <span className="text-[10px] text-gray-400 font-medium">{auth?.user?.email}</span>
+                  </div>
                 </div>
-                <ChevronDown className="w-4 h-4 text-gray-400" />
+                
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                  title="Déconnexion"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
               </div>
-            </div> */}
+            </div>
           </header>
 
           {/* Page Content */}

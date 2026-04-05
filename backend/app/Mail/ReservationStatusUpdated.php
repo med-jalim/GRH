@@ -20,7 +20,7 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
     public static array $statusLabels = [
         'en_attente'          => 'En attente',
         'en_validation'       => 'Vérification requise',
-        'valide'              => 'Confirmée par le client',
+        'valide'              => 'Validée par l\'administration',
         'en_attente_paiement' => 'En attente de paiement',
         'partiellement_paye'  => 'Partiellement payée',
         'confirme'            => 'Confirmée',

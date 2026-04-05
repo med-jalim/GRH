@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ReservationStatusUpdated;
+use App\Mail\ReservationValidationRequest;
 use App\Models\ItemReservation;
 use App\Models\Reservation;
+use App\Models\User;
+use App\Notifications\AdminNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -100,6 +104,18 @@ class ReservationController extends Controller
         unset($validated['details']);
 
         $reservation = Reservation::create($validated);
+
+        // Notify admins about the new reservation
+        try {
+            $admins = User::all();
+            Notification::send($admins, new AdminNotification(
+                'Nouvelle Réservation',
+                'Une nouvelle réservation (' . $reservation->code_reference . ') a été créée par ' . $reservation->nom_contact . '.',
+                route('admin.reservations.show', $reservation->id)
+            ));
+        } catch (\Exception $e) {
+            Log::error('Failed to send admin notification for new reservation: ' . $e->getMessage());
+        }
 
         // Create line items
         foreach ($details as $detail) {
@@ -222,9 +238,9 @@ class ReservationController extends Controller
             try {
                 if ($newStatut === 'en_validation') {
                     // Specific email for validation request
-                    Mail::to($reservation->email)->send(new \App\Mail\ReservationValidationRequest($reservation));
-                } elseif ($newStatut !== 'valide' && $newStatut !== 'en_attente') {
-                    // Standard notification for other statuses
+                    Mail::to($reservation->email)->send(new ReservationValidationRequest($reservation));
+                } elseif ($newStatut !== 'en_attente') {
+                    // Standard notification for other statuses (including 'valide')
                     Mail::to($reservation->email)
                         ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
                 }
