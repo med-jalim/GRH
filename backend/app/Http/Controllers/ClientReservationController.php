@@ -7,6 +7,7 @@ use App\Models\Hotel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\ItemReservation;
+use Illuminate\Support\Facades\Log;
 
 class ClientReservationController extends Controller
 {
@@ -40,11 +41,7 @@ class ClientReservationController extends Controller
             \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation confirmation: ' . $e->getMessage());
         }
 
-        return Inertia::render('PublicReservationAction', [
-            'success' => true,
-            'message' => 'Votre réservation a été confirmée avec succès. Nous reviendrons vers vous pour la suite.',
-            'reservation' => $reservation
-        ]);
+        return redirect()->route('reservation.show', $token)->with('success', 'Votre réservation a été confirmée avec succès. Nous reviendrons vers vous pour la suite.');
     }
 
     /**
@@ -68,10 +65,7 @@ class ClientReservationController extends Controller
             \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation cancellation: ' . $e->getMessage());
         }
 
-        return Inertia::render('PublicReservationAction', [
-            'success' => true,
-            'message' => 'Votre réservation a été annulée conformément à votre demande.',
-        ]);
+        return redirect()->route('reservation.show', $token)->with('success', 'Votre réservation a été annulée conformément à votre demande.');
     }
 
     /**
@@ -116,6 +110,19 @@ class ClientReservationController extends Controller
         $details = $validated['details'];
         unset($validated['details']);
 
+        // Recalculate total price for safety
+        $dateArrivee = \Carbon\Carbon::parse($validated['date_arrivee']);
+        $dateDepart = \Carbon\Carbon::parse($validated['date_depart']);
+        $nights = $dateArrivee->diffInDays($dateDepart);
+        if ($nights < 1) $nights = 1;
+
+        $prixTotal = 0;
+        foreach ($details as $d) {
+            $subtotal = ($d['quantite'] * $d['prix_unitaire'] * $nights);
+            $prixTotal += $subtotal;
+        }
+        $validated['prix_total'] = $prixTotal;
+
         // Reset status to en_attente and save
         $reservation->statut = 'en_attente';
         $reservation->fill($validated);
@@ -140,11 +147,7 @@ class ClientReservationController extends Controller
             \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation modification: ' . $e->getMessage());
         }
 
-        return Inertia::render('PublicReservationAction', [
-            'success' => true,
-            'message' => 'Vos modifications ont été enregistrées. Notre équipe va les examiner.',
-            'reservation' => $reservation,
-        ]);
+        return redirect()->route('reservation.show', $token)->with('success', 'Vos modifications ont été enregistrées. Notre équipe va les examiner.');
     }
 
     /**

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import { bookingSchema, type BookingSchemaType } from "@/lib/schemas";
 
 import type { Hotel } from "@/types/booking";
@@ -9,7 +9,7 @@ import { StepIndicator } from "@/components/booking/StepIndicator";
 import { AgencyInfoStep } from "@/components/booking/AgencyInfoStep";
 import { ReservationDetailsStep } from "@/components/booking/ReservationDetailsStep";
 import { SummaryStep } from "@/components/booking/SummaryStep";
-import { CheckCircle, XCircle, FileUp, CreditCard, ExternalLink, Calendar, Users, Building2, BedDouble, Upload, Clock, Ban, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, FileUp, CreditCard, ExternalLink, Calendar, Users, Building2, BedDouble, Upload, Clock, Ban, Loader2, Edit2 } from "lucide-react";
 
 interface Props {
     reservation: any;
@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function PublicReservationPortal({ reservation, hotels }: Props) {
+    const { flash } = usePage().props as any;
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<"general" | "payment">(() => {
         if (typeof window !== 'undefined') {
@@ -30,7 +31,8 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
 
-    // Payment State
+    // Action State
+    const [isActioning, setIsActioning] = useState<string | null>(null);
     const [paymentFile, setPaymentFile] = useState<File | null>(null);
     const [paymentAmount, setPaymentAmount] = useState<string>("");
     const [isUploading, setIsUploading] = useState(false);
@@ -125,6 +127,11 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         router.post(`/reservation/${reservation.token}/update`, payload, {
             onStart: () => setSubmitting(true),
             onFinish: () => setSubmitting(false),
+            onSuccess: () => {
+                setIsEditing(false);
+                setStep(1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            },
             onError: (errors) => {
                 console.error("Inertia Error:", errors);
                 alert("Une erreur est survenue lors de la mise à jour.");
@@ -150,19 +157,33 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         });
     };
 
-    const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
-    const formatDateStr = (dateStr: string) => new Date(dateStr).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    const handleAction = (action: 'confirm' | 'cancel') => {
+        const message = action === 'confirm' 
+            ? "Voulez-vous valider et confirmer votre réservation ?" 
+            : "Êtes-vous sûr de vouloir annuler cette réservation ?";
+        
+        if (confirm(message)) {
+            setIsActioning(action);
+            router.post(`/reservation/${reservation.token}/${action}`, {}, {
+                onFinish: () => setIsActioning(null)
+            });
+        }
+    };
 
-    // Status helpers
+    const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
+    const formatDateStr = (dateStr: string) => new Date(dateStr).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+
+    // Status helpers - ADMIN STYLE
     const getStatusInfo = (statut: string) => {
         switch(statut) {
-            case 'en_attente': return { label: 'En attente', colors: 'bg-amber-100 text-amber-700 border-amber-200' };
-            case 'en_attente_paiement': return { label: 'En attente de paiement', colors: 'bg-indigo-100 text-indigo-700 border-indigo-200' };
-            case 'confirme': return { label: 'Confirmée', colors: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
-            case 'annule': return { label: 'Annulée', colors: 'bg-red-100 text-red-700 border-red-200' };
-            case 'valide': return { label: 'Validée', colors: 'bg-cyan-100 text-cyan-700 border-cyan-200' };
-            case 'partiellement_paye': return { label: 'Partiellement Payée', colors: 'bg-blue-100 text-blue-700 border-blue-200' };
-            default: return { label: statut, colors: 'bg-slate-100 text-slate-700 border-slate-200' };
+            case 'en_attente': return { label: 'En attente', colors: 'bg-amber-50 text-amber-600 border-amber-200' };
+            case 'en_attente_paiement': return { label: 'En attente de paiement', colors: 'bg-indigo-50 text-indigo-600 border-indigo-200' };
+            case 'confirme': return { label: 'Confirmée', colors: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+            case 'annule': return { label: 'Annulée', colors: 'bg-rose-50 text-rose-600 border-rose-200' };
+            case 'valide': return { label: 'Validée', colors: 'bg-cyan-50 text-cyan-600 border-cyan-200' };
+            case 'partiellement_paye': return { label: 'Partiellement Payée', colors: 'bg-blue-50 text-blue-600 border-blue-200' };
+            case 'en_validation': return { label: 'Confirmation requise', colors: 'bg-amber-50 text-amber-600 border-amber-200' };
+            default: return { label: statut, colors: 'bg-slate-50 text-slate-600 border-slate-200' };
         }
     };
     const sInfo = getStatusInfo(reservation.statut);
@@ -172,193 +193,323 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const remaining = Math.max(0, reservation.prix_total - totalValidPaid);
 
     return (
-        <div className="min-h-screen bg-slate-900">
-            <header className="py-8 px-6 text-center">
-                <div className="max-w-3xl mx-auto">
-                   <h1 className="text-2xl font-black text-white uppercase tracking-widest">
-                       {isEditing ? "Modifier ma réservation" : "Détails de ma réservation"}
-                   </h1>
-                   <p className="text-slate-400 text-xs mt-2">Référence : <span className="text-amber-500 font-mono font-bold">{reservation.code_reference}</span></p>
+        <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+            {/* STICKY HEADER - ADMIN STYLE */}
+            <header className="sticky top-0 z-50 bg-white border-b border-slate-200/60 backdrop-blur-md bg-white/80 py-4 px-6 mb-8">
+                <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-[#54b172] rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <Building2 className="text-white w-6 h-6" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none uppercase">
+                                Portail Réservation
+                            </h1>
+                            <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">
+                                Référence: <span className="text-[#54b172]">{reservation.code_reference}</span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {!isEditing && (
+                        <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                            <button
+                                onClick={() => setActiveTab("general")}
+                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    activeTab === "general"
+                                        ? "bg-white text-slate-900 shadow-sm"
+                                        : "text-slate-400 hover:text-slate-600"
+                                }`}
+                            >
+                                <Building2 className="w-3.5 h-3.5" />
+                                Informations
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("payment")}
+                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+                                    activeTab === "payment"
+                                        ? "bg-[#54b172] text-white shadow-sm"
+                                        : "text-slate-400 hover:text-slate-600"
+                                }`}
+                            >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                Règlement
+                            </button>
+                        </div>
+                    )}
                 </div>
             </header>
 
-            <main className="px-4 pb-16">
-                <div className="max-w-4xl mx-auto">
+            <main className="px-6 pb-20">
+                <div className="max-w-5xl mx-auto">
+                    
+                    {/* Flash Messages */}
+                    {flash.success && (
+                        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-700 animate-in fade-in slide-in-from-top-4">
+                            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                            <p className="text-sm font-bold">{flash.success}</p>
+                        </div>
+                    )}
+                    {flash.error && (
+                        <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700 animate-in fade-in slide-in-from-top-4">
+                            <XCircle className="w-5 h-5 flex-shrink-0" />
+                            <p className="text-sm font-bold">{flash.error}</p>
+                        </div>
+                    )}
                     
                     {!isEditing ? (
-                        <div className="space-y-6">
-                            {/* Tabs Switcher */}
-                            <div className="flex justify-center mb-4">
-                                <div className="flex items-center gap-1 bg-slate-800/50 p-1.5 rounded-2xl w-fit backdrop-blur-sm border border-slate-700/50">
-                                    <button
-                                        onClick={() => setActiveTab("general")}
-                                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                                            activeTab === "general"
-                                                ? "bg-white text-slate-900 shadow-sm"
-                                                : "text-slate-400 hover:text-white"
-                                        }`}
-                                    >
-                                        <Building2 className="w-4 h-4" />
-                                        Informations
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab("payment")}
-                                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                                            activeTab === "payment"
-                                                ? "bg-indigo-500 text-white shadow-sm"
-                                                : "text-slate-400 hover:text-white"
-                                        }`}
-                                    >
-                                        <CreditCard className="w-4 h-4" />
-                                        Règlement
-                                    </button>
-                                </div>
-                            </div>
-
-                            {activeTab === "general" && (
-                                <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl flex flex-col gap-6 animate-in slide-in-from-bottom-5">
-                                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Statut actuel</p>
-                                        <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold border ${sInfo.colors}`}>
-                                            {sInfo.label}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {reservation.statut !== 'confirme' && reservation.statut !== 'annule' && (
-                                            <>
-                                                {reservation.statut === 'en_validation' && (
-                                                    <button onClick={() => { if(confirm("Confirmer la réservation ?")) router.get(`/reservation/${reservation.token}/confirm`) }} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5">
-                                                        <CheckCircle className="w-4 h-4" /> Valider
-                                                    </button>
-                                                )}
-                                                <button onClick={() => setIsEditing(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
-                                                    Modifier
-                                                </button>
-                                                <button onClick={() => { if(confirm("Annuler la réservation ?")) router.get(`/reservation/${reservation.token}/cancel`) }} className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
-                                                    <XCircle className="w-4 h-4" /> Annuler
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Informations</p>
-                                        <div className="space-y-3 font-medium text-sm text-slate-700">
-                                            <p><span className="text-slate-400">Nom :</span> {reservation.nom_contact}</p>
-                                            <p><span className="text-slate-400">Email :</span> {reservation.email}</p>
-                                            <p><span className="text-slate-400">Tél :</span> {reservation.telephone}</p>
-                                            {reservation.hotel && <p className="flex items-center gap-2 mt-2"><Building2 className="w-4 h-4 text-slate-400"/> {reservation.hotel.name}, {reservation.hotel.ville}</p>}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Séjour</p>
-                                        <div className="space-y-3 font-medium text-sm text-slate-700">
-                                            <p className="flex items-center gap-2"><Calendar className="w-4 h-4 text-slate-400"/> {formatDateStr(reservation.date_arrivee)} <span className="text-slate-300">→</span> {formatDateStr(reservation.date_depart)}</p>
-                                            <p className="flex items-center gap-2"><Users className="w-4 h-4 text-slate-400"/> {reservation.nb_personnes} personne(s)</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-4">
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Chambres & Options</p>
-                                    <div className="bg-slate-50 rounded-2xl p-4">
-                                        {reservation.details.map((d:any) => (
-                                            <div key={d.id} className="flex justify-between items-center py-2 border-b border-slate-200 last:border-0">
-                                                <div className="flex items-center gap-3">
-                                                    <BedDouble className="w-4 h-4 text-indigo-400" />
-                                                    <span className="text-sm font-bold text-slate-700">{d.type?.nom ?? 'Chambre'} (x{d.quantite})</span>
-                                                </div>
-                                                <span className="text-sm font-black text-slate-900">{formatPrice(d.prix_unitaire * d.quantite)}</span>
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            
+                            {/* Left Column: Summary & Actions */}
+                            <div className="lg:col-span-8 space-y-6">
+                                {activeTab === "general" && (
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/50">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Statut de la réservation</p>
+                                                <span className={`inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold border uppercase tracking-wider ${sInfo.colors}`}>
+                                                    {sInfo.label}
+                                                </span>
                                             </div>
-                                        ))}
-                                        <div className="flex justify-between items-center mt-4 pt-4 border-t-2 border-slate-200">
-                                            <span className="text-sm font-black text-slate-900 uppercase">Total Estimé</span>
-                                            <span className="text-lg font-black text-amber-500">{formatPrice(reservation.prix_total)}</span>
+                                            
+                                            <div className="flex flex-wrap gap-2">
+                                                {reservation.statut !== 'confirme' && reservation.statut !== 'annule' && (
+                                                    <>
+                                                        {reservation.statut === 'en_validation' && (
+                                                            <button 
+                                                                disabled={!!isActioning}
+                                                                onClick={() => handleAction('confirm')} 
+                                                                className="px-5 py-2.5 bg-[#54b172] hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+                                                            >
+                                                                {isActioning === 'confirm' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Confirmer
+                                                            </button>
+                                                        )}
+                                                        <button disabled={!!isActioning} onClick={() => setIsEditing(true)} className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50">
+                                                            <Edit2 className="w-3.5 h-3.5"/> Modifier
+                                                        </button>
+                                                        <button 
+                                                            disabled={!!isActioning}
+                                                            onClick={() => handleAction('cancel')} 
+                                                            className="px-5 py-2.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
+                                                        >
+                                                            {isActioning === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Annuler
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                                </div>
-                            )}
 
-                            {activeTab === "payment" && (
-                                <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-5">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center">
-                                        <CreditCard className="w-5 h-5"/>
-                                    </div>
-                                    <h2 className="text-xl font-black text-slate-900">Règlement</h2>
-                                </div>
+                                        <div className="p-8">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
+                                                <div>
+                                                    <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                        <Users size={14}/> Vos Coordonnées
+                                                    </h3>
+                                                    <div className="space-y-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Client</span>
+                                                            <span className="text-sm font-bold text-slate-800">{reservation.nom_contact}</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Email</span>
+                                                            <span className="text-sm font-bold text-slate-800">{reservation.email}</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Téléphone</span>
+                                                            <span className="text-sm font-bold text-slate-800">{reservation.telephone}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
 
-                                {(reservation.statut === 'en_attente_paiement' || reservation.payment_link) && reservation.statut !== 'confirme' && remaining > 0 && (
-                                    <div className="mb-8 p-6 bg-indigo-600 rounded-3xl text-white">
-                                        <p className="text-indigo-200 text-sm font-medium mb-4">Pour confirmer définitivement votre réservation, vous pouvez régler par carte bancaire via notre système sécurisé :</p>
-                                        <a href={reservation.payment_link || "#"} target="_blank" className="inline-flex items-center gap-2 bg-white text-indigo-900 font-bold px-6 py-3 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">
-                                            💳 Payer en ligne (Payzone)
-                                        </a>
+                                                <div>
+                                                    <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5 flex items-center gap-2">
+                                                        <Calendar size={14}/> Détails du Séjour
+                                                    </h3>
+                                                    <div className="space-y-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Hôtel</span>
+                                                            <span className="text-sm font-bold text-slate-800">{reservation.hotel?.name || 'Veuillez sélectionner un hôtel'}</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Période</span>
+                                                            <span className="text-sm font-bold text-slate-800">
+                                                                {formatDateStr(reservation.date_arrivee)} - {formatDateStr(reservation.date_depart)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Occupants</span>
+                                                            <span className="text-sm font-bold text-slate-800">{reservation.nb_personnes} Personne(s)</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-12 pt-8 border-t border-slate-100">
+                                                <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5">Hébergement & Tarification</h3>
+                                                <div className="bg-slate-50 rounded-xl border border-slate-200/60 overflow-hidden">
+                                                    <table className="w-full text-left text-xs">
+                                                        <thead className="bg-slate-100 text-slate-400 font-bold uppercase tracking-wider">
+                                                            <tr>
+                                                                <th className="px-6 py-3">Type</th>
+                                                                <th className="px-6 py-3 text-center">Quantité</th>
+                                                                <th className="px-6 py-3 text-right">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {reservation.details.map((d:any) => (
+                                                                <tr key={d.id} className="bg-white">
+                                                                    <td className="px-6 py-4 font-bold text-slate-700">{d.type?.nom ?? 'Chambre'}</td>
+                                                                    <td className="px-6 py-4 text-center font-medium text-slate-500">x{d.quantite}</td>
+                                                                    <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(d.prix_unitaire * d.quantite * nights)}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                        <tfoot className="bg-slate-50">
+                                                            <tr>
+                                                                <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Estimé</td>
+                                                                <td className="px-6 py-4 text-right font-black text-lg text-[#54b172]">{formatPrice(reservation.prix_total)}</td>
+                                                            </tr>
+                                                        </tfoot>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Historique des preuves</p>
-                                        {reservation.payments.length === 0 ? (
-                                            <p className="text-sm text-slate-500 italic">Aucun document soumis.</p>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {reservation.payments.map((p:any) => (
-                                                    <div key={p.id} className="p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
-                                                        <div>
-                                                            <p className="text-sm font-black text-slate-900">{formatPrice(p.amount)}</p>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                {p.statut === 'valide' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Validé</span>}
-                                                                {p.statut === 'en_attente' && <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">En attente</span>}
-                                                                {p.statut === 'refuse' && <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">Refusé</span>}
-                                                                <span className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString()}</span>
-                                                            </div>
+                                {activeTab === "payment" && (
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="p-8 border-b border-slate-100 bg-indigo-50/30 flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200">
+                                                <CreditCard className="w-6 h-6"/>
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-bold text-slate-900">Gestion du Règlement</h2>
+                                                <p className="text-xs text-slate-500 font-medium">Consultez l'état de vos paiements et envoyez vos justificatifs</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-8 grid grid-cols-1 md:grid-cols-12 gap-10">
+                                            <div className="md:col-span-12">
+                                                {(reservation.statut === 'en_attente_paiement' || reservation.payment_link) && reservation.statut !== 'confirme' && remaining > 0 && (
+                                                    <div className="mb-8 p-6 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-6">
+                                                        <div className="text-center sm:text-left">
+                                                            <h3 className="font-bold text-lg mb-1">Règlement en ligne sécurisé</h3>
+                                                            <p className="text-indigo-100 text-xs">Utilisez notre lien direct pour confirmer votre réservation instantanément.</p>
                                                         </div>
-                                                        <a href={`/storage/${p.document_path}`} target="_blank" className="p-2 text-indigo-500 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-                                                            <ExternalLink className="w-4 h-4"/>
+                                                        <a href={reservation.payment_link || "#"} target="_blank" className="bg-white text-indigo-700 font-bold px-8 py-3 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-2 whitespace-nowrap shadow-lg">
+                                                            💳 Payer via Payzone
                                                         </a>
                                                     </div>
-                                                ))}
+                                                )}
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">🖋️ Historique des versements</p>
+                                                        {reservation.payments.length === 0 ? (
+                                                            <div className="text-center py-10 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                                                                <p className="text-sm text-slate-400 font-medium italic">Aucun document soumis</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-4">
+                                                                {reservation.payments.map((p:any) => (
+                                                                    <div key={p.id} className="p-4 rounded-xl border border-slate-100 flex items-center justify-between hover:border-slate-200 transition-colors bg-white">
+                                                                        <div>
+                                                                            <p className="text-sm font-bold text-slate-900">{formatPrice(p.amount)}</p>
+                                                                            <div className="flex items-center gap-2 mt-1.5">
+                                                                                <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                                                                                    p.statut === 'valide' ? 'bg-emerald-50 text-emerald-600' : 
+                                                                                    p.statut === 'en_attente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                                                                }`}>
+                                                                                    {p.statut === 'valide' ? 'Validé' : p.statut === 'en_attente' ? 'En attente' : 'Refusé'}
+                                                                                </span>
+                                                                                <span className="text-[10px] text-slate-400 font-medium">{new Date(p.created_at).toLocaleDateString()}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <a href={`/storage/${p.document_path}`} target="_blank" className="p-2.5 text-indigo-500 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors">
+                                                                            <ExternalLink className="w-4 h-4"/>
+                                                                        </a>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {remaining > 0 && reservation.statut !== 'annule' && (
+                                                        <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200/60">
+                                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6">Soumettre une preuve de virement</p>
+                                                            <form onSubmit={handlePaymentSubmit} className="space-y-5">
+                                                                <div>
+                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Montant du virement (MAD)</label>
+                                                                    <input type="number" required min="1" max={remaining} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full bg-white border-slate-200 rounded-xl text-sm font-bold focus:ring-indigo-500 focus:border-indigo-500 py-3" placeholder={`Max : ${remaining}`} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Justificatif (PDF/Image)</label>
+                                                                    <input type="file" required accept=".pdf,image/*" onChange={e => setPaymentFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
+                                                                </div>
+                                                                <button disabled={isUploading || !paymentFile || !paymentAmount} type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200">
+                                                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />} Soumettre le versement
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Right Column: Mini Info Sticky */}
+                            <div className="hidden lg:block lg:col-span-4 space-y-6 sticky top-28">
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                                    <h2 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-4 mb-4 uppercase tracking-widest">
+                                        Résumé Financier
+                                    </h2>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500 font-medium">Total Séjour</span>
+                                            <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-slate-500 font-medium">Déjà versé</span>
+                                            <span className="font-bold text-emerald-600">-{formatPrice(totalValidPaid)}</span>
+                                        </div>
+                                        {waitingPayments.length > 0 && (
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="text-amber-500 font-bold uppercase tracking-tighter italic">En cours de vérif.</span>
+                                                <span className="font-bold text-amber-500 italic">+{formatPrice(waitingPayments.reduce((s:number, p:any) => s + p.amount, 0))}</span>
                                             </div>
                                         )}
-                                    </div>
-
-                                    {remaining > 0 && reservation.statut !== 'annule' && (
-                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Soumettre une preuve de virement</p>
-                                            <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                                                <div>
-                                                    <label className="text-xs font-medium text-slate-600 block mb-1">Montant transféré (MAD)</label>
-                                                    <input type="number" required min="1" max={remaining} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full bg-white border-slate-200 rounded-xl text-sm" placeholder={remaining.toString()} />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs font-medium text-slate-600 block mb-1">Document (PDF/Image)</label>
-                                                    <input type="file" required accept=".pdf,image/*" onChange={e => setPaymentFile(e.target.files?.[0] || null)} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
-                                                </div>
-                                                <button disabled={isUploading || !paymentFile || !paymentAmount} type="submit" className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold flex justify-center items-center gap-2 disabled:opacity-50">
-                                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4"/>} Soumettre
-                                                </button>
-                                            </form>
+                                        <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
+                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Reste à payer</span>
+                                            <span className={`text-xl font-black ${remaining > 0 ? 'text-indigo-600' : 'text-emerald-500'}`}>
+                                                {formatPrice(remaining)}
+                                            </span>
                                         </div>
-                                    )}
                                     </div>
                                 </div>
-                            )}
+                                
+                                <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-6">
+                                    <div className="flex items-center gap-3 text-emerald-700 mb-3">
+                                        <CheckCircle size={20}/>
+                                        <span className="text-xs font-bold uppercase tracking-widest">Assistance</span>
+                                    </div>
+                                    <p className="text-[11px] text-emerald-600 font-medium leading-relaxed">
+                                        Notre équipe de réception est disponible 24h/24 pour répondre à vos questions. Contactez l'hôtel directement par téléphone pour toute demande urgente.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                     ) : (
 
-                        /* EDITING MODE */
-                        <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-500">
-                            <div className="bg-slate-50 border-b border-slate-100 px-8 py-6 flex justify-between items-center">
+                        /* EDITING MODE - ADMIN FORM STYLE */
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                            <div className="bg-slate-50 border-b border-slate-100 px-8 py-5 flex justify-between items-center bg-white/50 backdrop-blur">
                                 <StepIndicator currentStep={step} />
-                                <button onClick={cancelEdit} className="text-xs text-slate-500 font-bold hover:text-slate-800 uppercase tracking-wider hidden md:block">
-                                    X Annuler la modification
+                                <button onClick={cancelEdit} className="text-[10px] text-rose-500 font-black hover:text-rose-700 uppercase tracking-widest flex items-center gap-1">
+                                    <span className="w-5 h-5 bg-rose-50 rounded-full flex items-center justify-center">×</span> Abandonner
                                 </button>
                             </div>
 
@@ -372,25 +523,33 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                 </FormProvider>
                             </div>
 
-                            <div className="px-12 pb-12 flex justify-between items-center">
-                                <button type="button" onClick={handleBack} className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all ${step === 1 ? "invisible" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"}`}>
+                            <div className="px-12 pb-10 flex justify-between items-center">
+                                <button type="button" onClick={handleBack} className={`px-6 py-3 rounded-xl text-xs font-bold transition-all ${step === 1 ? "invisible" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"}`}>
                                     ← Retour
                                 </button>
 
-                                {step < 3 ? (
-                                    <button type="button" onClick={handleNext} className="px-10 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-sm font-black tracking-wide transition-all active:scale-[0.98] shadow-xl shadow-slate-900/20">
-                                        Continuer →
-                                    </button>
-                                ) : (
-                                    <button type="button" onClick={handleSubmit(onSubmit)} disabled={submitting} className="px-10 py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-slate-900 rounded-2xl text-sm font-black tracking-wide transition-all active:scale-[0.98] shadow-xl shadow-amber-500/20 flex items-center gap-2">
-                                        {submitting ? "Mise à jour..." : "✓ Enregistrer"}
-                                    </button>
-                                )}
+                                <div className="flex gap-4">
+                                    {step < 3 ? (
+                                        <button type="button" onClick={handleNext} className="px-10 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10">
+                                            Suivant →
+                                        </button>
+                                    ) : (
+                                        <button type="button" onClick={handleSubmit(onSubmit)} disabled={submitting} className="px-10 py-4 bg-[#54b172] hover:bg-emerald-600 disabled:opacity-70 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+                                            {submitting ? "Traitement..." : "Confirmer les changements"}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             </main>
+            
+            <footer className="py-10 text-center border-t border-slate-200 mt-20">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                    © 2026 GRH Hôtels · Expérience Client Premium
+                </p>
+            </footer>
         </div>
     );
 }

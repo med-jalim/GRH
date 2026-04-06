@@ -22,19 +22,19 @@ export function RoomRow({ room, availableOptions, nights, index, onChange, onRem
   const subtotal = price * nights;
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-slate-300 transition-colors">
+    <div className="group flex flex-col sm:flex-row gap-4 p-5 bg-white rounded-2xl border border-slate-200 hover:border-[#54b172]/30 hover:shadow-lg hover:shadow-emerald-500/5 transition-all duration-300">
       <div className="flex items-center sm:items-start pt-1">
-        <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
+        <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-black flex items-center justify-center flex-shrink-0 border border-slate-200 group-hover:bg-[#54b172] group-hover:text-white group-hover:border-[#54b172] transition-colors">
           {index + 1}
         </span>
       </div>
 
-      <div className="flex-1 space-y-1">
-        <label className="text-xs font-medium text-slate-500">Type de chambre</label>
+      <div className="flex-1 space-y-1.5">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Type de chambre</label>
         <select
           value={room.roomTypeId}
           onChange={e => onChange(room.uid, 'roomTypeId', Number(e.target.value))}
-          className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+          className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50/50 px-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#54b172]/20 focus:border-[#54b172] transition-all"
         >
           {availableOptions.map(opt => (
             <option key={opt.type.id} value={opt.type.id}>
@@ -44,38 +44,41 @@ export function RoomRow({ room, availableOptions, nights, index, onChange, onRem
         </select>
       </div>
 
-      <div className="w-full sm:w-36 space-y-1">
-        <label className="text-xs font-medium text-slate-500">Nombre de chambres</label>
+      <div className="w-full sm:w-40 space-y-1.5">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Quantité</label>
         <Input
           type="number"
           min="1"
           value={room.quantity}
           onChange={e => onChange(room.uid, 'quantity', Math.max(1, Number(e.target.value)))}
-          className="h-9 bg-white"
+          className="h-10 bg-slate-50/50 rounded-xl border-slate-200 font-bold text-sm focus:ring-[#54b172]/20 focus:border-[#54b172]"
         />
       </div>
 
-      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-1 sm:w-32 pt-1">
-        <div className="text-center sm:text-right">
+      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 sm:w-36 pt-1">
+        <div className="text-right">
           {selectedOption && (
-            <p className="text-xs text-slate-400">{formatPrice(price * room.quantity)}<span className="text-[10px]">/nuit</span></p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">{formatPrice(price * room.quantity)}/nuit</p>
           )}
-          {subtotal > 0 && (
-            <p className="text-sm font-bold text-amber-600">{formatPrice(subtotal * room.quantity)}</p>
-          )}
-          {nights > 0 && <p className="text-[10px] text-slate-400">{nights} nuits</p>}
+          <p className="text-lg font-black text-[#54b172] leading-none tracking-tighter">
+            {formatPrice(subtotal * room.quantity)}
+          </p>
+          {nights > 0 && <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">{nights} Nuits</p>}
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onRemove(room.uid)}
-        className="self-start sm:self-center p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-all"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <div className="flex items-center justify-center pl-2">
+        <button
+            type="button"
+            onClick={() => onRemove(room.uid)}
+            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all active:scale-95"
+            title="Supprimer cette ligne"
+        >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+      </div>
     </div>
   );
 }

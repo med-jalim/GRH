@@ -16,11 +16,12 @@ Route::get('/', function () {
 });
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
+Route::post('/booking', [ReservationController::class, 'store'])->name('public.reservation.store');
 
 // ----- Public Reservation Actions (via Token) -----
 Route::get('/reservation/{token}', [ClientReservationController::class, 'show'])->name('reservation.show');
-Route::get('/reservation/{token}/confirm', [ClientReservationController::class, 'confirm'])->name('reservation.confirm');
-Route::get('/reservation/{token}/cancel', [ClientReservationController::class, 'cancel'])->name('reservation.cancel');
+Route::post('/reservation/{token}/confirm', [ClientReservationController::class, 'confirm'])->name('reservation.confirm');
+Route::post('/reservation/{token}/cancel', [ClientReservationController::class, 'cancel'])->name('reservation.cancel');
 Route::post('/reservation/{token}/update', [ClientReservationController::class, 'update'])->name('reservation.update');
 Route::post('/reservation/{token}/payments', [ClientReservationController::class, 'addPayment'])->name('reservation.addPayment');
 

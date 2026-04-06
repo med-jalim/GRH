@@ -11,17 +11,17 @@ export function AgencyInfoStep() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-amber-400 text-sm font-bold shadow-sm">
+      <div className="mb-10">
+        <div className="flex items-center gap-4 mb-2">
+          <div className="w-9 h-9 rounded-xl bg-[#54b172] flex items-center justify-center text-white text-xs font-black shadow-lg shadow-emerald-500/20">
             1
           </div>
-          <h2 className="text-xl font-bold text-slate-800">
-            Informations de l'agence
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">
+            Informations Agence
           </h2>
         </div>
-        <p className="text-slate-400 text-sm ml-11">
-          Identifiez votre agence pour le traitement du dossier.
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-[52px]">
+          Identité et contact de l'émetteur
         </p>
       </div>
 

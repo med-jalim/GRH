@@ -1,145 +1,167 @@
-import { Link } from '@inertiajs/react';
-import { Separator } from '@/components/ui/separator';
-import type { BookingSchemaType as BookingFormData } from '@/lib/schemas';
-import type { Hotel } from '@/types/booking';
-import { formatPrice } from '@/data/mockData';
+import { Link } from "@inertiajs/react";
+import { Separator } from "@/components/ui/separator";
+import type { BookingSchemaType as BookingFormData } from "@/lib/schemas";
+import type { Hotel } from "@/types/booking";
+import {
+  Building2,
+  CheckCircle,
+  Mail,
+  MapPin,
+  Calendar,
+  Users,
+  BedDouble,
+  PlusCircle,
+} from "lucide-react";
 
 interface Props {
-  reference:  string;
-  formData:   BookingFormData;
-  hotel:      Hotel | null;
+  reference: string;
+  formData: BookingFormData;
+  hotel: Hotel | null;
   totalPrice: number;
-  nights:     number;
+  nights: number;
 }
 
-export function BookingSuccessPage({ reference, formData, hotel, totalPrice, nights }: Props) {
+export function BookingSuccessPage({
+  reference,
+  formData,
+  hotel,
+  totalPrice,
+  nights,
+}: Props) {
+  const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
+  
   const fmt = (d: string) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('fr-MA', {
+    new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', {
       day: 'numeric', month: 'long', year: 'numeric',
     });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col">
-      {/* Header */}
-      <header className="py-5 px-6">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-            <span className="text-slate-900 font-black text-xs">GRH</span>
-          </div>
-          <div>
-            <p className="text-white font-bold text-base leading-none">Groupe Résidences Hôtelières</p>
-            <p className="text-slate-400 text-xs mt-0.5">Confirmation de demande</p>
-          </div>
+    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+      {/* STICKY HEADER */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200/60 backdrop-blur-md bg-white/80 py-4 px-6 mb-8">
+        <div className="max-w-3xl mx-auto flex items-center gap-4">
+            <div className="w-10 h-10 bg-[#54b172] rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <Building2 className="text-white w-6 h-6" />
+            </div>
+            <div>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none uppercase">
+                    Confirmation Demande
+                </h1>
+                <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">
+                    Portail <span className="text-[#54b172]">Groupe Résidences Hôtelières </span>
+                </p>
+            </div>
         </div>
       </header>
 
-      <main className="flex-1 px-4 pb-16 flex items-start justify-center">
-        <div className="w-full max-w-2xl">
-          {/* Success card */}
-          <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 overflow-hidden">
-            {/* Green banner */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-8 py-8 text-center">
-              {/* Animated check */}
-              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
+      <main className="px-6 pb-20">
+        <div className="max-w-3xl mx-auto">
+          
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+            {/* Minimal Success Header */}
+            <div className="bg-emerald-50/50 border-b border-emerald-100 p-10 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#54b172] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
+                <CheckCircle className="text-white w-8 h-8" />
               </div>
-              <h1 className="text-2xl font-black text-white">Demande envoyée !</h1>
-              <p className="text-emerald-100 text-sm mt-1">
-                Votre demande de réservation a été reçue avec succès
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight uppercase mb-2">Demande Envoyée</h1>
+              <p className="text-slate-500 text-sm font-medium">
+                Votre dossier est en cours de traitement par notre équipe de réservation.
               </p>
-              <div className="mt-4 inline-flex items-center gap-2 bg-white/20 rounded-xl px-4 py-2">
-                <span className="text-emerald-100 text-xs font-medium">N° de référence</span>
-                <span className="text-white font-black text-lg tracking-wider">{reference}</span>
+              
+              <div className="mt-8 inline-flex flex-col items-center gap-1 bg-white border border-emerald-200 rounded-xl px-8 py-3 shadow-sm">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">N° de Référence</span>
+                <span className="text-slate-900 font-black text-xl tracking-tight">{reference}</span>
               </div>
             </div>
 
-            {/* Details */}
-            <div className="p-8 space-y-6">
-              {/* Info notice */}
-              <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex gap-3">
-                <svg className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <p className="text-blue-700 text-sm">
-                  Notre équipe vous contactera à l'adresse{' '}
-                  <strong>{formData.email}</strong> dans un délai de 24h pour confirmer votre réservation.
-                </p>
+            <div className="p-10 space-y-10">
+              {/* Info Notice */}
+              <div className="p-5 bg-slate-50 border border-slate-100 rounded-xl flex gap-4 items-start">
+                <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm text-[#54b172]">
+                    <Mail size={16} />
+                </div>
+                <div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                        Un récapitulatif a été envoyé à <strong>{formData.email}</strong>. 
+                        Notre équipe vous contactera sous 24h pour finaliser votre séjour.
+                    </p>
+                </div>
               </div>
 
-              {/* Booking summary */}
+              {/* Booking Summary - PORTAL STYLE */}
               <div>
-                <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                  Récapitulatif de votre demande
-                </h2>
+                <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-6 border-b border-slate-100 pb-2">
+                    Récapitulatif de la Demande
+                </h3>
 
-                <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Agence</span>
-                    <span className="text-sm font-medium text-slate-700">{formData.agencyName}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Responsable</span>
-                    <span className="text-sm font-medium text-slate-700">{formData.contactName}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Hôtel</span>
-                    <span className="text-sm font-medium text-slate-700">{hotel?.name} — {hotel?.ville}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Arrivée</span>
-                    <span className="text-sm font-medium text-slate-700">{fmt(formData.checkIn)}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Départ</span>
-                    <span className="text-sm font-medium text-slate-700">{fmt(formData.checkOut)}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Durée</span>
-                    <span className="text-sm font-medium text-slate-700">{nights} nuit{nights > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Personnes</span>
-                    <span className="text-sm font-medium text-slate-700">{formData.totalOccupants} personne{formData.totalOccupants > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Chambres</span>
-                    <span className="text-sm font-medium text-slate-700">
-                      {formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0)} chambre{formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0) > 1 ? 's' : ''}
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Agence émettrice</span>
+                            <span className="text-sm font-bold text-slate-800">{formData.agencyName}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Établissement</span>
+                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <MapPin size={14} className="text-slate-400"/> {hotel?.name} — {hotel?.ville}
+                            </span>
+                        </div>
+                    </div>
 
-                  <Separator />
-                  <div className="flex justify-between py-1 items-center">
-                    <span className="text-sm font-semibold text-slate-600">Total estimé</span>
-                    <span className="text-xl font-black text-amber-600">{formatPrice(totalPrice)}</span>
-                  </div>
+                    <div className="space-y-4">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates du Séjour</span>
+                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <Calendar size={14} className="text-slate-400"/> {fmt(formData.checkIn)} au {fmt(formData.checkOut)}
+                            </span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Capacité & Durée</span>
+                            <span className="text-sm font-bold text-slate-800">
+                                {formData.totalOccupants} Pers. · {nights} Nuit{nights > 1 ? 's' : ''}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                {formData.specialRequests && (
-                  <div className="mt-3 p-3 bg-slate-50 rounded-xl">
-                    <p className="text-xs text-slate-400 mb-1">Demandes particulières</p>
-                    <p className="text-sm text-slate-600 italic">"{formData.specialRequests}"</p>
-                  </div>
-                )}
+                <div className="mt-8 p-6 bg-slate-50/50 rounded-2xl border border-slate-200/60">
+                    <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-4 mb-4">
+                        <span className="text-slate-500 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                            <BedDouble size={14}/> Configuration Chambres
+                        </span>
+                        <span className="font-bold text-slate-700">
+                            {formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0)} Unité(s)
+                        </span>
+                    </div>
+
+                    {formData.specialRequests && (
+                        <div className="mb-4 text-xs text-slate-500 italic pb-4 border-b border-slate-100">
+                            " {formData.specialRequests} "
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Estimation Totale (HT)</span>
+                        <span className="text-2xl font-black text-[#54b172]">{formatPrice(totalPrice)}</span>
+                    </div>
+                </div>
               </div>
 
-              {/* New request button */}
+              {/* Action */}
               <Link
                 href="/booking"
-                className="block w-full py-3 text-center bg-slate-800 hover:bg-slate-900 text-white
-                  rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg"
+                className="w-full flex items-center justify-center gap-2 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10"
               >
-                + Nouvelle demande de réservation
+                <PlusCircle size={16} /> Effectuer une nouvelle demande
               </Link>
             </div>
           </div>
 
-          <p className="text-center text-slate-500 text-xs mt-6">
-            Groupe Résidences Hôtelières · Toutes les demandes sont traitées sous 24h
-          </p>
+          <footer className="py-10 text-center border-t border-slate-200 mt-20">
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                © 2026 GRH Hôtels · Expérience Client Premium
+            </p>
+          </footer>
         </div>
       </main>
     </div>

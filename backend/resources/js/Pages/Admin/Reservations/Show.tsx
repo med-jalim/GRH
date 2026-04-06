@@ -568,7 +568,7 @@ export default function ReservationShow({ reservation }: Props) {
                             <span className="inline-flex items-center justify-center w-7 h-7 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">{item.quantite}</span>
                           </td>
                           <td className="py-3 text-right text-slate-600 text-xs">{formatPrice(item.prix_unitaire)}</td>
-                          <td className="py-3 text-right font-semibold text-slate-800">{formatPrice(item.quantite * item.prix_unitaire)}</td>
+                          <td className="py-3 text-right font-semibold text-slate-800">{formatPrice(item.quantite * item.prix_unitaire * nights)}</td>
                         </tr>
                       ))}
                     </tbody>

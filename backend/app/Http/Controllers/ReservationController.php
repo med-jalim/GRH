@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\PaymentRequired;
+use App\Mail\ReservationCancelled;
+use App\Mail\ReservationConfirmed;
 use App\Mail\ReservationStatusUpdated;
 use App\Mail\ReservationValidationRequest;
 use App\Models\ItemReservation;
@@ -91,18 +94,20 @@ class ReservationController extends Controller
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
 
-        // Calculate total price from details
+        // Recalculate total price for safety
+        $dateArrivee = \Carbon\Carbon::parse($validated['date_arrivee']);
+        $dateDepart = \Carbon\Carbon::parse($validated['date_depart']);
+        $nights = $dateArrivee->diffInDays($dateDepart);
+        if ($nights < 1) $nights = 1;
+
+        $details = $validated['details'] ?? [];
         $prixTotal = 0;
-        if (! empty($validated['details'])) {
-            foreach ($validated['details'] as $detail) {
-                $prixTotal += $detail['quantite'] * $detail['prix_unitaire'];
-            }
+        foreach ($details as $d) {
+            $prixTotal += ($d['quantite'] * $d['prix_unitaire'] * $nights);
         }
         $validated['prix_total'] = $prixTotal;
 
-        $details = $validated['details'] ?? [];
         unset($validated['details']);
-
         $reservation = Reservation::create($validated);
 
         // Notify admins about the new reservation
@@ -123,12 +128,13 @@ class ReservationController extends Controller
             ItemReservation::create($detail);
         }
 
+
         $reservation->load(['hotel', 'details.type']);
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
         }
-
+        
         return redirect()->back()->with([
             'success' => 'Votre réservation a été enregistrée avec succès.',
             'reference' => $reservation->code_reference,
@@ -189,6 +195,22 @@ class ReservationController extends Controller
         ]);
 
         $reservation->update($validated);
+
+        // Recalculate total if dates or line items might have changed
+        // Note: Currently admin update doesn't handle line items, but we should update total if dates change
+        $dateArrivee = \Carbon\Carbon::parse($reservation->date_arrivee);
+        $dateDepart = \Carbon\Carbon::parse($reservation->date_depart);
+        $nights = $dateArrivee->diffInDays($dateDepart);
+        if ($nights < 1) $nights = 1;
+
+        $prixTotal = 0;
+        foreach ($reservation->details as $d) {
+            $subtotal = ($d->quantite * $d->prix_unitaire * $nights);
+            $prixTotal += $subtotal;
+        }
+        $reservation->prix_total = $prixTotal;
+        $reservation->save();
+
         $reservation->load(['hotel', 'details.type']);
 
         return response()->json([
@@ -237,20 +259,20 @@ class ReservationController extends Controller
         if ($previousStatut !== $newStatut) {
             try {
                 if ($newStatut === 'en_validation') {
-                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationValidationRequest($reservation));
+                    Mail::to($reservation->email)->send(new ReservationValidationRequest($reservation));
                 } elseif ($newStatut === 'confirme') {
-                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationConfirmed($reservation));
+                    Mail::to($reservation->email)->send(new ReservationConfirmed($reservation));
                 } elseif ($newStatut === 'annule') {
-                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationCancelled($reservation, $validated['message'] ?? null));
+                    Mail::to($reservation->email)->send(new ReservationCancelled($reservation, $validated['message'] ?? null));
                 } elseif ($newStatut === 'en_attente_paiement') {
-                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\PaymentRequired($reservation));
+                    Mail::to($reservation->email)->send(new PaymentRequired($reservation));
                 } elseif ($newStatut !== 'en_attente') {
                     // Fallback to generic if we add more statuses later
-                    \Illuminate\Support\Facades\Mail::to($reservation->email)
-                        ->send(new \App\Mail\ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
+                    Mail::to($reservation->email)
+                        ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send status email', [
+                Log::error('Failed to send status email', [
                     'reservation_id' => $reservation->id,
                     'error'          => $e->getMessage(),
                 ]);

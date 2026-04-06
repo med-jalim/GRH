@@ -16,6 +16,8 @@ interface Props {
     hotels: Hotel[];
 }
 
+import { Building2 } from "lucide-react";
+
 export default function BookingFormPage({ hotels }: Props) {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
@@ -137,7 +139,7 @@ export default function BookingFormPage({ hotels }: Props) {
         };
 
         try {
-            const res = await axios.post("/admin/reservations", payload, {
+            const res = await axios.post("/booking", payload, {
                 headers: { Accept: "application/json" }
             });
             setSuccessData({
@@ -165,33 +167,32 @@ export default function BookingFormPage({ hotels }: Props) {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900">
-            <header className="py-5 px-6">
-                <div className="max-w-3xl mx-auto flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
-                        <span className="text-slate-900 font-black text-xs tracking-tight">
-                            GRH
-                        </span>
+        <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+            {/* STICKY HEADER - ADMIN STYLE */}
+            <header className="sticky top-0 z-50 bg-white border-b border-slate-200/60 backdrop-blur-md bg-white/80 py-4 px-6 mb-8">
+                <div className="max-w-3xl mx-auto flex items-center gap-4">
+                    <div className="w-10 h-10 bg-[#54b172] rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <Building2 className="text-white w-6 h-6" />
                     </div>
                     <div>
-                        <p className="text-white font-bold text-base leading-none">
-                            Groupe Résidences Hôtelières
-                        </p>
-                        <p className="text-slate-400 text-xs mt-0.5">
-                            Demande de réservation en ligne
+                        <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none uppercase">
+                            Nouvelle Réservation
+                        </h1>
+                        <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-1">
+                            Portail <span className="text-[#54b172]">Groupe Résidences Hôtelières </span>
                         </p>
                     </div>
                 </div>
             </header>
 
-            <main className="px-4 pb-16">
+            <main className="px-6 pb-20">
                 <div className="max-w-3xl mx-auto">
-                    <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 overflow-hidden">
-                        <div className="bg-slate-50 border-b border-slate-100 px-8 py-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+                        <div className="bg-slate-50 border-b border-slate-100 px-8 py-5 flex justify-between items-center bg-white/50 backdrop-blur">
                             <StepIndicator currentStep={step} />
                         </div>
 
-                        <div className="p-8">
+                        <div className="p-8 md:p-12">
                             <FormProvider {...methods}>
                                 <form onSubmit={handleSubmit(onSubmit)}>
                                     {step === 1 && <AgencyInfoStep />}
@@ -214,40 +215,44 @@ export default function BookingFormPage({ hotels }: Props) {
                         </div>
 
                         {/* Navigation buttons */}
-                        <div className="px-8 pb-8 flex justify-between items-center">
+                        <div className="px-12 pb-10 flex justify-between items-center">
                             <button
                                 type="button"
                                 onClick={handleBack}
-                                className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${step === 1 ? "invisible" : "text-slate-500 hover:bg-slate-100"}`}
+                                className={`px-6 py-3 rounded-xl text-xs font-bold transition-all ${step === 1 ? "invisible" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"}`}
                             >
                                 ← Retour
                             </button>
 
-                            {step < 3 ? (
-                                <button
-                                    type="button"
-                                    onClick={handleNext}
-                                    className="px-8 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold transition-all"
-                                >
-                                    Continuer →
-                                </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={handleSubmit(onSubmit)}
-                                    disabled={submitting}
-                                    className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-slate-900 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
-                                >
-                                    {submitting
-                                        ? "Envoi en cours..."
-                                        : "✓ Envoyer la demande"}
-                                </button>
-                            )}
+                            <div className="flex gap-4">
+                                {step < 3 ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleNext}
+                                        className="px-10 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10"
+                                    >
+                                        Suivant →
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit(onSubmit)}
+                                        disabled={submitting}
+                                        className="px-10 py-4 bg-[#54b172] hover:bg-emerald-600 disabled:opacity-70 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                                    >
+                                        {submitting
+                                            ? "Envoi en cours..."
+                                            : "✓ Envoyer la demande"}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    <p className="text-center text-slate-500 text-xs mt-6">
-                        Groupe Résidences Hôtelières · 2026
-                    </p>
+                    <footer className="py-10 text-center border-t border-slate-200 mt-20">
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                            © 2026 GRH Hôtels · Expérience Client Premium
+                        </p>
+                    </footer>
                 </div>
             </main>
         </div>

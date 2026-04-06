@@ -92,17 +92,17 @@ export function ReservationDetailsStep({ hotels, nights, totalPrice, disabledHot
 
     return (
         <div>
-            <div className="mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-amber-400 text-sm font-bold">
+            <div className="mb-10">
+                <div className="flex items-center gap-4 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-[#54b172] flex items-center justify-center text-white text-xs font-black shadow-lg shadow-emerald-500/20">
                         2
                     </div>
-                    <h2 className="text-xl font-bold text-slate-800">
-                        Détails de la réservation
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">
+                        Détails du Séjour
                     </h2>
                 </div>
-                <p className="text-slate-400 text-sm ml-11">
-                    Hôtel, dates et types de chambres
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-[52px]">
+                    Choix de l'Hôtel, Dates et Chambres
                 </p>
             </div>
 
