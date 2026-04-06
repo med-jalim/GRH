@@ -13,6 +13,7 @@ import {
   HelpCircle,
   LogOut,
   Eye,
+  Mail,
 } from "lucide-react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useFlash } from "@/lib/hooks";
@@ -41,6 +42,7 @@ export function AdminLayout({ children }: Props) {
     { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Réservations", href: "/admin/reservations", icon: CalendarCheck },
     { name: "Hôtels", href: "/admin/hotels", icon: Building2 },
+    { name: "Emails", href: "/admin/email-templates", icon: Mail },
   ];
 
   return (

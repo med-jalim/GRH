@@ -52,4 +52,9 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     // Notifications
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
+
+    // Email Templates
+    Route::get('/email-templates', [\App\Http\Controllers\EmailTemplateController::class, 'index'])->name('email-templates.index');
+    Route::get('/email-templates/{id}/edit', [\App\Http\Controllers\EmailTemplateController::class, 'edit'])->name('email-templates.edit');
+    Route::patch('/email-templates/{id}', [\App\Http\Controllers\EmailTemplateController::class, 'update'])->name('email-templates.update');
 });

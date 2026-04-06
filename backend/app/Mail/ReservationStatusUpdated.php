@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Traits\HasDynamicTemplate;
 use App\Models\Reservation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -12,7 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class ReservationStatusUpdated extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use Queueable, SerializesModels, HasDynamicTemplate;
 
     /**
      * Status labels for the email body.
@@ -53,16 +54,31 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
      */
     public function content(): Content
     {
+        $statusLabel = self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut;
+        
+        $data = [
+            'NOM_CLIENT'    => $this->reservation->nom_contact,
+            'CODE_REF'      => $this->reservation->code_reference,
+            'NOM_HOTEL'     => $this->reservation->hotel->name ?? 'votre hôtel',
+            'DATES_SEJOUR'  => $this->reservation->date_arrivee->format('d/m/Y') . ' au ' . $this->reservation->date_depart->format('d/m/Y'),
+            'STATUT_LABEL'  => $statusLabel,
+            'PORTAL_URL'    => url('reservation/' . $this->reservation->token),
+            'TABLEAU_DEVIS' => $this->generateQuoteTable($this->reservation),
+        ];
+
+        $dynamicHtml = $this->resolveDynamicTemplate('reservation_status_updated', $data);
+
         return new Content(
-            view: 'emails.reservation_status_updated',
-            with: [
+            view: $dynamicHtml ? 'emails.dynamic' : 'emails.reservation_status_updated',
+            with: array_merge($data, [
                 'reservation'        => $this->reservation,
                 'previousStatut'     => $this->previousStatut,
                 'newStatut'          => $this->reservation->statut,
-                'statusLabel'        => self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut,
+                'statusLabel'        => $statusLabel,
                 'prevLabel'          => self::$statusLabels[$this->previousStatut] ?? $this->previousStatut,
                 'cancellationReason' => $this->cancellationReason,
-            ],
+                'dynamicHtml'        => $dynamicHtml,
+            ]),
         );
     }
 }
