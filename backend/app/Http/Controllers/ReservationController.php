@@ -237,16 +237,20 @@ class ReservationController extends Controller
         if ($previousStatut !== $newStatut) {
             try {
                 if ($newStatut === 'en_validation') {
-                    // Specific email for validation request
-                    Mail::to($reservation->email)->send(new ReservationValidationRequest($reservation));
+                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationValidationRequest($reservation));
+                } elseif ($newStatut === 'confirme') {
+                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationConfirmed($reservation));
+                } elseif ($newStatut === 'annule') {
+                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\ReservationCancelled($reservation, $validated['message'] ?? null));
+                } elseif ($newStatut === 'en_attente_paiement') {
+                    \Illuminate\Support\Facades\Mail::to($reservation->email)->send(new \App\Mail\PaymentRequired($reservation));
                 } elseif ($newStatut !== 'en_attente') {
-                    // Standard notification for other statuses (including 'valide')
-                    Mail::to($reservation->email)
-                        ->send(new ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
+                    // Fallback to generic if we add more statuses later
+                    \Illuminate\Support\Facades\Mail::to($reservation->email)
+                        ->send(new \App\Mail\ReservationStatusUpdated($reservation, $previousStatut, $validated['message'] ?? null));
                 }
             } catch (\Throwable $e) {
-                // Log the failure but don't block the response
-                Log::error('Failed to send status email', [
+                \Illuminate\Support\Facades\Log::error('Failed to send status email', [
                     'reservation_id' => $reservation->id,
                     'error'          => $e->getMessage(),
                 ]);
