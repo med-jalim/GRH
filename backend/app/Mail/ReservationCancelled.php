@@ -36,6 +36,7 @@ class ReservationCancelled extends Mailable implements ShouldQueue
             'RAISON_ANNULATION'   => $this->cancellationReason ?? 'Non spécifiée',
             'DATES_SEJOUR'        => $this->reservation->date_arrivee->format('d/m/Y') . ' au ' . $this->reservation->date_depart->format('d/m/Y'),
             'PORTAL_URL'          => url('reservation/' . $this->reservation->token),
+            'TABLEAU_DEVIS'       => $this->generateQuoteTable($this->reservation),
         ];
 
         $dynamicHtml = $this->resolveDynamicTemplate('reservation_cancelled', $data);

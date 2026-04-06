@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function PublicReservationPortal({ reservation, hotels }: Props) {
-    const { flash } = usePage().props as any;
+    const { flash, errors } = usePage().props as any;
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<"general" | "payment">(() => {
         if (typeof window !== 'undefined') {
@@ -30,6 +30,8 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     // Edit Form State
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
+    const [isAvailable, setIsAvailable] = useState(true);
+    const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
     // Action State
     const [isActioning, setIsActioning] = useState<string | null>(null);
@@ -46,13 +48,16 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             email: reservation.email || "",
             phone: reservation.telephone || "",
             hotelId: reservation.id_hotel,
-            checkIn: reservation.date_arrivee ? reservation.date_arrivee.split('T')[0] : "",
-            checkOut: reservation.date_depart ? reservation.date_depart.split('T')[0] : "",
-            totalOccupants: reservation.nb_personnes || 0,
-            rooms: reservation.details?.map((d: any) => ({
-                uid: crypto.randomUUID(),
-                roomTypeId: d.id_type,
-                quantity: d.quantite,
+            groups: reservation.groups?.map((g: any) => ({
+                uid: Math.random().toString(36).substr(2, 9),
+                checkIn: g.date_arrivee ? g.date_arrivee.split('T')[0] : "",
+                checkOut: g.date_depart ? g.date_depart.split('T')[0] : "",
+                occupants: g.nb_personnes || 1,
+                rooms: g.items?.map((i: any) => ({
+                    uid: Math.random().toString(36).substr(2, 9),
+                    roomTypeId: i.id_type,
+                    quantity: i.quantite,
+                })) || [],
             })) || [],
             specialRequests: reservation.remarques_speciales || "",
         },
@@ -67,30 +72,34 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         [formData.hotelId, hotels],
     );
 
-    const nights = useMemo(() => {
-        if (!formData.checkIn || !formData.checkOut) return 0;
-        const diff = new Date(formData.checkOut).getTime() - new Date(formData.checkIn).getTime();
-        return Math.max(0, Math.round(diff / 86_400_000));
-    }, [formData.checkIn, formData.checkOut]);
-
     const totalPrice = useMemo(() => {
-        if (!selectedHotel || nights === 0 || !formData.checkIn) return 0;
-        const checkInDate = new Date(formData.checkIn);
-        return formData.rooms.reduce((sum: number, r: any) => {
-            const tarif = selectedHotel.tarifs.find(
-                (t: any) =>
-                    t.id_type === r.roomTypeId &&
-                    new Date(t.date_debut) <= checkInDate &&
-                    new Date(t.date_fin) >= checkInDate,
-            );
-            return sum + (tarif ? tarif.prix * nights * r.quantity : 0);
+        if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
+        
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
+            
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+            const checkInDate = new Date(g.checkIn);
+
+            const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
+                const tarif = selectedHotel.tarifs?.find(
+                    (t: any) =>
+                        t.id_type === r.roomTypeId &&
+                        new Date(t.date_debut) <= checkInDate &&
+                        new Date(t.date_fin) >= checkInDate,
+                );
+                return rSum + (tarif ? tarif.prix * nights * r.quantity : 0);
+            }, 0);
+
+            return sum + groupTotal;
         }, 0);
-    }, [formData.rooms, selectedHotel, nights, formData.checkIn]);
+    }, [formData.groups, selectedHotel]);
 
     const handleNext = async () => {
         let fieldsToValidate: any[] = [];
         if (step === 1) fieldsToValidate = ["agencyName", "agencyCode", "contactName", "email", "phone"];
-        if (step === 2) fieldsToValidate = ["hotelId", "checkIn", "checkOut", "totalOccupants", "rooms"];
+        if (step === 2) fieldsToValidate = ["hotelId", "groups"];
 
         const isValid = await trigger(fieldsToValidate);
         if (isValid) {
@@ -110,32 +119,54 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         setIsEditing(false);
     }
 
-    const onSubmit = async (data: BookingSchemaType) => {
+    const onSubmit = (data: BookingSchemaType) => {
         setSubmitting(true);
         const payload = {
-            nom_agence: data.agencyName, nom_contact: data.contactName, code_agence: data.agencyCode,
-            email: data.email, telephone: data.phone, id_hotel: data.hotelId,
-            date_arrivee: data.checkIn, date_depart: data.checkOut,
-            nb_personnes: data.totalOccupants, prix_total: totalPrice, remarques_speciales: data.specialRequests,
-            details: data.rooms.map((r: any) => {
-                const checkInDate = new Date(data.checkIn);
-                const validTarif = selectedHotel?.tarifs.find((t: any) => t.id_type === r.roomTypeId && new Date(t.date_debut) <= checkInDate && new Date(t.date_fin) >= checkInDate);
-                return { id_type: r.roomTypeId, quantite: r.quantity, prix_unitaire: validTarif?.prix || 0 };
-            }),
+            nom_contact: data.contactName,
+            email: data.email,
+            telephone: data.phone,
+            remarques_speciales: data.specialRequests,
+            groups: data.groups.map(g => ({
+                date_arrivee: g.checkIn,
+                date_depart: g.checkOut,
+                nb_personnes: g.occupants,
+                rooms: g.rooms.map(r => {
+                    const checkInDate = new Date(g.checkIn);
+                    const validTarif = selectedHotel?.tarifs.find(
+                        (t) =>
+                            t.id_type === r.roomTypeId &&
+                            new Date(t.date_debut) <= checkInDate &&
+                            new Date(t.date_fin) >= checkInDate,
+                    );
+                    return {
+                        id_type: r.roomTypeId,
+                        quantite: r.quantity,
+                        prix_unitaire: validTarif?.prix || 0,
+                    };
+                })
+            }))
         };
-
-        router.post(`/reservation/${reservation.token}/update`, payload, {
-            onStart: () => setSubmitting(true),
-            onFinish: () => setSubmitting(false),
+        
+        router.put(`/reservation/${reservation.token}/update`, payload, {
             onSuccess: () => {
+                setSubmitting(false);
                 setIsEditing(false);
                 setStep(1);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             },
-            onError: (errors) => {
-                console.error("Inertia Error:", errors);
-                alert("Une erreur est survenue lors de la mise à jour.");
-            }
+            onError: (errs) => {
+                setSubmitting(false);
+                // Smart redirect based on errors
+                const hasStep2Error = Object.keys(errs).some(k => k.startsWith('groups') || k === 'availability');
+                const hasStep1Error = Object.keys(errs).some(k => ['nom_contact', 'email', 'telephone'].includes(k));
+
+                if (hasStep2Error) {
+                    setStep(2);
+                } else if (hasStep1Error) {
+                    setStep(1);
+                }
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            },
         });
     };
 
@@ -224,7 +255,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                 <Building2 className="w-3.5 h-3.5" />
                                 Informations
                             </button>
-                            <button
+                            {(reservation.statut === 'en_attente_paiement' || reservation.statut === 'partiellement_paye') && (<button
                                 onClick={() => setActiveTab("payment")}
                                 className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
                                     activeTab === "payment"
@@ -235,6 +266,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                 <CreditCard className="w-3.5 h-3.5" />
                                 Règlement
                             </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -273,7 +305,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                             </div>
                                             
                                             <div className="flex flex-wrap gap-2">
-                                                {reservation.statut !== 'confirme' && reservation.statut !== 'annule' && (
+                                                {reservation.statut !== 'confirme' && reservation.statut !== 'annule'  && (
                                                     <>
                                                         {reservation.statut === 'en_validation' && (
                                                             <button 
@@ -347,23 +379,31 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                             <div className="mt-12 pt-8 border-t border-slate-100">
                                                 <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5">Hébergement & Tarification</h3>
                                                 <div className="bg-slate-50 rounded-xl border border-slate-200/60 overflow-hidden">
-                                                    <table className="w-full text-left text-xs">
-                                                        <thead className="bg-slate-100 text-slate-400 font-bold uppercase tracking-wider">
-                                                            <tr>
-                                                                <th className="px-6 py-3">Type</th>
-                                                                <th className="px-6 py-3 text-center">Quantité</th>
-                                                                <th className="px-6 py-3 text-right">Total</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-100">
-                                                            {reservation.details.map((d:any) => (
-                                                                <tr key={d.id} className="bg-white">
-                                                                    <td className="px-6 py-4 font-bold text-slate-700">{d.type?.nom ?? 'Chambre'}</td>
-                                                                    <td className="px-6 py-4 text-center font-medium text-slate-500">x{d.quantite}</td>
-                                                                    <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(d.prix_unitaire * d.quantite * nights)}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
+                                                    <table className="w-full">
+                                                         <thead>
+                                                             <tr className="bg-slate-50 border-b border-slate-100">
+                                                                 <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Hébergement & Dates</th>
+                                                                 <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantité</th>
+                                                                 <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Sous-total</th>
+                                                             </tr>
+                                                         </thead>
+                                                         <tbody className="divide-y divide-slate-100">
+                                                             {reservation.groups.map((g:any) => {
+                                                                 const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
+                                                                 const groupNights = Math.max(1, Math.round(diff / 86_400_000));
+                                                                 
+                                                                 return g.items.map((i:any) => (
+                                                                     <tr key={i.id} className="bg-white">
+                                                                         <td className="px-6 py-4">
+                                                                             <p className="font-bold text-slate-700">{i.type?.nom ?? 'Chambre'}</p>
+                                                                             <p className="text-[10px] text-slate-400 font-medium">Du {g.date_arrivee} au {g.date_depart} ({groupNights} nuits)</p>
+                                                                         </td>
+                                                                         <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
+                                                                         <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
+                                                                     </tr>
+                                                                 ));
+                                                             })}
+                                                         </tbody>
                                                         <tfoot className="bg-slate-50">
                                                             <tr>
                                                                 <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Estimé</td>
@@ -441,7 +481,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             <form onSubmit={handlePaymentSubmit} className="space-y-5">
                                                                 <div>
                                                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Montant du virement (MAD)</label>
-                                                                    <input type="number" required min="1" max={remaining} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full bg-white border-slate-200 rounded-xl text-sm font-bold focus:ring-indigo-500 focus:border-indigo-500 py-3" placeholder={`Max : ${remaining}`} />
+                                                                    <input type="number" required min="1" max={remaining} value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="ps-3 w-full bg-white border-slate-200 rounded-xl text-sm font-bold focus:ring-indigo-500 focus:border-indigo-500 py-3" placeholder={`Max : ${remaining}`} />
                                                                 </div>
                                                                 <div>
                                                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-2">Justificatif (PDF/Image)</label>
@@ -517,11 +557,41 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                 <FormProvider {...methods}>
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         {step === 1 && <AgencyInfoStep />}
-                                        {step === 2 && <ReservationDetailsStep hotels={hotels} nights={nights} totalPrice={totalPrice} disabledHotel={true} />}
-                                        {step === 3 && <SummaryStep hotel={selectedHotel} nights={nights} totalPrice={totalPrice} />}
+                                        {step === 2 && (
+                                            <ReservationDetailsStep 
+                                                hotels={hotels} 
+                                                totalPrice={totalPrice} 
+                                                disabledHotel={true} 
+                                                reservationId={reservation.id}
+                                                onAvailabilityChange={setIsAvailable}
+                                                onCheckingChange={setIsCheckingAvailability}
+                                            />
+                                        )}
+                                        {step === 3 && <SummaryStep hotel={selectedHotel} totalPrice={totalPrice} />}
                                     </form>
                                 </FormProvider>
                             </div>
+
+                            {/* API Errors Display */}
+                            {errors && Object.keys(errors).length > 0 && (
+                                <div className="mx-12 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="flex gap-3">
+                                        <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0 mt-0.5">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Configuration Requise</p>
+                                            <ul className="list-disc list-inside space-y-0.5">
+                                                {Object.values(errors).flat().map((err: any, idx) => (
+                                                    <li key={idx} className="text-xs font-bold text-rose-600 leading-relaxed">{err}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="px-12 pb-10 flex justify-between items-center">
                                 <button type="button" onClick={handleBack} className={`px-6 py-3 rounded-xl text-xs font-bold transition-all ${step === 1 ? "invisible" : "text-slate-400 hover:bg-slate-50 hover:text-slate-900"}`}>
@@ -530,11 +600,23 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
                                 <div className="flex gap-4">
                                     {step < 3 ? (
-                                        <button type="button" onClick={handleNext} className="px-10 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10">
-                                            Suivant →
+                                        <button 
+                                            type="button" 
+                                            onClick={handleNext} 
+                                            disabled={!isAvailable || isCheckingAvailability}
+                                            className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
+                                        >
+                                            {isCheckingAvailability ? (
+                                                <>
+                                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    Vérification...
+                                                </>
+                                            ) : (
+                                                "Suivant →"
+                                            )}
                                         </button>
                                     ) : (
-                                        <button type="button" onClick={handleSubmit(onSubmit)} disabled={submitting} className="px-10 py-4 bg-[#54b172] hover:bg-emerald-600 disabled:opacity-70 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+                                        <button type="button" onClick={handleSubmit(onSubmit)} disabled={submitting || !isAvailable} className="px-10 py-4 bg-[#54b172] hover:bg-emerald-600 disabled:opacity-70 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20 flex items-center gap-2">
                                             {submitting ? "Traitement..." : "Confirmer les changements"}
                                         </button>
                                     )}

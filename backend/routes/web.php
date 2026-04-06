@@ -17,6 +17,7 @@ Route::get('/', function () {
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
 Route::post('/booking', [ReservationController::class, 'store'])->name('public.reservation.store');
+Route::post('/booking/check-availability', [ReservationController::class, 'checkAvailabilityAjax'])->name('public.reservation.check');
 
 // ----- Public Reservation Actions (via Token) -----
 Route::get('/reservation/{token}', [ClientReservationController::class, 'show'])->name('reservation.show');

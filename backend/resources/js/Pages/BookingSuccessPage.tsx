@@ -18,7 +18,6 @@ interface Props {
   formData: BookingFormData;
   hotel: Hotel | null;
   totalPrice: number;
-  nights: number;
 }
 
 export function BookingSuccessPage({
@@ -26,7 +25,6 @@ export function BookingSuccessPage({
   formData,
   hotel,
   totalPrice,
-  nights,
 }: Props) {
   const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
   
@@ -88,61 +86,93 @@ export function BookingSuccessPage({
                 </div>
               </div>
 
-              {/* Booking Summary - PORTAL STYLE */}
+                    {/* Booking Summary - PORTAL STYLE */}
               <div>
                 <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-6 border-b border-slate-100 pb-2">
                     Récapitulatif de la Demande
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-8">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-50 border border-slate-100 rounded-2xl">
                         <div className="flex flex-col">
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Agence émettrice</span>
                             <span className="text-sm font-bold text-slate-800">{formData.agencyName}</span>
                         </div>
-                        <div className="flex flex-col">
+                        <div className="flex flex-col md:text-right">
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Établissement</span>
-                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-800 flex items-center md:justify-end gap-2">
                                 <MapPin size={14} className="text-slate-400"/> {hotel?.name} — {hotel?.ville}
                             </span>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates du Séjour</span>
-                            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <Calendar size={14} className="text-slate-400"/> {fmt(formData.checkIn)} au {fmt(formData.checkOut)}
-                            </span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Capacité & Durée</span>
-                            <span className="text-sm font-bold text-slate-800">
-                                {formData.totalOccupants} Pers. · {nights} Nuit{nights > 1 ? 's' : ''}
-                            </span>
-                        </div>
+                    <div className="space-y-6">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                             Détails des Groupes de Séjour
+                        </h4>
+                        {formData.groups.map((group, idx) => {
+                            const diff = new Date(group.checkOut).getTime() - new Date(group.checkIn).getTime();
+                            const groupNights = Math.max(1, Math.round(diff / 86_400_000));
+                            
+                            return (
+                                <div key={group.uid} className="p-6 border border-slate-100 rounded-2xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-6 h-6 bg-slate-900 text-white rounded-lg flex items-center justify-center text-[10px] font-black">
+                                                {idx + 1}
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-800 uppercase tracking-widest">Groupe #{idx + 1}</span>
+                                        </div>
+                                        <div className="flex items-center gap-4 text-[10px] font-bold text-indigo-500 uppercase tracking-widest">
+                                            <span>{group.occupants} voyageurs</span>
+                                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                            <span>{groupNights} nuit(s)</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Calendar size={14} className="text-slate-400" />
+                                            <span>Du {fmt(group.checkIn)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                            <Calendar size={14} className="text-slate-400" />
+                                            <span>Au {fmt(group.checkOut)}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-50">
+                                        <div className="flex flex-wrap gap-2">
+                                            {group.rooms.map((r, rIdx) => {
+                                                const typeNom = hotel?.chambres.find(c => c.id_type === r.roomTypeId)?.type.nom || "Type Inconnu";
+                                                return (
+                                                    <span key={rIdx} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold text-slate-700">
+                                                        <BedDouble size={12} className="text-slate-400" />
+                                                        {r.quantity}x {typeNom}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <div className="mt-8 p-6 bg-slate-50/50 rounded-2xl border border-slate-200/60">
-                    <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-4 mb-4">
-                        <span className="text-slate-500 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
-                            <BedDouble size={14}/> Configuration Chambres
-                        </span>
-                        <span className="font-bold text-slate-700">
-                            {formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0)} Unité(s)
-                        </span>
-                    </div>
-
+                <div className="mt-8 p-8 bg-slate-900 rounded-3xl text-white shadow-xl shadow-slate-200">
                     {formData.specialRequests && (
-                        <div className="mb-4 text-xs text-slate-500 italic pb-4 border-b border-slate-100">
-                            " {formData.specialRequests} "
+                        <div className="mb-6 pb-6 border-b border-white/10 text-xs text-slate-400 italic">
+                             "{formData.specialRequests}"
                         </div>
                     )}
 
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Estimation Totale (HT)</span>
-                        <span className="text-2xl font-black text-[#54b172]">{formatPrice(totalPrice)}</span>
+                        <div>
+                            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Estimation Totale (HT)</p>
+                            <p className="text-xs text-white/60 font-medium">Récapitulatif de tous les groupes</p>
+                        </div>
+                        <span className="text-3xl font-black text-[#54b172]">{formatPrice(totalPrice)}</span>
                     </div>
                 </div>
               </div>

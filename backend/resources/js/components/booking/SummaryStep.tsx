@@ -8,7 +8,6 @@ import type { BookingSchemaType } from '@/lib/schemas';
 
 interface Props {
   hotel:      Hotel | null;
-  nights:     number;
   totalPrice: number;
 }
 
@@ -23,16 +22,11 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-export function SummaryStep({ hotel, nights, totalPrice }: Props) {
+export function SummaryStep({ hotel, totalPrice }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
-  const fmt = (d: string) => {
-    if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    });
-  };
+  const totalOccupants = formData.groups?.reduce((acc, g) => acc + (Number(g.occupants) || 0), 0) || 0;
 
   return (
     <div>
@@ -45,6 +39,7 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
       </div>
 
       <div className="space-y-6">
+        {/* Contact Info */}
         <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
           <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-4 border-b border-slate-100 pb-2">Agence & Contact</h3>
           <Row label="Agence"      value={formData.agencyName} />
@@ -54,72 +49,105 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
           <Row label="Téléphone"   value={formData.phone} />
         </div>
 
+        {/* Stay Summary */}
         <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
-          <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-4 border-b border-slate-100 pb-2">Détails du Séjour</h3>
+          <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-4 border-b border-slate-100 pb-2">Détails Globaux</h3>
           <Row label="Hôtel"       value={hotel ? `${hotel.name} — ${hotel.ville}` : '—'} />
-          <Row label="Arrivée"     value={fmt(formData.checkIn)} />
-          <Row label="Départ"      value={fmt(formData.checkOut)} />
-          <Row label="Durée"       value={`${nights} nuit${nights > 1 ? 's' : ''}`} />
-          <Row label="Personnes"   value={`${formData.totalOccupants} personne${formData.totalOccupants > 1 ? 's' : ''}`} />
+          <Row label="Total Pers." value={`${totalOccupants} personne${totalOccupants > 1 ? 's' : ''}`} />
+          <Row label="Total Groupes" value={`${formData.groups?.length || 0} groupe(s)`} />
         </div>
 
-        {hotel && formData.rooms.length > 0 && (
-          <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
-            <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-4 border-b border-slate-100 pb-2">
-              Configuration Chambres ({formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0)})
-            </h3>
-            {formData.rooms.map((room, i) => {
-              const chambre = hotel.chambres.find(c => c.id_type === room.roomTypeId);
-              const tarif   = hotel.tarifs.find(t => t.id_type === room.roomTypeId);
-              const price   = tarif?.prix || 0;
-              const sub     = price * nights * room.quantity;
+        {/* Groups Breakdown */}
+        {hotel && formData.groups?.map((group, gIdx) => {
+          const diff = group.checkIn && group.checkOut ? new Date(group.checkOut).getTime() - new Date(group.checkIn).getTime() : 0;
+          const groupNights = Math.max(1, Math.round(diff / 86_400_000));
+          const checkInDate = new Date(group.checkIn);
 
-              return (
-                <div key={room.uid}>
-                  {i > 0 && <Separator className="my-3 opacity-50" />}
-                  <div className="flex justify-between items-start py-1">
-                    <div>
-                      <p className="text-sm font-bold text-slate-800 tracking-tight">{chambre?.type.nom ?? '—'}</p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        {room.quantity} chambre{room.quantity > 1 ? 's' : ''} ·{' '}
-                        {formatPrice(price)}/nuit
-                      </p>
+          return (
+            <div key={group.uid} className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-md">
+                            {gIdx + 1}
+                        </span>
+                        <div>
+                            <h4 className="text-sm font-black text-slate-800 tracking-tight">Groupe #{gIdx + 1}</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                {group.occupants} voyageurs · {groupNights} nuits
+                            </p>
+                        </div>
                     </div>
-                    <span className="text-sm font-black text-slate-800">{formatPrice(sub)}</span>
-                  </div>
+                    <div className="text-right">
+                        <p className="text-[9px] font-black text-[#54b172] uppercase tracking-widest mb-0.5">Période du séjour</p>
+                        <p className="text-[10px] font-bold text-slate-600">
+                            Du {group.checkIn} au {group.checkOut}
+                        </p>
+                    </div>
                 </div>
-              );
-            })}
 
-            <Separator className="my-5" />
-            <div className="flex justify-between items-center bg-white p-5 rounded-xl border border-emerald-100 shadow-sm shadow-emerald-500/5">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Estimation Totale (HT)</span>
-              <span className="text-2xl font-black text-[#54b172] tracking-tighter">{formatPrice(totalPrice)}</span>
+                <div className="space-y-4">
+                    {group.rooms.map((room) => {
+                        const chambre = hotel.chambres.find(c => c.id_type === room.roomTypeId);
+                        const tarif = hotel.tarifs.find(
+                            (t) =>
+                                t.id_type === room.roomTypeId &&
+                                new Date(t.date_debut) <= checkInDate &&
+                                new Date(t.date_fin) >= checkInDate,
+                        );
+                        const price = tarif?.prix || 0;
+                        const sub = price * groupNights * room.quantity;
+
+                        return (
+                            <div key={room.uid} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">{chambre?.type.nom ?? '—'}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                            {room.quantity} unité(s) · {formatPrice(price)}/nuit
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-black text-slate-900 tracking-tighter">{formatPrice(sub)}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+          );
+        })}
+
+        <div className="bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full -mr-16 -mt-16 blur-3xl" />
+          <div className="relative z-10">
+            <div className="flex justify-between items-end">
+                <div>
+                    <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-2">Total de la Demande</h3>
+                    <p className="text-xs text-slate-400">Taxes de séjour incluses dans l'estimation</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-4xl font-black tracking-tighter text-white leading-none">{formatPrice(totalPrice)}</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">{formData.groups?.reduce((acc, g) => acc + g.rooms.reduce((ra, r) => ra + r.quantity, 0), 0)} unité(s) au total</p>
+                </div>
             </div>
           </div>
-        )}
-
-        <div className="space-y-3">
-          <Label htmlFor="specialRequests" className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
-            Demandes particulières <span className="lowercase font-normal opacity-50">(optionnel)</span>
-          </Label>
-          <Textarea 
-            id="specialRequests" 
-            {...register('specialRequests')} 
-            rows={3} 
-            className="resize-none border-slate-200 rounded-xl focus:ring-[#54b172] focus:border-[#54b172] text-sm" 
-            placeholder="Ex: Chambres côte à côte, lit bébé..."
-          />
         </div>
 
-        <div className="p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex gap-4 text-emerald-800 text-xs leading-relaxed">
-          <div className="w-5 h-5 rounded-lg bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm shadow-emerald-500/20">
-            <span className="text-white font-black text-[10px]">!</span>
+        <div className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Notes & Remarques Spéciales</Label>
+            <Textarea
+              {...register('specialRequests')}
+              placeholder="Ex: Arrivée tardive, allergie alimentaire, besoins spécifiques..."
+              className="min-h-[140px] bg-slate-50/50 rounded-2xl border-slate-200 text-sm focus:ring-[#54b172]/20 focus:border-[#54b172] p-6 shadow-inner"
+            />
           </div>
-          <p>
-            <strong className="font-black uppercase tracking-widest text-[9px] block mb-1">Information Importante :</strong> 
-            Ce formulaire constitue une <strong>demande de réservation</strong>. Elle sera validée par notre équipe sous 24h ouvrées.
-          </p>
         </div>
       </div>
     </div>

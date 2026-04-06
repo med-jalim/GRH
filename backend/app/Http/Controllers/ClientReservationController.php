@@ -7,10 +7,18 @@ use App\Models\Hotel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\ItemReservation;
+use App\Services\ReservationService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 class ClientReservationController extends Controller
 {
+    protected $reservationService;
+
+    public function __construct(ReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
     /**
      * Confirm the reservation via token.
      */
@@ -73,7 +81,7 @@ class ClientReservationController extends Controller
      */
     public function show($token)
     {
-        $reservation = Reservation::with(['hotel', 'details.type', 'payments'])->where('token', $token)->firstOrFail();
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'payments'])->where('token', $token)->firstOrFail();
 
         // We fetch all hotels only to show the selected one as locked, 
         // or we just fetch the selected hotel to keep it simple.
@@ -96,43 +104,67 @@ class ClientReservationController extends Controller
             'nom_contact'         => 'required|string|max:255',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
-            'date_arrivee'        => 'required|date',
-            'date_depart'         => 'required|date|after:date_arrivee',
-            'nb_personnes'        => 'required|integer|min:1',
             'remarques_speciales' => 'nullable|string',
-            'prix_total'          => 'required|numeric|min:0',
-            'details'             => 'required|array',
-            'details.*.id_type'   => 'required|integer|exists:types,id',
-            'details.*.quantite'  => 'required|integer|min:1',
-            'details.*.prix_unitaire' => 'required|numeric|min:0',
+
+            // Multi-group structure
+            'groups'                  => 'required|array|min:1',
+            'groups.*.date_arrivee'   => 'required|date',
+            'groups.*.date_depart'    => 'required|date|after:groups.*.date_arrivee',
+            'groups.*.nb_personnes'   => 'required|integer|min:1',
+            'groups.*.rooms'          => 'required|array|min:1',
+            'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
+            'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
+            'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
         ]);
 
-        $details = $validated['details'];
-        unset($validated['details']);
+        // Availability check
+        $failures = $this->reservationService->checkAvailability($reservation->id_hotel, $validated['groups'], $reservation->id);
+        if (!empty($failures)) {
+            return redirect()->back()->withErrors(['availability' => $failures]);
+        }
 
-        // Recalculate total price for safety
-        $dateArrivee = \Carbon\Carbon::parse($validated['date_arrivee']);
-        $dateDepart = \Carbon\Carbon::parse($validated['date_depart']);
-        $nights = $dateArrivee->diffInDays($dateDepart);
-        if ($nights < 1) $nights = 1;
+        $groupsData = $validated['groups'];
+        unset($validated['groups']);
 
         $prixTotal = 0;
-        foreach ($details as $d) {
-            $subtotal = ($d['quantite'] * $d['prix_unitaire'] * $nights);
-            $prixTotal += $subtotal;
+        $totalPersonnes = 0;
+        foreach ($groupsData as $g) {
+            $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
+            $totalPersonnes += $g['nb_personnes'];
+            foreach ($g['rooms'] as $r) {
+                $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+            }
         }
         $validated['prix_total'] = $prixTotal;
+        $validated['nb_personnes'] = $totalPersonnes;
 
         // Reset status to en_attente and save
         $reservation->statut = 'en_attente';
         $reservation->fill($validated);
         $reservation->save();
 
-        // Update line items
-        $reservation->details()->delete();
-        foreach ($details as $detail) {
-            $detail['id_reservation'] = $reservation->id;
-            ItemReservation::create($detail);
+        // Update groups and items (rebuild)
+        foreach ($reservation->groups as $group) {
+            $group->items()->delete();
+            $group->delete();
+        }
+
+        foreach ($groupsData as $groupData) {
+            $group = \App\Models\ReservationGroup::create([
+                'id_reservation' => $reservation->id,
+                'date_arrivee'   => $groupData['date_arrivee'],
+                'date_depart'    => $groupData['date_depart'],
+                'nb_personnes'   => $groupData['nb_personnes'],
+            ]);
+
+            foreach ($groupData['rooms'] as $roomData) {
+                ItemReservation::create([
+                    'id_group'      => $group->id,
+                    'id_type'       => $roomData['id_type'],
+                    'quantite'      => $roomData['quantite'],
+                    'prix_unitaire' => $roomData['prix_unitaire'],
+                ]);
+            }
         }
 
         // Notify admins about the modification

@@ -32,23 +32,32 @@ trait HasDynamicTemplate
      */
     protected function generateQuoteTable($reservation): string
     {
-        $html = '<table style="width:100%; border-collapse: collapse; margin: 20px 0; font-family: sans-serif;">';
-        $html .= '<thead style="background-color: #f8f9fa; text-align: left;">';
-        $html .= '<tr><th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Type</th><th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Quantité</th><th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Prix Unitaire</th><th style="padding: 12px; border-bottom: 2px solid #dee2e6;">Total</th></tr>';
+        $html = '<table style="width:100%; border-collapse: collapse; margin: 20px 0; font-family: sans-serif; font-size: 13px;">';
+        $html .= '<thead style="background-color: #f1f5f9; text-align: left;">';
+        $html .= '<tr><th style="padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em;">Détails du Séjour</th><th style="padding: 12px; border-bottom: 2px solid #e2e8f0; color: #64748b; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; text-align: right;">Information</th></tr>';
         $html .= '</thead><tbody>';
 
-        foreach ($reservation->details as $detail) {
-            $total = $detail->quantite * $detail->prix_unitaire;
+        foreach ($reservation->groups as $group) {
+            $nights = \Carbon\Carbon::parse($group->date_depart)->diffInDays(\Carbon\Carbon::parse($group->date_arrivee));
+            $arrival = \Carbon\Carbon::parse($group->date_arrivee)->format('d/m/Y');
+            $departure = \Carbon\Carbon::parse($group->date_depart)->format('d/m/Y');
+            
             $html .= "<tr>";
-            $html .= "<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>{$detail->type->nom}</td>";
-            $html .= "<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>{$detail->quantite}</td>";
-            $html .= "<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>" . number_format($detail->prix_unitaire, 2) . " DH</td>";
-            $html .= "<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>" . number_format($total, 2) . " DH</td>";
+            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9;'>";
+            $html .= "<div style='font-weight: 800; color: #1e293b; margin-bottom: 4px;'>Séjour du {$arrival} au {$departure}</div>";
+            $html .= "<div style='color: #64748b; font-size: 11px;'>Durée : {$nights} nuit(s)</div>";
+            $html .= "</td>";
+            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; vertical-align: middle;'>";
+            $html .= "<span style='background-color: #f0fdf4; color: #166534; padding: 4px 8px; rounded: 6px; font-weight: bold; font-size: 11px;'>" . ($group->nb_personnes ?? 1) . " Pers.</span>";
+            $html .= "</td>";
             $html .= "</tr>";
         }
 
         $html .= '</tbody><tfoot>';
-        $html .= "<tr><td colspan='3' style='padding: 12px; text-align: right; font-weight: bold;'>TOTAL</td><td style='padding: 12px; font-weight: bold; background-color: #f8f9fa;'>" . number_format($reservation->prix_total, 2) . " DH</td></tr>";
+        $html .= "<tr>";
+        $html .= "<td style='padding: 20px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>TOTAL GÉNÉRAL</td>";
+        $html .= "<td style='padding: 20px 12px; font-weight: 900; font-size: 18px; color: #54b172; border-top: 2px solid #f1f5f9; text-align: right;'>" . number_format($reservation->prix_total, 0, ',', ' ') . " MAD</td>";
+        $html .= "</tr>";
         $html .= '</tfoot></table>';
 
         return $html;

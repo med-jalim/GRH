@@ -197,6 +197,32 @@ class EmailTemplateSeeder extends Seeder
                             </td>
                         </tr>' . $commonFooter;
 
+        $paymentRejectedHtml = $commonStyles . '
+                        <!-- Header -->
+                        <tr>
+                            <td align="center" style="background-color: #be123c; padding: 40px 20px;">
+                                <h1 style="color: #ffffff; margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 2px;">Virement Refusé</h1>
+                            </td>
+                        </tr>
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px;">
+                                <p style="font-size: 16px; color: #333333; line-height: 1.6;">Bonjour <strong>{{NOM_CLIENT}}</strong>,</p>
+                                <p style="font-size: 16px; color: #333333; line-height: 1.6;">Votre justificatif de paiement de <strong>{{MONTANT}}</strong> pour la réservation <strong>{{CODE_REF}}</strong> a été refusé par l\'administration.</p>
+                                
+                                <div style="margin: 30px 0; padding: 20px; background-color: #fff1f2; border-left: 4px solid #be123c;">
+                                    <p style="margin: 0; font-size: 14px; color: #9f1239; font-weight: bold;">Raison du refus :</p>
+                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #9f1239;">{{RAISON}}</p>
+                                </div>
+
+                                <p style="font-size: 14px; color: #666666; line-height: 1.6;">Nous ne pouvons pas valider votre paiement en l\'état. Veuillez soumettre un nouveau justificatif valide depuis votre espace client.</p>
+
+                                <div align="center" style="margin-top: 40px;">
+                                    <a href="{{PORTAL_URL}}" style="background-color: #be123c; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Accéder à mon espace client</a>
+                                </div>
+                            </td>
+                        </tr>' . $commonFooter;
+
         EmailTemplate::updateOrCreate(
             ['slug' => 'reservation_validation'],
             [
@@ -253,6 +279,16 @@ class EmailTemplateSeeder extends Seeder
                 'name'    => 'Accusé de Réception de Paiement',
                 'subject' => 'Paiement reçu — Réservation {{CODE_REF}}',
                 'content_html' => $paymentReceivedHtml,
+                'content_json' => null,
+            ]
+        );
+
+        EmailTemplate::updateOrCreate(
+            ['slug' => 'payment_rejected'],
+            [
+                'name'    => 'Refus de Paiement',
+                'subject' => 'Virement refusé — Réservation {{CODE_REF}}',
+                'content_html' => $paymentRejectedHtml,
                 'content_json' => null,
             ]
         );

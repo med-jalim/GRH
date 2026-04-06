@@ -11,15 +11,23 @@ class ItemReservation extends Model
     protected $table = 'reservation_items';
 
     protected $fillable = [
-        'id_reservation',
+        'id_group',
         'id_type',
         'quantite',
-        'prix_unitaire'
+        'prix_unitaire',
+        'date_arrivee',
+        'date_depart',
+        'nb_personnes'
     ];
 
-    public function reservation(): BelongsTo
+    protected $casts = [
+        'date_arrivee' => 'date',
+        'date_depart'  => 'date',
+    ];
+
+    public function group(): BelongsTo
     {
-        return $this->belongsTo(Reservation::class, 'id_reservation');
+        return $this->belongsTo(ReservationGroup::class, 'id_group');
     }
 
     public function type(): BelongsTo

@@ -243,29 +243,10 @@
                 <td class="value">{{ $reservation->hotel->name }}, {{ $reservation->hotel->ville }}</td>
             </tr>
             @endif
-            <tr>
-                <td class="label">Arrivée</td>
-                <td class="value">
-                    {{ \Carbon\Carbon::parse($reservation->date_arrivee)->translatedFormat('d F Y') }}
-                </td>
-            </tr>
-            <tr>
-                <td class="label">Départ</td>
-                <td class="value">
-                    {{ \Carbon\Carbon::parse($reservation->date_depart)->translatedFormat('d F Y') }}
-                </td>
-            </tr>
-            <tr>
-                <td class="label">Nombre de personnes</td>
-                <td class="value">{{ $reservation->nb_personnes }}</td>
-            </tr>
-            <tr>
-                <td class="label">Prix total</td>
-                <td class="value" style="color:#d97706; font-size:15px;">
-                    {{ number_format($reservation->prix_total, 0, ',', ' ') }} MAD
-                </td>
-            </tr>
         </table>
+        
+        <p class="details-title">Récapitulatif de votre séjour</p>
+        {!! $TABLEAU_DEVIS !!}
 
         <div class="divider"></div>
 

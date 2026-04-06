@@ -35,18 +35,24 @@ export interface RoomSelection {
   quantity: number;
 }
 
+export interface GroupSelection {
+  uid: string;
+  checkIn: string;
+  checkOut: string;
+  occupants: number;
+  rooms: RoomSelection[];
+}
+
 export interface BookingFormData {
   // Step 1 — Agence
   agencyName: string;
+  agencyCode: string;
   contactName: string;
   email: string;
   phone: string;
   // Step 2 — Réservation
   hotelId: number | null;
-  checkIn: string;
-  checkOut: string;
-  totalOccupants: number;
-  rooms: RoomSelection[];
+  groups: GroupSelection[];
   // Step 3 — Confirmation
   specialRequests: string;
 }

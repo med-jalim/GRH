@@ -134,7 +134,8 @@ class PaymentVerificationController extends Controller
     public function updateStatut(Request $request, $id)
     {
         $request->validate([
-            'statut' => 'required|in:en_attente,valide,refuse'
+            'statut' => 'required|in:en_attente,valide,refuse',
+            'reason' => 'nullable|string|max:1000',
         ]);
 
         $payment = PaymentVerification::findOrFail($id);
@@ -142,7 +143,7 @@ class PaymentVerificationController extends Controller
         $payment->save();
 
         // Recalculate reservation state
-        $reservation = Reservation::with('payments')->findOrFail($payment->id_reservation);
+        $reservation = Reservation::with('payments', 'hotel')->findOrFail($payment->id_reservation);
         $totalPaid = $reservation->payments->where('statut', 'valide')->sum('amount');
         $previousStatut = $reservation->statut;
 
@@ -163,17 +164,25 @@ class PaymentVerificationController extends Controller
                 'statut' => $newStatut,
                 'paid_amount' => $totalPaid
             ]);
-            
-            try {
+        }
+
+        // Send email based on action
+        try {
+            if ($request->statut === 'refuse') {
+                Mail::to($reservation->email)->send(new \App\Mail\PaymentRejected(
+                    $reservation,
+                    $payment->amount,
+                    $request->reason
+                ));
+            } elseif ($request->statut === 'valide') {
                 if ($newStatut === 'confirme') {
                     Mail::to($reservation->email)->send(new \App\Mail\ReservationConfirmed($reservation));
                 } else {
-                    // Just notify about payment receipt
                     Mail::to($reservation->email)->send(new \App\Mail\PaymentReceived($reservation, $payment->amount));
                 }
-            } catch (\Throwable $e) {
-                \Log::error("Failed to send status update email on payment status update: " . $e->getMessage());
             }
+        } catch (\Throwable $e) {
+            \Log::error("Failed to send email on payment status update: " . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Statut du paiement mis à jour avec succès.');

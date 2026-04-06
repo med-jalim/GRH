@@ -11,6 +11,8 @@ use App\Models\ItemReservation;
 use App\Models\Reservation;
 use App\Models\User;
 use App\Notifications\AdminNotification;
+use App\Services\ReservationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +25,12 @@ use Inertia\Response as InertiaResponse;
 
 class ReservationController extends Controller
 {
+    protected $reservationService;
+
+    public function __construct(ReservationService $reservationService)
+    {
+        $this->reservationService = $reservationService;
+    }
     /**
      * Display a listing of reservations, optionally filtered by hotel or status.
      */
@@ -50,7 +58,7 @@ class ReservationController extends Controller
             $baseQuery->where('statut', $request->statut);
         }
 
-        $reservations = $baseQuery->with(['hotel', 'details.type'])
+        $reservations = $baseQuery->with(['hotel', 'groups.items.type'])
             ->orderByDesc('created_at')
             ->paginate(15);
 
@@ -70,44 +78,57 @@ class ReservationController extends Controller
      */
     public function store(Request $request): JsonResponse|RedirectResponse
     {
-        $validated = $request->validate([
+         $validated = $request->validate([
             'nom_agence'          => 'nullable|string|max:255',
             'code_agence'         => 'required|string|max:100',
             'nom_contact'         => 'required|string|max:255',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
             'id_hotel'            => 'required|integer|exists:hotels,id',
-            'date_arrivee'        => 'required|date',
-            'date_depart'         => 'required|date|after:date_arrivee',
-            'nb_personnes'        => 'required|integer|min:1',
             'remarques_speciales' => 'nullable|string',
             'statut'              => 'nullable|string|in:en_attente,confirme,annule',
 
-            // Line items
-            'details'                  => 'nullable|array',
-            'details.*.id_type'        => 'required_with:details|integer|exists:types,id',
-            'details.*.quantite'       => 'required_with:details|integer|min:1',
-            'details.*.prix_unitaire'  => 'required_with:details|numeric|min:0',
+            // Multi-group structure
+            'groups'                         => 'required|array|min:1',
+            'groups.*.date_arrivee'          => 'required|date',
+            'groups.*.date_depart'           => 'required|date|after:groups.*.date_arrivee',
+            'groups.*.nb_personnes'          => 'required|integer|min:1',
+            'groups.*.rooms'                 => 'required|array|min:1',
+            'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
+            'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
+            'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
         ]);
+
+        // Availability check
+        $failures = $this->reservationService->checkAvailability($validated['id_hotel'], $validated['groups']);
+        if (!empty($failures)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Certains articles ne sont pas disponibles.',
+                'errors'  => $failures
+            ], 422);
+        }
 
         // Auto-generate a unique reference code
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
 
-        // Recalculate total price for safety
-        $dateArrivee = \Carbon\Carbon::parse($validated['date_arrivee']);
-        $dateDepart = \Carbon\Carbon::parse($validated['date_depart']);
-        $nights = $dateArrivee->diffInDays($dateDepart);
-        if ($nights < 1) $nights = 1;
-
-        $details = $validated['details'] ?? [];
+        $groupsData = $validated['groups'];
         $prixTotal = 0;
-        foreach ($details as $d) {
-            $prixTotal += ($d['quantite'] * $d['prix_unitaire'] * $nights);
-        }
-        $validated['prix_total'] = $prixTotal;
+        $totalPersonnes = 0;
 
-        unset($validated['details']);
+        foreach ($groupsData as $g) {
+            $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
+            $totalPersonnes += $g['nb_personnes'];
+            foreach ($g['rooms'] as $r) {
+                $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+            }
+        }
+
+        $validated['prix_total'] = $prixTotal;
+        $validated['nb_personnes'] = $totalPersonnes;
+
+        unset($validated['groups']);
         $reservation = Reservation::create($validated);
 
         // Notify admins about the new reservation
@@ -122,14 +143,26 @@ class ReservationController extends Controller
             Log::error('Failed to send admin notification for new reservation: ' . $e->getMessage());
         }
 
-        // Create line items
-        foreach ($details as $detail) {
-            $detail['id_reservation'] = $reservation->id;
-            ItemReservation::create($detail);
+        // Create groups and line items
+        foreach ($groupsData as $groupData) {
+            $group = \App\Models\ReservationGroup::create([
+                'id_reservation' => $reservation->id,
+                'date_arrivee'   => $groupData['date_arrivee'],
+                'date_depart'    => $groupData['date_depart'],
+                'nb_personnes'   => $groupData['nb_personnes'],
+            ]);
+
+            foreach ($groupData['rooms'] as $roomData) {
+                ItemReservation::create([
+                    'id_group'      => $group->id,
+                    'id_type'       => $roomData['id_type'],
+                    'quantite'      => $roomData['quantite'],
+                    'prix_unitaire' => $roomData['prix_unitaire'],
+                ]);
+            }
         }
 
-
-        $reservation->load(['hotel', 'details.type']);
+        $reservation->load(['hotel', 'groups.items.type']);
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
@@ -143,11 +176,34 @@ class ReservationController extends Controller
     }
 
     /**
+     * Check availability via AJAX for real-time feedback.
+     */
+    public function checkAvailabilityAjax(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'id_hotel' => 'required|integer|exists:hotels,id',
+            'groups'   => 'required|array',
+            'reservation_id' => 'nullable|integer|exists:reservations,id'
+        ]);
+
+        $results = $this->reservationService->checkDetailedAvailability(
+            $validated['id_hotel'], 
+            $validated['groups'],
+            $validated['reservation_id'] ?? null
+        );
+
+        return response()->json([
+            'success' => true,
+            'availability' => $results
+        ]);
+    }
+
+    /**
      * Display the specified reservation with all details.
      */
     public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::with(['hotel', 'details.type', 'payments'])->find($id);
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'payments'])->find($id);
 
         if (! $reservation) {
             if (request()->wantsJson() && ! request()->header('X-Inertia')) {
@@ -186,32 +242,31 @@ class ReservationController extends Controller
             'email'               => 'sometimes|required|email|max:255',
             'telephone'           => 'sometimes|required|string|max:30',
             'id_hotel'            => 'sometimes|required|integer|exists:hotels,id',
-            'date_arrivee'        => 'sometimes|required|date',
-            'date_depart'         => 'sometimes|required|date|after:date_arrivee',
-            'nb_personnes'        => 'sometimes|required|integer|min:1',
-            'prix_total'          => 'sometimes|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
             'statut'              => 'nullable|string|in:en_attente,confirme,annule',
+            'prix_total'          => 'sometimes|numeric|min:0',
+            'nb_personnes'        => 'sometimes|integer|min:1',
         ]);
 
         $reservation->update($validated);
 
-        // Recalculate total if dates or line items might have changed
-        // Note: Currently admin update doesn't handle line items, but we should update total if dates change
-        $dateArrivee = \Carbon\Carbon::parse($reservation->date_arrivee);
-        $dateDepart = \Carbon\Carbon::parse($reservation->date_depart);
-        $nights = $dateArrivee->diffInDays($dateDepart);
-        if ($nights < 1) $nights = 1;
-
+        // Recalculate total if general info changed (hotel, etc.)
+        // In this implementation, the admin update doesn't yet handle direct group/item editing.
+        // We recalculate based on existing groups.
         $prixTotal = 0;
-        foreach ($reservation->details as $d) {
-            $subtotal = ($d->quantite * $d->prix_unitaire * $nights);
-            $prixTotal += $subtotal;
+        $totalPersonnes = 0;
+        foreach ($reservation->groups as $group) {
+            $nights = $this->reservationService->calculateNights($group->date_arrivee, $group->date_depart);
+            $totalPersonnes += $group->nb_personnes;
+            foreach ($group->items as $item) {
+                $prixTotal += ($item->quantite * $item->prix_unitaire * $nights);
+            }
         }
         $reservation->prix_total = $prixTotal;
+        $reservation->nb_personnes = $totalPersonnes;
         $reservation->save();
 
-        $reservation->load(['hotel', 'details.type']);
+        $reservation->load(['hotel', 'groups.items.type']);
 
         return response()->json([
             'success' => true,
@@ -304,8 +359,11 @@ class ReservationController extends Controller
             return redirect()->back()->with('error', 'Réservation introuvable.');
         }
 
-        // Delete line items first
-        $reservation->details()->delete();
+        // Delete groups first (line items will cascade delete if schema is correct, or we do it manually)
+        foreach ($reservation->groups as $group) {
+            $group->items()->delete();
+            $group->delete();
+        }
         $reservation->delete();
 
         if (request()->wantsJson() && ! request()->header('X-Inertia')) {

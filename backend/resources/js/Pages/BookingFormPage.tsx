@@ -21,6 +21,9 @@ import { Building2 } from "lucide-react";
 export default function BookingFormPage({ hotels }: Props) {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
+    const [apiError, setApiError] = useState<string[]>([]);
+    const [isAvailable, setIsAvailable] = useState(true);
+    const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
     const [successData, setSuccessData] = useState<{
         reference: string;
         data: any;
@@ -36,10 +39,15 @@ export default function BookingFormPage({ hotels }: Props) {
             email: "",
             phone: "",
             hotelId: undefined,
-            checkIn: "",
-            checkOut: "",
-            totalOccupants: 0,
-            rooms: [],
+            groups: [
+                {
+                    uid: Math.random().toString(36).substr(2, 9),
+                    checkIn: "",
+                    checkOut: "",
+                    occupants: 1,
+                    rooms: [],
+                },
+            ],
             specialRequests: "",
         },
         mode: "onBlur",
@@ -53,30 +61,33 @@ export default function BookingFormPage({ hotels }: Props) {
         [formData.hotelId, hotels],
     );
 
-    const nights = useMemo(() => {
-        if (!formData.checkIn || !formData.checkOut) return 0;
-        const diff =
-            new Date(formData.checkOut).getTime() -
-            new Date(formData.checkIn).getTime();
-        return Math.max(0, Math.round(diff / 86_400_000));
-    }, [formData.checkIn, formData.checkOut]);
-
     const totalPrice = useMemo(() => {
-        if (!selectedHotel || nights === 0 || !formData.checkIn) return 0;
-        const checkInDate = new Date(formData.checkIn);
-        return formData.rooms.reduce((sum: number, r: any) => {
-            const tarif = selectedHotel.tarifs.find(
-                (t) =>
-                    t.id_type === r.roomTypeId &&
-                    new Date(t.date_debut) <= checkInDate &&
-                    new Date(t.date_fin) >= checkInDate,
-            );
-            return sum + (tarif ? tarif.prix * nights * r.quantity : 0);
+        if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
+        
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
+            
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+            const checkInDate = new Date(g.checkIn);
+
+            const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
+                const tarif = selectedHotel.tarifs?.find(
+                    (t: any) =>
+                        t.id_type === r.roomTypeId &&
+                        new Date(t.date_debut) <= checkInDate &&
+                        new Date(t.date_fin) >= checkInDate,
+                );
+                return rSum + (tarif ? tarif.prix * nights * r.quantity : 0);
+            }, 0);
+
+            return sum + groupTotal;
         }, 0);
-    }, [formData.rooms, selectedHotel, nights, formData.checkIn]);
+    }, [formData.groups, selectedHotel]);
 
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
+        setApiError([]);
         let fieldsToValidate: any[] = [];
         if (step === 1)
             fieldsToValidate = [
@@ -89,10 +100,7 @@ export default function BookingFormPage({ hotels }: Props) {
         if (step === 2)
             fieldsToValidate = [
                 "hotelId",
-                "checkIn",
-                "checkOut",
-                "totalOccupants",
-                "rooms",
+                "groups",
             ];
 
         const isValid = await trigger(fieldsToValidate);
@@ -117,25 +125,27 @@ export default function BookingFormPage({ hotels }: Props) {
             email: data.email,
             telephone: data.phone,
             id_hotel: data.hotelId,
-            date_arrivee: data.checkIn,
-            date_depart: data.checkOut,
-            nb_personnes: data.totalOccupants,
             prix_total: totalPrice,
             remarques_speciales: data.specialRequests,
-            details: data.rooms.map((r: any) => {
-                const checkInDate = new Date(data.checkIn);
-                const validTarif = selectedHotel?.tarifs.find(
-                    (t) =>
-                        t.id_type === r.roomTypeId &&
-                        new Date(t.date_debut) <= checkInDate &&
-                        new Date(t.date_fin) >= checkInDate,
-                );
-                return {
-                    id_type: r.roomTypeId,
-                    quantite: r.quantity,
-                    prix_unitaire: validTarif?.prix || 0,
-                };
-            }),
+            groups: data.groups.map(g => ({
+                date_arrivee: g.checkIn,
+                date_depart: g.checkOut,
+                nb_personnes: g.occupants,
+                rooms: g.rooms.map(r => {
+                    const checkInDate = new Date(g.checkIn);
+                    const validTarif = selectedHotel?.tarifs.find(
+                        (t) =>
+                            t.id_type === r.roomTypeId &&
+                            new Date(t.date_debut) <= checkInDate &&
+                            new Date(t.date_fin) >= checkInDate,
+                    );
+                    return {
+                        id_type: r.roomTypeId,
+                        quantite: r.quantity,
+                        prix_unitaire: validTarif?.prix || 0,
+                    };
+                })
+            }))
         };
 
         try {
@@ -146,9 +156,24 @@ export default function BookingFormPage({ hotels }: Props) {
                 reference: res.data.data.code_reference,
                 data: data,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error("API Error:", error);
-            alert("Une erreur est survenue lors de la réservation.");
+            if (error.response && error.response.status === 422) {
+                const data = error.response.data;
+                if (data.errors && Array.isArray(data.errors)) {
+                    setApiError(data.errors);
+                } else if (data.errors) {
+                    const flatErrors = Object.values(data.errors).flat() as string[];
+                    setApiError(flatErrors);
+                } else {
+                    setApiError([data.message || "Erreur de validation"]);
+                }
+                // Redirect back to Step 2 for corrections
+                setStep(2);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+                setApiError(["Une erreur est survenue lors de la réservation. Veuillez réessayer."]);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -161,7 +186,6 @@ export default function BookingFormPage({ hotels }: Props) {
                 formData={successData.data}
                 hotel={selectedHotel}
                 totalPrice={totalPrice}
-                nights={nights}
             />
         );
     }
@@ -199,20 +223,41 @@ export default function BookingFormPage({ hotels }: Props) {
                                     {step === 2 && (
                                         <ReservationDetailsStep
                                             hotels={hotels}
-                                            nights={nights}
                                             totalPrice={totalPrice}
+                                            onAvailabilityChange={setIsAvailable}
+                                            onCheckingChange={setIsCheckingAvailability}
                                         />
                                     )}
                                     {step === 3 && (
                                         <SummaryStep
                                             hotel={selectedHotel}
-                                            nights={nights}
                                             totalPrice={totalPrice}
                                         />
                                     )}
                                 </form>
                             </FormProvider>
                         </div>
+
+                        {/* API Errors Display */}
+                        {apiError.length > 0 && (
+                            <div className="mx-12 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="flex gap-3">
+                                    <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0 mt-0.5">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Action Requise</p>
+                                        <ul className="list-disc list-inside space-y-0.5">
+                                            {apiError.map((err, idx) => (
+                                                <li key={idx} className="text-xs font-bold text-rose-600 leading-relaxed">{err}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Navigation buttons */}
                         <div className="px-12 pb-10 flex justify-between items-center">
@@ -229,9 +274,17 @@ export default function BookingFormPage({ hotels }: Props) {
                                     <button
                                         type="button"
                                         onClick={handleNext}
-                                        className="px-10 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10"
+                                        disabled={!isAvailable || isCheckingAvailability}
+                                        className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
                                     >
-                                        Suivant →
+                                        {isCheckingAvailability ? (
+                                            <>
+                                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                Vérification...
+                                            </>
+                                        ) : (
+                                            "Suivant →"
+                                        )}
                                     </button>
                                 ) : (
                                     <button
