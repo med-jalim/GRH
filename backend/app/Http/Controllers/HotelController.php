@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Hotel;
+use App\Models\HotelTypeTarification;
 use App\Models\Type;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -17,7 +18,7 @@ class HotelController extends Controller
      */
     public function bookingPage(): Response
     {
-        $hotels = Hotel::with(['chambres.type', 'tarifs.type'])->get();
+        $hotels = Hotel::with(['chambres.type', 'tarifs.type', 'typeTarifications.type'])->get();
 
         return Inertia::render('BookingFormPage', [
             'hotels' => $hotels,
@@ -31,13 +32,13 @@ class HotelController extends Controller
     {
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse(
-                Hotel::with('chambres.type', 'tarifs.type')->get(),
+                Hotel::with('chambres.type', 'tarifs.type', 'typeTarifications.type')->get(),
                 'Liste des hôtels récupérée avec succès.'
             );
         }
 
         $hotels = Hotel::withCount(['chambres', 'reservations'])
-            ->with(['tarifs.type'])
+            ->with(['tarifs.type', 'typeTarifications.type'])
             ->orderBy('name')
             ->get();
 
@@ -88,6 +89,7 @@ class HotelController extends Controller
         $hotel = Hotel::with([
             'chambres.type',
             'tarifs.type',
+            'typeTarifications.type',
             'reservations' => fn ($q) => $q->orderByDesc('created_at')->limit(10),
         ])->find($id);
 
@@ -106,8 +108,14 @@ class HotelController extends Controller
         $types = Type::orderBy('nom')->get();
 
         return Inertia::render('Admin/Hotels/Show', [
-            'hotel' => $hotel,
-            'types' => $types,
+            'hotel'          => $hotel,
+            'types'          => $types,
+            'tarification'   => $hotel->typeTarifications->map(fn($t) => [
+                'id_type'      => $t->id_type,
+                'type_nom'     => $t->type?->nom,
+                'is_essentiel' => $t->is_essentiel,
+                'pourcentage'  => $t->pourcentage,
+            ]),
         ]);
     }
 

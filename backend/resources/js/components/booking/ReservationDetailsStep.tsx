@@ -6,6 +6,7 @@ import type { Hotel, GroupSelection, RoomSelection } from "@/types/booking";
 import type { BookingSchemaType } from "@/lib/schemas";
 import { GroupRow } from "./GroupRow";
 import { PriceSummary } from "./PriceSummary";
+import { computeDynamicPrice } from "@/lib/utils";
 
 interface Props {
     hotels: Hotel[];
@@ -102,9 +103,10 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 
                 if (!chambre?.type) return null;
                 
-                const defaultTarif = selectedHotel.tarifs?.find(t => t.id_type === tid);
+                
+                const dynamicPrice = computeDynamicPrice(selectedHotel, tid, today);
 
-                return { type: chambre.type, price: defaultTarif?.prix || 0 };
+                return { type: chambre.type, price: dynamicPrice };
             })
             .filter(Boolean) as { type: any; price: number }[];
     }, [selectedHotel]);

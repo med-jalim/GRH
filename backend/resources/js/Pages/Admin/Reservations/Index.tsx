@@ -362,7 +362,7 @@ export default function ReservationsIndex({
             case 'en_attente':
                 return ['en_attente', 'en_validation', 'annule'];
             case 'en_validation':
-                return ['en_validation', 'valide', 'annule'];
+                return ['en_validation', 'annule'];
             case 'valide':
                 return ['valide', 'en_attente_paiement', 'annule'];
             case 'en_attente_paiement':

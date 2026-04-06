@@ -79,13 +79,23 @@ export function PricingCalendar({
 
     const getTarifsForDay = useCallback(
         (day: Date) => {
-            return filteredTarifs.filter((t: any) => {
+            const raw = filteredTarifs.filter((t: any) => {
                 const start = parseISO(t.date_debut);
                 start.setHours(0, 0, 0, 0);
                 const end = parseISO(t.date_fin);
                 end.setHours(23, 59, 59, 999);
                 return day >= start && day <= end;
             });
+
+            // Déduplication par type de chambre: on priorise toujours l'explicite sur le virtuel
+            const mapped = new Map<number, any>();
+            for (const t of raw) {
+                const existing = mapped.get(t.id_type);
+                if (!existing || (!t.is_virtual && existing.is_virtual)) {
+                    mapped.set(t.id_type, t);
+                }
+            }
+            return Array.from(mapped.values());
         },
         [filteredTarifs],
     );

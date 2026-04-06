@@ -12,7 +12,9 @@ import {
   LayoutDashboard,
   Layers,
   BedDouble,
-  Tag
+  Tag,
+  Calendar as CalendarIcon,
+  Percent
 } from "lucide-react";
 import { useState } from "react";
 import { ApercuTab } from "./Partials/ApercuTab";
@@ -69,9 +71,17 @@ interface Hotel {
   reservations: Reservation[];
 }
 
+interface Tarification {
+  id_type: number;
+  type_nom: string | null;
+  is_essentiel: boolean;
+  pourcentage: number;
+}
+
 interface Props {
   hotel: Hotel;
   types: Type[];
+  tarification: Tarification[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -214,12 +224,12 @@ function EditHotelModal({
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export default function HotelShow({ hotel, types }: Props) {
+export default function HotelShow({ hotel, types, tarification }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
   // Onglets State
-  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"tarifs">("apercu");
+  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"calendrier"|"multiplicateurs">("apercu");
 
   // Group rooms by type for Apercu display
   const chambresByType = hotel.chambres.reduce<Record<string, Chambre[]>>((acc, c) => {
@@ -238,7 +248,8 @@ export default function HotelShow({ hotel, types }: Props) {
     { id: "apercu", label: "Aperçu Global", icon: LayoutDashboard },
     { id: "types", label: "Types de Chambres", icon: Layers },
     { id: "chambres", label: "Chambres", icon: BedDouble },
-    { id: "tarifs", label: "Tarifs & Prix", icon: Tag },
+    { id: "calendrier", label: "Tarif Essentiel", icon: CalendarIcon },
+    { id: "multiplicateurs", label: "Multiplicateurs", icon: Percent },
   ] as const;
 
   return (
@@ -322,7 +333,12 @@ export default function HotelShow({ hotel, types }: Props) {
         {activeTab === "apercu" && <ApercuTab hotel={hotel} chambresByType={chambresByType} />}
         {activeTab === "types" && <TypesTab types={types} />}
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
-        {activeTab === "tarifs" && <TarifsTab hotel={hotel} types={types} />}
+        {activeTab === "calendrier" && (
+          <TarifsTab section="calendrier" hotel={hotel} types={types} tarification={tarification} />
+        )}
+        {activeTab === "multiplicateurs" && (
+          <TarifsTab section="multiplicateurs" hotel={hotel} types={types} tarification={tarification} />
+        )}
       </div>
 
     </AdminLayout>

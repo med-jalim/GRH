@@ -9,6 +9,7 @@ use App\Http\Controllers\TypeController;
 use App\Http\Controllers\PaymentVerificationController;
 use App\Http\Controllers\ClientReservationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\HotelTypeTarificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -50,6 +51,10 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::resource('chambres', ChambreController::class);
     Route::resource('types', TypeController::class);
     Route::resource('tarifs', TarifController::class);
+
+    // Tarification par chambre essentielle + pourcentages
+    Route::post('hotels/{hotel}/tarification', [HotelTypeTarificationController::class, 'store'])->name('hotels.tarification.store');
+    Route::delete('hotels/{hotel}/tarification', [HotelTypeTarificationController::class, 'destroy'])->name('hotels.tarification.destroy');
 
     // Notifications
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');

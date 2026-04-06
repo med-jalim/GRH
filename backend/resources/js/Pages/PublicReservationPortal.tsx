@@ -3,6 +3,7 @@ import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, usePage } from "@inertiajs/react";
 import { bookingSchema, type BookingSchemaType } from "@/lib/schemas";
+import { computeDynamicPrice } from "@/lib/utils";
 
 import type { Hotel } from "@/types/booking";
 import { StepIndicator } from "@/components/booking/StepIndicator";
@@ -74,22 +75,17 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
     const totalPrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
-        
+
         return formData.groups.reduce((sum: number, g: any) => {
             if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
-            
+
             const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
             const nights = Math.max(1, Math.round(diff / 86_400_000));
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const tarif = selectedHotel.tarifs?.find(
-                    (t: any) =>
-                        t.id_type === r.roomTypeId &&
-                        new Date(t.date_debut) <= checkInDate &&
-                        new Date(t.date_fin) >= checkInDate,
-                );
-                return rSum + (tarif ? tarif.prix * nights * r.quantity : 0);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                return rSum + (prix * nights * r.quantity);
             }, 0);
 
             return sum + groupTotal;
@@ -132,21 +128,16 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                 nb_personnes: g.occupants,
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const validTarif = selectedHotel?.tarifs.find(
-                        (t) =>
-                            t.id_type === r.roomTypeId &&
-                            new Date(t.date_debut) <= checkInDate &&
-                            new Date(t.date_fin) >= checkInDate,
-                    );
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
                     return {
                         id_type: r.roomTypeId,
                         quantite: r.quantity,
-                        prix_unitaire: validTarif?.prix || 0,
+                        prix_unitaire: prix,
                     };
                 })
             }))
         };
-        
+
         router.put(`/reservation/${reservation.token}/update`, payload, {
             onSuccess: () => {
                 setSubmitting(false);
@@ -189,10 +180,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     };
 
     const handleAction = (action: 'confirm' | 'cancel') => {
-        const message = action === 'confirm' 
-            ? "Voulez-vous valider et confirmer votre réservation ?" 
+        const message = action === 'confirm'
+            ? "Voulez-vous valider et confirmer votre réservation ?"
             : "Êtes-vous sûr de vouloir annuler cette réservation ?";
-        
+
         if (confirm(message)) {
             setIsActioning(action);
             router.post(`/reservation/${reservation.token}/${action}`, {}, {
@@ -206,7 +197,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
     // Status helpers - ADMIN STYLE
     const getStatusInfo = (statut: string) => {
-        switch(statut) {
+        switch (statut) {
             case 'en_attente': return { label: 'En attente', colors: 'bg-amber-50 text-amber-600 border-amber-200' };
             case 'en_attente_paiement': return { label: 'En attente de paiement', colors: 'bg-indigo-50 text-indigo-600 border-indigo-200' };
             case 'confirme': return { label: 'Confirmée', colors: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
@@ -219,8 +210,8 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     };
     const sInfo = getStatusInfo(reservation.statut);
 
-    const totalValidPaid = reservation.payments.filter((p:any) => p.statut === 'valide').reduce((sum:number, p:any) => sum + p.amount, 0);
-    const waitingPayments = reservation.payments.filter((p:any) => p.statut === 'en_attente');
+    const totalValidPaid = reservation.payments.filter((p: any) => p.statut === 'valide').reduce((sum: number, p: any) => sum + p.amount, 0);
+    const waitingPayments = reservation.payments.filter((p: any) => p.statut === 'en_attente');
     const remaining = Math.max(0, reservation.prix_total - totalValidPaid);
 
     return (
@@ -241,27 +232,25 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                             </p>
                         </div>
                     </div>
-                    
+
                     {!isEditing && (
                         <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
                             <button
                                 onClick={() => setActiveTab("general")}
-                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                                    activeTab === "general"
+                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === "general"
                                         ? "bg-white text-slate-900 shadow-sm"
                                         : "text-slate-400 hover:text-slate-600"
-                                }`}
+                                    }`}
                             >
                                 <Building2 className="w-3.5 h-3.5" />
                                 Informations
                             </button>
                             {(reservation.statut === 'en_attente_paiement' || reservation.statut === 'partiellement_paye') && (<button
                                 onClick={() => setActiveTab("payment")}
-                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${
-                                    activeTab === "payment"
+                                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === "payment"
                                         ? "bg-[#54b172] text-white shadow-sm"
                                         : "text-slate-400 hover:text-slate-600"
-                                }`}
+                                    }`}
                             >
                                 <CreditCard className="w-3.5 h-3.5" />
                                 Règlement
@@ -274,7 +263,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
             <main className="px-6 pb-20">
                 <div className="max-w-5xl mx-auto">
-                    
+
                     {/* Flash Messages */}
                     {flash.success && (
                         <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-700 animate-in fade-in slide-in-from-top-4">
@@ -288,10 +277,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                             <p className="text-sm font-bold">{flash.error}</p>
                         </div>
                     )}
-                    
+
                     {!isEditing ? (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                            
+
                             {/* Left Column: Summary & Actions */}
                             <div className="lg:col-span-8 space-y-6">
                                 {activeTab === "general" && (
@@ -303,25 +292,25 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                     {sInfo.label}
                                                 </span>
                                             </div>
-                                            
+
                                             <div className="flex flex-wrap gap-2">
-                                                {reservation.statut !== 'confirme' && reservation.statut !== 'annule'  && (
+                                                {reservation.statut !== 'confirme' && reservation.statut !== 'annule' && (
                                                     <>
                                                         {reservation.statut === 'en_validation' && (
-                                                            <button 
+                                                            <button
                                                                 disabled={!!isActioning}
-                                                                onClick={() => handleAction('confirm')} 
+                                                                onClick={() => handleAction('confirm')}
                                                                 className="px-5 py-2.5 bg-[#54b172] hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
                                                             >
                                                                 {isActioning === 'confirm' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Confirmer
                                                             </button>
                                                         )}
                                                         <button disabled={!!isActioning} onClick={() => setIsEditing(true)} className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50">
-                                                            <Edit2 className="w-3.5 h-3.5"/> Modifier
+                                                            <Edit2 className="w-3.5 h-3.5" /> Modifier
                                                         </button>
-                                                        <button 
+                                                        <button
                                                             disabled={!!isActioning}
-                                                            onClick={() => handleAction('cancel')} 
+                                                            onClick={() => handleAction('cancel')}
                                                             className="px-5 py-2.5 bg-white border border-rose-200 text-rose-500 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50"
                                                         >
                                                             {isActioning === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-3.5 h-3.5" />} Annuler
@@ -335,7 +324,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10">
                                                 <div>
                                                     <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5 flex items-center gap-2">
-                                                        <Users size={14}/> Vos Coordonnées
+                                                        <Users size={14} /> Vos Coordonnées
                                                     </h3>
                                                     <div className="space-y-4">
                                                         <div className="flex flex-col">
@@ -355,7 +344,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
                                                 <div>
                                                     <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5 flex items-center gap-2">
-                                                        <Calendar size={14}/> Détails du Séjour
+                                                        <Calendar size={14} /> Détails du Séjour
                                                     </h3>
                                                     <div className="space-y-4">
                                                         <div className="flex flex-col">
@@ -380,30 +369,30 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                 <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest mb-5">Hébergement & Tarification</h3>
                                                 <div className="bg-slate-50 rounded-xl border border-slate-200/60 overflow-hidden">
                                                     <table className="w-full">
-                                                         <thead>
-                                                             <tr className="bg-slate-50 border-b border-slate-100">
-                                                                 <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Hébergement & Dates</th>
-                                                                 <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantité</th>
-                                                                 <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Sous-total</th>
-                                                             </tr>
-                                                         </thead>
-                                                         <tbody className="divide-y divide-slate-100">
-                                                             {reservation.groups.map((g:any) => {
-                                                                 const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
-                                                                 const groupNights = Math.max(1, Math.round(diff / 86_400_000));
-                                                                 
-                                                                 return g.items.map((i:any) => (
-                                                                     <tr key={i.id} className="bg-white">
-                                                                         <td className="px-6 py-4">
-                                                                             <p className="font-bold text-slate-700">{i.type?.nom ?? 'Chambre'}</p>
-                                                                             <p className="text-[10px] text-slate-400 font-medium">Du {g.date_arrivee} au {g.date_depart} ({groupNights} nuits)</p>
-                                                                         </td>
-                                                                         <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
-                                                                         <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
-                                                                     </tr>
-                                                                 ));
-                                                             })}
-                                                         </tbody>
+                                                        <thead>
+                                                            <tr className="bg-slate-50 border-b border-slate-100">
+                                                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Hébergement & Dates</th>
+                                                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantité</th>
+                                                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Sous-total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {reservation.groups.map((g: any) => {
+                                                                const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
+                                                                const groupNights = Math.max(1, Math.round(diff / 86_400_000));
+
+                                                                return g.items.map((i: any) => (
+                                                                    <tr key={i.id} className="bg-white">
+                                                                        <td className="px-6 py-4">
+                                                                            <p className="font-bold text-slate-700">{i.type?.nom ?? 'Chambre'}</p>
+                                                                            <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
+                                                                        <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
+                                                                    </tr>
+                                                                ));
+                                                            })}
+                                                        </tbody>
                                                         <tfoot className="bg-slate-50">
                                                             <tr>
                                                                 <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Estimé</td>
@@ -421,7 +410,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4">
                                         <div className="p-8 border-b border-slate-100 bg-indigo-50/30 flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200">
-                                                <CreditCard className="w-6 h-6"/>
+                                                <CreditCard className="w-6 h-6" />
                                             </div>
                                             <div>
                                                 <h2 className="text-lg font-bold text-slate-900">Gestion du Règlement</h2>
@@ -452,22 +441,21 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-4">
-                                                                {reservation.payments.map((p:any) => (
+                                                                {reservation.payments.map((p: any) => (
                                                                     <div key={p.id} className="p-4 rounded-xl border border-slate-100 flex items-center justify-between hover:border-slate-200 transition-colors bg-white">
                                                                         <div>
                                                                             <p className="text-sm font-bold text-slate-900">{formatPrice(p.amount)}</p>
                                                                             <div className="flex items-center gap-2 mt-1.5">
-                                                                                <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
-                                                                                    p.statut === 'valide' ? 'bg-emerald-50 text-emerald-600' : 
-                                                                                    p.statut === 'en_attente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
-                                                                                }`}>
+                                                                                <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${p.statut === 'valide' ? 'bg-emerald-50 text-emerald-600' :
+                                                                                        p.statut === 'en_attente' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                                                                    }`}>
                                                                                     {p.statut === 'valide' ? 'Validé' : p.statut === 'en_attente' ? 'En attente' : 'Refusé'}
                                                                                 </span>
                                                                                 <span className="text-[10px] text-slate-400 font-medium">{new Date(p.created_at).toLocaleDateString()}</span>
                                                                             </div>
                                                                         </div>
                                                                         <a href={`/storage/${p.document_path}`} target="_blank" className="p-2.5 text-indigo-500 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors">
-                                                                            <ExternalLink className="w-4 h-4"/>
+                                                                            <ExternalLink className="w-4 h-4" />
                                                                         </a>
                                                                     </div>
                                                                 ))}
@@ -488,7 +476,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                     <input type="file" required accept=".pdf,image/*" onChange={e => setPaymentFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
                                                                 </div>
                                                                 <button disabled={isUploading || !paymentFile || !paymentAmount} type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex justify-center items-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-indigo-200">
-                                                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Upload className="w-4 h-4" />} Soumettre le versement
+                                                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Soumettre le versement
                                                                 </button>
                                                             </form>
                                                         </div>
@@ -518,7 +506,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         {waitingPayments.length > 0 && (
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="text-amber-500 font-bold uppercase tracking-tighter italic">En cours de vérif.</span>
-                                                <span className="font-bold text-amber-500 italic">+{formatPrice(waitingPayments.reduce((s:number, p:any) => s + p.amount, 0))}</span>
+                                                <span className="font-bold text-amber-500 italic">+{formatPrice(waitingPayments.reduce((s: number, p: any) => s + p.amount, 0))}</span>
                                             </div>
                                         )}
                                         <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
@@ -529,10 +517,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-6">
                                     <div className="flex items-center gap-3 text-emerald-700 mb-3">
-                                        <CheckCircle size={20}/>
+                                        <CheckCircle size={20} />
                                         <span className="text-xs font-bold uppercase tracking-widest">Assistance</span>
                                     </div>
                                     <p className="text-[11px] text-emerald-600 font-medium leading-relaxed">
@@ -558,10 +546,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                     <form onSubmit={handleSubmit(onSubmit)}>
                                         {step === 1 && <AgencyInfoStep />}
                                         {step === 2 && (
-                                            <ReservationDetailsStep 
-                                                hotels={hotels} 
-                                                totalPrice={totalPrice} 
-                                                disabledHotel={true} 
+                                            <ReservationDetailsStep
+                                                hotels={hotels}
+                                                totalPrice={totalPrice}
+                                                disabledHotel={true}
                                                 reservationId={reservation.id}
                                                 onAvailabilityChange={setIsAvailable}
                                                 onCheckingChange={setIsCheckingAvailability}
@@ -600,9 +588,9 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
                                 <div className="flex gap-4">
                                     {step < 3 ? (
-                                        <button 
-                                            type="button" 
-                                            onClick={handleNext} 
+                                        <button
+                                            type="button"
+                                            onClick={handleNext}
                                             disabled={!isAvailable || isCheckingAvailability}
                                             className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
                                         >
@@ -626,7 +614,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                     )}
                 </div>
             </main>
-            
+
             <footer className="py-10 text-center border-t border-slate-200 mt-20">
                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
                     © 2026 GRH Hôtels · Expérience Client Premium

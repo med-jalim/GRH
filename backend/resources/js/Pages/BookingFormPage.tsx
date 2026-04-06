@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import { bookingSchema, type BookingSchemaType } from "@/lib/schemas";
+import { computeDynamicPrice } from "@/lib/utils";
 
 import type { Hotel } from "@/types/booking";
 import { StepIndicator } from "@/components/booking/StepIndicator";
@@ -72,13 +73,8 @@ export default function BookingFormPage({ hotels }: Props) {
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const tarif = selectedHotel.tarifs?.find(
-                    (t: any) =>
-                        t.id_type === r.roomTypeId &&
-                        new Date(t.date_debut) <= checkInDate &&
-                        new Date(t.date_fin) >= checkInDate,
-                );
-                return rSum + (tarif ? tarif.prix * nights * r.quantity : 0);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                return rSum + (prix * nights * r.quantity);
             }, 0);
 
             return sum + groupTotal;
@@ -133,16 +129,11 @@ export default function BookingFormPage({ hotels }: Props) {
                 nb_personnes: g.occupants,
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const validTarif = selectedHotel?.tarifs.find(
-                        (t) =>
-                            t.id_type === r.roomTypeId &&
-                            new Date(t.date_debut) <= checkInDate &&
-                            new Date(t.date_fin) >= checkInDate,
-                    );
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
                     return {
                         id_type: r.roomTypeId,
                         quantite: r.quantity,
-                        prix_unitaire: validTarif?.prix || 0,
+                        prix_unitaire: prix,
                     };
                 })
             }))

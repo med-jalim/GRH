@@ -85,7 +85,7 @@ class ClientReservationController extends Controller
 
         // We fetch all hotels only to show the selected one as locked, 
         // or we just fetch the selected hotel to keep it simple.
-        $hotels = Hotel::with(['chambres.type', 'tarifs.type'])->get();
+        $hotels = Hotel::with(['chambres.type', 'tarifs.type', 'typeTarifications.type'])->get();
 
         return Inertia::render('PublicReservationPortal', [
             'reservation' => $reservation,
