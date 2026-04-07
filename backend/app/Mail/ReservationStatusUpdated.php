@@ -56,15 +56,9 @@ class ReservationStatusUpdated extends Mailable implements ShouldQueue
     {
         $statusLabel = self::$statusLabels[$this->reservation->statut] ?? $this->reservation->statut;
         
-        $data = [
-            'NOM_CLIENT'    => $this->reservation->nom_contact,
-            'CODE_REF'      => $this->reservation->code_reference,
-            'NOM_HOTEL'     => $this->reservation->hotel->name ?? 'votre hôtel',
-            'DATES_SEJOUR'  => $this->reservation->date_arrivee->format('d/m/Y') . ' au ' . $this->reservation->date_depart->format('d/m/Y'),
+        $data = array_merge($this->getCommonVariables($this->reservation), [
             'STATUT_LABEL'  => $statusLabel,
-            'PORTAL_URL'    => url('reservation/' . $this->reservation->token),
-            'TABLEAU_DEVIS' => $this->generateQuoteTable($this->reservation),
-        ];
+        ]);
 
         $dynamicHtml = $this->resolveDynamicTemplate('reservation_status_updated', $data);
 

@@ -37,16 +37,7 @@ class ReservationValidationRequest extends Mailable implements ShouldQueue
         $baseUrl = "http://127.0.0.1:8000";
         $portalUrl = "{$baseUrl}/reservation/{$this->reservation->token}";
 
-        // Prepare data for dynamic template
-        $data = [
-            'NOM_CLIENT'    => $this->reservation->nom_contact,
-            'CODE_REF'      => $this->reservation->code_reference,
-            'NOM_HOTEL'     => $this->reservation->hotel->name ?? 'votre hôtel',
-            'NB_PERSONNES'  => $this->reservation->nb_personnes,
-            'DATES_SEJOUR'  => $this->reservation->date_arrivee->format('d/m/Y') . ' au ' . $this->reservation->date_depart->format('d/m/Y'),
-            'TABLEAU_DEVIS' => $this->generateQuoteTable($this->reservation),
-            'PORTAL_URL'    => url('reservation/' . $this->reservation->token),
-        ];
+        $data = $this->getCommonVariables($this->reservation);
 
         $dynamicHtml = $this->resolveDynamicTemplate('reservation_validation', $data);
 

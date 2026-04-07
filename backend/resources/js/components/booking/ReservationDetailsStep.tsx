@@ -270,23 +270,23 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 </div>
 
                 {/* Groups Section */}
-                <div className="space-y-8">
-                    {formData.groups?.map((group, idx) => (
-                        <GroupRow
-                            key={group.uid}
-                            group={group}
-                            availableOptions={allTypes}
-                            index={idx}
-                            onUpdateGroup={updateGroup}
-                            onUpdateRoom={updateRoomInGroup}
-                            onAddRoom={addRoomToGroup}
-                            onRemoveRoom={removeRoomFromGroup}
-                            onRemoveGroup={removeGroup}
-                            availabilityData={availabilityMap}
-                        />
-                    ))}
+                {formData.hotelId ? (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                        {formData.groups?.map((group, idx) => (
+                            <GroupRow
+                                key={group.uid}
+                                group={group}
+                                availableOptions={allTypes}
+                                index={idx}
+                                onUpdateGroup={updateGroup}
+                                onUpdateRoom={updateRoomInGroup}
+                                onAddRoom={addRoomToGroup}
+                                onRemoveRoom={removeRoomFromGroup}
+                                onRemoveGroup={removeGroup}
+                                availabilityData={availabilityMap}
+                            />
+                        ))}
 
-                    {formData.hotelId ? (
                         <button
                             type="button"
                             onClick={addGroup}
@@ -299,14 +299,22 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                             </div>
                             <span className="text-[10px] uppercase tracking-widest">Ajouter un nouveau groupe de voyageurs</span>
                         </button>
-                    ) : (
-                        <div className="py-12 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-[32px] border-2 border-dashed border-slate-200">
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Veuillez d'abord sélectionner un hôtel</p>
+                        
+                        <PriceSummary totalPrice={totalPrice} groups={formData.groups} hotel={selectedHotel} />
+                    </div>
+                ) : (
+                    <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-[40px] border-2 border-dashed border-slate-200 animate-in fade-in zoom-in-95 duration-500">
+                        <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-6 text-slate-300">
+                            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
                         </div>
-                    )}
-                </div>
-
-                <PriceSummary totalPrice={totalPrice} groups={formData.groups} hotel={selectedHotel} />
+                        <h3 className="text-sm font-bold text-slate-900 mb-2 uppercase tracking-wide">Action Requise</h3>
+                        <p className="text-xs text-slate-400 font-medium max-w-[280px] leading-relaxed italic">
+                            Veuillez choisir un hôtel ci-dessus pour configurer vos groupes et vos types de chambres.
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

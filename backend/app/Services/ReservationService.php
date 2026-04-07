@@ -24,17 +24,16 @@ class ReservationService
                 $typeId = $room['id_type'] ?? $room['roomTypeId'];
                 $requestedQty = $room['quantite'] ?? $room['quantity'];
 
-                // Total rooms of this type in this hotel
+                // 1. Total rooms of this type in this hotel
                 $totalRooms = Chambre::where('id_hotel', $hotelId)
                     ->where('id_type', $typeId)
                     ->count();
 
-                // Occupied rooms of this type in this hotel during the period
-                // Now linking through group relationship
-                $occupiedRooms = ItemReservation::where('id_type', $typeId)
+                // 2. Occupied rooms in DB for this period
+                $occupiedInDB = ItemReservation::where('id_type', $typeId)
                     ->whereHas('group.reservation', function($query) use ($hotelId, $excludeReservationId) {
                         $query->where('id_hotel', $hotelId)
-                              ->whereNotIn('statut', ['annule']);
+                              ->whereNotIn('statut', ['annule', 'refuse']);
                         if ($excludeReservationId) {
                             $query->where('id', '!=', $excludeReservationId);
                         }
@@ -45,8 +44,29 @@ class ReservationService
                     })
                     ->sum('quantite');
 
-                if (($totalRooms - $occupiedRooms) < $requestedQty) {
-                    $failures[] = "Le type de chambre sélectionné dans le groupe " . ($gIndex + 1) . " n'est pas disponible pour les dates choisies.";
+                // 3. Subtract rooms already selected in OTHER groups of this current request
+                // that overlap with this current group's period.
+                $currentRequestConsumption = 0;
+                foreach ($groups as $otherIndex => $otherGroup) {
+                    if ($otherIndex === $gIndex) continue; // Don't subtract self
+
+                    $oStart = Carbon::parse($otherGroup['date_arrivee'] ?? $otherGroup['checkIn']);
+                    $oEnd = Carbon::parse($otherGroup['date_depart'] ?? $otherGroup['checkOut']);
+
+                    // If periods overlap
+                    if ($start < $oEnd && $oStart < $end) {
+                        $otherRooms = $otherGroup['details'] ?? $otherGroup['rooms'] ?? [];
+                        foreach ($otherRooms as $otherRoom) {
+                            $oTypeId = $otherRoom['id_type'] ?? $otherRoom['roomTypeId'];
+                            if ($oTypeId == $typeId) {
+                                $currentRequestConsumption += ($otherRoom['quantite'] ?? $otherRoom['quantity'] ?? 0);
+                            }
+                        }
+                    }
+                }
+
+                if (($totalRooms - $occupiedInDB - $currentRequestConsumption) < $requestedQty) {
+                    $failures[] = "Le type de chambre sélectionné dans le groupe " . ($gIndex + 1) . " n'est pas disponible pour les dates choisies (Déjà utilisé dans d'autres groupes ou complet).";
                 }
             }
         }
@@ -78,16 +98,16 @@ class ReservationService
                     continue;
                 }
 
-                // Total rooms of this type in this hotel
+                // Total rooms of this type
                 $totalRooms = Chambre::where('id_hotel', $hotelId)
                     ->where('id_type', $typeId)
                     ->count();
 
-                // Occupied rooms
-                $occupiedRooms = ItemReservation::where('id_type', $typeId)
+                // Occupied in DB
+                $occupiedInDB = ItemReservation::where('id_type', $typeId)
                     ->whereHas('group.reservation', function($query) use ($hotelId, $excludeReservationId) {
                         $query->where('id_hotel', $hotelId)
-                              ->whereNotIn('statut', ['annule']);
+                              ->whereNotIn('statut', ['annule', 'refuse']);
                         if ($excludeReservationId) {
                             $query->where('id', '!=', $excludeReservationId);
                         }
@@ -98,12 +118,31 @@ class ReservationService
                     })
                     ->sum('quantite');
 
-                $remaining = $totalRooms - $occupiedRooms;
+                // Internal consumption in this request (other groups)
+                $requestConsumption = 0;
+                foreach ($groups as $otherIndex => $otherGroup) {
+                    if ($otherIndex === $gIndex) continue;
+                    
+                    $oStart = Carbon::parse($otherGroup['date_arrivee'] ?? $otherGroup['checkIn']);
+                    $oEnd = Carbon::parse($otherGroup['date_depart'] ?? $otherGroup['checkOut']);
+
+                    if ($start < $oEnd && $oStart < $end) {
+                        $otherRooms = $otherGroup['details'] ?? $otherGroup['rooms'] ?? [];
+                        foreach ($otherRooms as $otherRoom) {
+                            $oTypeId = $otherRoom['id_type'] ?? $otherRoom['roomTypeId'];
+                            if ($oTypeId == $typeId) {
+                                $requestConsumption += ($otherRoom['quantite'] ?? $otherRoom['quantity'] ?? 0);
+                            }
+                        }
+                    }
+                }
+
+                $effectiveRemaining = $totalRooms - $occupiedInDB - $requestConsumption;
                 
                 $groupResults[] = [
                     'uid' => $roomUid,
-                    'available' => $remaining >= $requestedQty,
-                    'remaining' => max(0, $remaining),
+                    'available' => $effectiveRemaining >= $requestedQty,
+                    'remaining' => max(0, $effectiveRemaining),
                     'total' => $totalRooms
                 ];
             }

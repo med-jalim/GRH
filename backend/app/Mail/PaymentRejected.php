@@ -30,14 +30,10 @@ class PaymentRejected extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $data = [
-            'NOM_CLIENT'   => $this->reservation->nom_contact,
-            'CODE_REF'     => $this->reservation->code_reference,
-            'NOM_HOTEL'    => $this->reservation->hotel->name ?? 'votre hôtel',
+        $data = array_merge($this->getCommonVariables($this->reservation), [
             'MONTANT'      => number_format($this->amount, 2, ',', ' ') . ' MAD',
             'RAISON'       => $this->reason ?? 'Aucune raison spécifiée.',
-            'PORTAL_URL'   => url('reservation/' . $this->reservation->token),
-        ];
+        ]);
 
         $dynamicHtml = $this->resolveDynamicTemplate('payment_rejected', $data);
 

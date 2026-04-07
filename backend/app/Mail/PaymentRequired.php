@@ -28,15 +28,7 @@ class PaymentRequired extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $data = [
-            'NOM_CLIENT'    => $this->reservation->nom_contact,
-            'CODE_REF'      => $this->reservation->code_reference,
-            'NOM_HOTEL'     => $this->reservation->hotel->name ?? 'votre hôtel',
-            'PRIX_TOTAL'    => number_format($this->reservation->prix_total, 2, ',', ' ') . ' MAD',
-            'PORTAL_URL'    => url('reservation/' . $this->reservation->token),
-            'PAYMENT_LINK'  => $this->reservation->payment_link ?? url('reservation/' . $this->reservation->token),
-            'TABLEAU_DEVIS' => $this->generateQuoteTable($this->reservation),
-        ];
+        $data = $this->getCommonVariables($this->reservation);
 
         $dynamicHtml = $this->resolveDynamicTemplate('payment_required', $data);
 

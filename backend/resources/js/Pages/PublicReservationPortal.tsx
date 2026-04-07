@@ -591,7 +591,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         <button
                                             type="button"
                                             onClick={handleNext}
-                                            disabled={!isAvailable || isCheckingAvailability}
+                                            disabled={!isAvailable || isCheckingAvailability || (step === 2 && !formData.hotelId)}
                                             className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
                                         >
                                             {isCheckingAvailability ? (

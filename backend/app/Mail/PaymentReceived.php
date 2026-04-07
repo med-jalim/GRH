@@ -33,16 +33,11 @@ class PaymentReceived extends Mailable implements ShouldQueue
         $paidSoFar = $this->reservation->paid_amount;
         $balance = $total - $paidSoFar;
 
-        $data = [
-            'NOM_CLIENT'      => $this->reservation->nom_contact,
-            'CODE_REF'        => $this->reservation->code_reference,
-            'NOM_HOTEL'       => $this->reservation->hotel->name ?? 'votre hôtel',
+        $data = array_merge($this->getCommonVariables($this->reservation), [
             'MONTANT_PAYE'    => number_format($this->amountPaidNow, 2, ',', ' ') . ' MAD',
             'TOTAL_PAYE'      => number_format($paidSoFar, 2, ',', ' ') . ' MAD',
             'SOLDE_RESTANT'   => number_format($balance, 2, ',', ' ') . ' MAD',
-            'PRIX_TOTAL'      => number_format($total, 2, ',', ' ') . ' MAD',
-            'PORTAL_URL'      => url('reservation/' . $this->reservation->token),
-        ];
+        ]);
 
         $dynamicHtml = $this->resolveDynamicTemplate('payment_received', $data);
 
