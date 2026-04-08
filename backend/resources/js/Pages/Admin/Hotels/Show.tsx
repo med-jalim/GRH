@@ -15,10 +15,12 @@ import {
   Tag
 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ApercuTab } from "./Partials/ApercuTab";
 import { TypesTab } from "./Partials/TypesTab";
 import { ChambresTab } from "./Partials/ChambresTab";
 import { TarifsTab } from "./Partials/TarifsTab";
+import { Percent } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,12 @@ interface Reservation {
   prix_total: number;
 }
 
+interface PricingRule {
+  id_type: number;
+  percentage: string | number;
+  type?: Type;
+}
+
 interface Hotel {
   id: number;
   name: string;
@@ -64,6 +72,8 @@ interface Hotel {
   email: string | null;
   adresse: string | null;
   rib: string | null;
+  main_type_id: number | null;
+  pricing_rules: PricingRule[];
   chambres: Chambre[];
   tarifs: Tarif[];
   reservations: Reservation[];
@@ -220,6 +230,7 @@ export default function HotelShow({ hotel, types }: Props) {
   
   // Onglets State
   const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"tarifs">("apercu");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Group rooms by type for Apercu display
   const chambresByType = hotel.chambres.reduce<Record<string, Chambre[]>>((acc, c) => {
@@ -228,17 +239,17 @@ export default function HotelShow({ hotel, types }: Props) {
     return acc;
   }, {});
 
-  function handleDeleteHotel() {
-    if (!confirm(`Supprimer définitivement l'hôtel "${hotel.name}" ?`)) return;
+  function handleConfirmDelete() {
+    setConfirmDelete(false);
     setDeleting(true);
     router.delete(`/admin/hotels/${hotel.id}`);
   }
 
   const TABS = [
     { id: "apercu", label: "Aperçu Global", icon: LayoutDashboard },
-    { id: "types", label: "Types de Chambres", icon: Layers },
+    { id: "types", label: "Types & Tarification", icon: Layers },
     { id: "chambres", label: "Chambres", icon: BedDouble },
-    { id: "tarifs", label: "Tarifs & Prix", icon: Tag },
+    { id: "tarifs", label: "Calendrier", icon: Tag },
   ] as const;
 
   return (
@@ -285,7 +296,7 @@ export default function HotelShow({ hotel, types }: Props) {
               Modifier Hôtel
             </button>
             <button
-              onClick={handleDeleteHotel}
+              onClick={() => setConfirmDelete(true)}
               disabled={deleting}
               className="inline-flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
@@ -317,13 +328,23 @@ export default function HotelShow({ hotel, types }: Props) {
         })}
       </div>
 
-      {/* ── TAB CONTENT ── */}
       <div className="min-h-[400px]">
         {activeTab === "apercu" && <ApercuTab hotel={hotel} chambresByType={chambresByType} />}
-        {activeTab === "types" && <TypesTab types={types} />}
+        {activeTab === "types" && <TypesTab hotel={hotel} types={types} />}
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
         {activeTab === "tarifs" && <TarifsTab hotel={hotel} types={types} />}
       </div>
+
+      <ConfirmDialog 
+        isOpen={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleting}
+        title="Supprimer l'établissement"
+        description={`Êtes-vous sûr de vouloir supprimer l'hôtel "${hotel.name}" ? Toutes les données, prix et chambres associées seront perdus définitivement.`}
+        confirmLabel="Supprimer définitivement"
+        variant="danger"
+      />
 
     </AdminLayout>
   );

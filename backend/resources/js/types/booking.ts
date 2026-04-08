@@ -4,6 +4,13 @@ export interface RoomType {
   description: string;
 }
 
+export interface TypeCapacity {
+  id_type: number;
+  capacite_adultes: number;
+  capacite_enfants: number;
+  capacite_bebes: number;
+}
+
 export interface Tarif {
   id_type: number;
   id_hotel: number;
@@ -27,26 +34,33 @@ export interface Hotel {
   description: string;
   chambres: Chambre[];
   tarifs: Tarif[];
+  type_capacities: TypeCapacity[];
 }
 
 export interface RoomSelection {
   uid: string;
-  roomTypeId: number;
-  quantity: number;
+  id_type: number;
+  quantite: number;
+  nb_adultes: number;
+  nb_enfants: number;
+  nb_bebes: number;
 }
 
 export interface BookingFormData {
   // Step 1 — Agence
   agencyName: string;
+  agencyCode: string;
   contactName: string;
   email: string;
   phone: string;
   // Step 2 — Réservation
   hotelId: number | null;
-  checkIn: string;
-  checkOut: string;
-  totalOccupants: number;
-  rooms: RoomSelection[];
+  groups: {
+    uid: string;
+    date_arrivee: string;
+    date_depart: string;
+    items: RoomSelection[];
+  }[];
   // Step 3 — Confirmation
   specialRequests: string;
 }

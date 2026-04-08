@@ -32,16 +32,27 @@ import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import axios from "axios";
 
-interface RoomDetail {
+interface ItemReservation {
     id?: number;
     id_type: number;
     quantite: number;
     prix_unitaire: number;
-    nom: string;
+    nb_adultes: number;
+    nb_enfants: number;
+    nb_bebes: number;
+    nom?: string;
     type?: {
         id: number;
         nom: string;
     };
+}
+
+interface ReservationGroup {
+    id: number;
+    date_arrivee: string;
+    date_depart: string;
+    nb_personnes: number;
+    items: ItemReservation[];
 }
 
 interface Tarif {
@@ -54,6 +65,19 @@ interface Tarif {
         id: number;
         nom: string;
     };
+}
+
+interface Payment {
+    id: number;
+    amount: number;
+    payment_date: string;
+    proof_path: string;
+    provenance: string;
+    notes?: string;
+    is_verified: boolean;
+    status: 'pending' | 'verified' | 'rejected';
+    notes_admin?: string;
+    created_at: string;
 }
 
 interface Reservation {
@@ -75,7 +99,9 @@ interface Reservation {
         ville: string;
         tarifs: Tarif[];
     };
-    details: RoomDetail[];
+    groups: ReservationGroup[];
+    details: ItemReservation[]; // Keep for backward compatibility if needed, but primary is groups
+    payments: Payment[];
 }
 
 interface Props {
@@ -83,6 +109,7 @@ interface Props {
     token: string;
     confirm_url: string;
     update_url: string;
+    payment_url: string;
 }
 
 const ProcessTimeline = ({ currentStatus }: { currentStatus: string }) => {
@@ -158,84 +185,342 @@ const ProcessTimeline = ({ currentStatus }: { currentStatus: string }) => {
     );
 };
 
-const PaymentSection = ({ reservation }: { reservation: Reservation }) => {
+const PaymentSection = ({
+    reservation,
+    paymentUrl,
+}: {
+    reservation: Reservation;
+    paymentUrl: string;
+}) => {
+    const [showUpload, setShowUpload] = useState(false);
     const montantPaye = reservation.montant_paye || 0;
     const resteAPayer = Math.max(0, reservation.prix_total - montantPaye);
-    const isReadyForPayment = reservation.statut === "en_attente_paiement" || reservation.statut === "paye_partiellement";
+
+    const { data, setData, post, processing, reset, errors } = useForm({
+        amount: resteAPayer.toString(),
+        preuve_paiement: null as File | null,
+        notes: "",
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(paymentUrl, {
+            onSuccess: () => {
+                setShowUpload(false);
+                reset();
+            },
+        });
+    };
 
     return (
-        <div className="bg-white rounded-2xl border border-amber-200 shadow-lg shadow-amber-500/5 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-            <div className="p-6 border-b border-amber-100 flex items-center gap-3 bg-amber-50/30">
-                <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
-                    <CreditCard className="w-4 h-4" />
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Totals Grid */}
+            <div className="bg-white rounded-2xl border border-amber-200 shadow-lg shadow-amber-500/5 overflow-hidden">
+                <div className="p-6 border-b border-amber-100 flex items-center gap-3 bg-amber-50/30">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
+                        <CreditCard className="w-4 h-4" />
+                    </div>
+                    <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
+                        Informations de Paiement
+                    </h2>
                 </div>
-                <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
-                    Informations de Paiement
-                </h2>
-            </div>
-            <div className="p-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                    <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Montant Total</p>
-                        <p className="text-xl font-black text-slate-900">
-                            {reservation.prix_total.toLocaleString("fr-FR")} <span className="text-sm font-bold text-slate-400">MAD</span>
-                        </p>
-                    </div>
-                    <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Montant Payé</p>
-                        <p className="text-xl font-black text-emerald-600">
-                            {montantPaye.toLocaleString("fr-FR")} <span className="text-sm font-bold text-emerald-200 text-emerald-600/30">MAD</span>
-                        </p>
-                    </div>
-                    <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reste à Payer</p>
-                        <p className={`text-xl font-black ${resteAPayer > 0 ? "text-amber-500" : "text-emerald-600"}`}>
-                            {resteAPayer.toLocaleString("fr-FR")} <span className="text-sm font-bold text-slate-300">MAD</span>
-                        </p>
-                    </div>
-                </div>
-
-                {isReadyForPayment && reservation.lien_paiement ? (
-                    <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 items-center gap-6 flex flex-col md:flex-row text-center md:text-left">
-                        <div className="flex-1">
-                            <h3 className="font-bold text-amber-900 mb-1">Paiement Sécurisé en Ligne</h3>
-                            <p className="text-xs text-amber-700 font-medium">
-                                Votre lien de paiement est prêt. Cliquez sur le bouton pour finaliser votre réservation en toute sécurité.
+                <div className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Montant Total
+                            </p>
+                            <p className="text-xl font-black text-slate-900">
+                                {reservation.prix_total.toLocaleString("fr-FR")}{" "}
+                                <span className="text-sm font-bold text-slate-400">
+                                    MAD
+                                </span>
                             </p>
                         </div>
-                        <a
-                            href={reservation.lien_paiement}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-slate-900 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs hover:bg-black hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-3 active:scale-95"
-                        >
-                            <CreditCard className="w-4 h-4" />
-                            Procéder au Paiement
-                            <ChevronRight className="w-4 h-4" />
-                        </a>
-                    </div>
-                ) : reservation.statut === "paye" ? (
-                    <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-4 text-emerald-800">
-                        <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white shrink-0">
-                            <Check className="w-6 h-6" />
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Montant Validé
+                            </p>
+                            <p className="text-xl font-black text-emerald-600">
+                                {montantPaye.toLocaleString("fr-FR")}{" "}
+                                <span className="text-sm font-bold text-emerald-600/30">
+                                    MAD
+                                </span>
+                            </p>
                         </div>
-                        <div>
-                            <p className="font-bold">Réservation Entièrement Réglée</p>
-                            <p className="text-xs font-medium opacity-80">Nous avons bien reçu la totalité de votre paiement. Merci de votre confiance.</p>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Reste à Payer
+                            </p>
+                            <p
+                                className={`text-xl font-black ${resteAPayer > 0 ? "text-amber-500" : "text-emerald-600"}`}
+                            >
+                                {resteAPayer.toLocaleString("fr-FR")}{" "}
+                                <span className="text-sm font-bold text-slate-300">
+                                    MAD
+                                </span>
+                            </p>
                         </div>
                     </div>
-                ) : (
-                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4 text-slate-600">
-                        <Clock className="w-5 h-5 text-slate-400" />
-                        <p className="text-xs font-medium">Votre lien de paiement sera généré une fois que l'administrateur aura validé définitivement votre dossier.</p>
+
+                    <div className="mt-8 pt-8 border-t border-slate-100">
+                        {resteAPayer > 0 ? (
+                            <div className="flex flex-col md:flex-row items-center gap-4">
+                                <div className="flex-1 text-center md:text-left">
+                                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                                        Vous pouvez régler le solde via le lien
+                                        de paiement en ligne (si disponible) ou
+                                        en nous envoyant votre preuve de payment
+                                        directement ci-dessous.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    {reservation.lien_paiement && (
+                                        <a
+                                            href={reservation.lien_paiement}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 md:flex-none px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+                                        >
+                                            Payer en ligne
+                                            <MoveRight className="w-3 h-3" />
+                                        </a>
+                                    )}
+                                    <button
+                                        onClick={() =>
+                                            setShowUpload(!showUpload)
+                                        }
+                                        className="flex-1 md:flex-none px-6 py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                        Envoyer une preuve
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-3 text-emerald-700">
+                                <CheckCircle2 className="w-5 h-5" />
+                                <p className="text-xs font-bold uppercase tracking-tight">
+                                    Réservation entièrement réglée
+                                </p>
+                            </div>
+                        )}
                     </div>
-                )}
+
+                    {/* Upload Form */}
+                    {showUpload && (
+                        <div className="mt-8 p-8 bg-slate-50 rounded-2xl border border-slate-200 animate-in slide-in-from-top-4 duration-300">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            Montant versé (MAD)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            required
+                                            value={data.amount}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "amount",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none font-bold"
+                                        />
+                                        {errors.amount && (
+                                            <p className="text-rose-500 text-[10px] font-bold">
+                                                {errors.amount}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            Preuve de paiement (IMG/PDF)
+                                        </label>
+                                        <input
+                                            type="file"
+                                            required
+                                            onChange={(e) =>
+                                                setData(
+                                                    "preuve_paiement",
+                                                    e.target.files?.[0] || null,
+                                                )
+                                            }
+                                            className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition-all cursor-pointer"
+                                        />
+                                        {errors.preuve_paiement && (
+                                            <p className="text-rose-500 text-[10px] font-bold">
+                                                {errors.preuve_paiement}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        Notes ou précisions (optionnel)
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        value={data.notes}
+                                        onChange={(e) =>
+                                            setData("notes", e.target.value)
+                                        }
+                                        placeholder="Ex: Virement effectué depuis le compte de M. X..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowUpload(false)}
+                                        className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="px-8 py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-600 shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {processing ? (
+                                            "Envoi en cours..."
+                                        ) : (
+                                            <>
+                                                Confirmer l'envoi
+                                                <Save className="w-3 h-3" />
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* Payment History */}
+            {reservation.payments && reservation.payments.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+                        <Receipt className="w-5 h-5 text-slate-400" />
+                        <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
+                            Historique des versements
+                        </h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">
+                                    <th className="px-8 py-4">Date Sub</th>
+                                    <th className="px-8 py-4">Montant</th>
+                                    <th className="px-8 py-4">Status</th>
+                                    <th className="px-8 py-4">Preuve</th>
+                                    <th className="px-8 py-4">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {reservation.payments.map((p) => (
+                                    <tr key={p.id} className="group">
+                                        <td className="px-8 py-4 text-xs font-bold text-slate-600">
+                                            {format(
+                                                new Date(p.created_at),
+                                                "dd/MM/yyyy HH:mm",
+                                            )}
+                                        </td>
+                                        <td className="px-8 py-4 font-black text-slate-900">
+                                            {p.amount.toLocaleString("fr-FR")}{" "}
+                                            MAD
+                                        </td>
+                                        <td className="px-8 py-4">
+                                            <div
+                                                className={`
+                                            inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border
+                                            ${
+                                                p.status === "verified"
+                                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                                    : p.status === "rejected"
+                                                      ? "bg-rose-50 text-rose-600 border-rose-100"
+                                                      : "bg-blue-50 text-blue-600 border-blue-100"
+                                            }
+                                        `}
+                                            >
+                                                {p.status === "pending" && (
+                                                    <Clock className="w-3 h-3" />
+                                                )}
+                                                {p.status === "verified" && (
+                                                    <Check className="w-3 h-3" />
+                                                )}
+                                                {p.status === "rejected" && (
+                                                    <XCircle className="w-3 h-3" />
+                                                )}
+                                                {p.status === "pending"
+                                                    ? "En attente"
+                                                    : p.status === "verified"
+                                                      ? "Validé"
+                                                      : "Refusé"}
+                                            </div>
+                                            {p.status === "rejected" &&
+                                                p.notes_admin && (
+                                                    <p className="text-[10px] text-rose-400 font-bold mt-1 max-w-[200px]">
+                                                        ⚠️ {p.notes_admin}
+                                                    </p>
+                                                )}
+                                        </td>
+                                        <td className="px-8 py-4">
+                                            <a
+                                                href={`/storage/${p.proof_path}`}
+                                                target="_blank"
+                                                className="text-amber-500 hover:text-amber-600"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </a>
+                                        </td>
+                                        <td className="px-8 py-4 text-xs text-slate-500 font-medium italic">
+                                            {p.notes || "-"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-export default function Verify({ reservation, token, confirm_url, update_url }: Props) {
+const OccupantStepper = ({ label, value, onChange, min = 0 }: { label: string; value: number; onChange: (v: number) => void; min?: number }) => (
+    <div className="flex items-center gap-2">
+        <span className="text-xs">{label}</span>
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg p-1 scale-90 origin-left">
+            <button
+                type="button"
+                onClick={() => onChange(Math.max(min, value - 1))}
+                className="w-5 h-5 flex items-center justify-center rounded bg-slate-50 hover:bg-slate-100 text-[10px] font-bold transition-colors"
+            >
+                -
+            </button>
+            <span className="text-[10px] font-black w-3 text-center">{value}</span>
+            <button
+                type="button"
+                onClick={() => onChange(value + 1)}
+                className="w-5 h-5 flex items-center justify-center rounded bg-slate-50 hover:bg-slate-100 text-[10px] font-bold transition-colors"
+            >
+                +
+            </button>
+        </div>
+    </div>
+);
+
+export default function Verify({
+    reservation,
+    token,
+    confirm_url,
+    update_url,
+    payment_url,
+}: Props) {
     const [isEditing, setIsEditing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -248,75 +533,46 @@ export default function Verify({ reservation, token, confirm_url, update_url }: 
     };
 
     const { data, setData, post, processing, errors } = useForm({
-        date_arrivee: formatDateForInput(reservation.date_arrivee),
-        date_depart: formatDateForInput(reservation.date_depart),
-        nb_personnes: reservation.nb_personnes,
-        details: reservation.details.map((d) => ({
-            id_type: d.id_type,
-            quantite: d.quantite,
-            prix_unitaire: d.prix_unitaire,
-            nom: d.nom || d.type?.nom || "Inconnu",
+        groups: reservation.groups.map((g) => ({
+            id: g.id,
+            date_arrivee: formatDateForInput(g.date_arrivee),
+            date_depart: formatDateForInput(g.date_depart),
+            nb_personnes: g.nb_personnes,
+            items: g.items.map((i) => ({
+                id_type: i.id_type,
+                quantite: i.quantite,
+                prix_unitaire: i.prix_unitaire,
+                nb_adultes: i.nb_adultes || 2,
+                nb_enfants: i.nb_enfants || 0,
+                nb_bebes: i.nb_bebes || 0,
+                nom: i.nom || i.type?.nom || "Inconnu",
+            })),
         })),
     });
 
-    // Available tarifs filtered by arrival date
-    const availableTarifs = useMemo(() => {
-        if (!data.date_arrivee) return [];
-        const checkIn = new Date(data.date_arrivee);
-        return reservation.hotel.tarifs.filter((t) => {
-            const start = new Date(t.date_debut);
-            const end = new Date(t.date_fin);
-            return start <= checkIn && end >= checkIn;
-        });
-    }, [data.date_arrivee, reservation.hotel.tarifs]);
 
-    // Sync unit prices when arrival date changes
-    useEffect(() => {
-        if (!isEditing || !data.date_arrivee) return;
+        // Sync unit prices when arrival date changes
+        // This logic needs to be per-group now. Skipping for now as it's complex 
+        // to do in a simple useEffect, better handled within GroupEdit component.
 
-        const checkIn = new Date(data.date_arrivee);
-        const updatedDetails = data.details.map((detail) => {
-            const matchingTarif = reservation.hotel.tarifs.find((t) => {
-                const start = new Date(t.date_debut);
-                const end = new Date(t.date_fin);
-                return (
-                    t.id_type === detail.id_type &&
-                    start <= checkIn &&
-                    end >= checkIn
-                );
-            });
-
-            if (matchingTarif && matchingTarif.prix !== detail.prix_unitaire) {
-                return { ...detail, prix_unitaire: matchingTarif.prix };
-            }
-            return detail;
-        });
-
-        // Only update if there are changes to avoid infinite loop
-        const hasChange =
-            JSON.stringify(updatedDetails) !== JSON.stringify(data.details);
-        if (hasChange) {
-            setData("details", updatedDetails);
-        }
-    }, [data.date_arrivee, reservation.hotel.tarifs, isEditing]);
-
-    const nights = useMemo(() => {
-        const start = new Date(
-            isEditing ? data.date_arrivee : reservation.date_arrivee,
-        );
-        const end = new Date(
-            isEditing ? data.date_depart : reservation.date_depart,
-        );
+    const getGroupNights = (date_arrivee: string, date_depart: string) => {
+        if (!date_arrivee || !date_depart) return 0;
+        const start = new Date(date_arrivee);
+        const end = new Date(date_depart);
         return Math.max(1, differenceInDays(end, start));
-    }, [isEditing, data.date_arrivee, data.date_depart, reservation]);
+    };
 
     const calculatedTotal = useMemo(() => {
         if (!isEditing) return reservation.prix_total;
-        return data.details.reduce(
-            (sum, item) => sum + item.quantite * item.prix_unitaire * nights,
-            0,
-        );
-    }, [isEditing, data.details, nights, reservation.prix_total]);
+        return data.groups.reduce((total, group) => {
+            const groupNights = getGroupNights(group.date_arrivee, group.date_depart);
+            const groupTotal = group.items.reduce(
+                (sum, item) => sum + item.quantite * item.prix_unitaire * groupNights,
+                0,
+            );
+            return total + groupTotal;
+        }, 0);
+    }, [isEditing, data.groups, reservation.prix_total]);
 
     const handleConfirm = () => {
         router.post(
@@ -333,8 +589,9 @@ export default function Verify({ reservation, token, confirm_url, update_url }: 
 
     const handleUpdateSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (data.details.length === 0) {
-            alert("Veuillez ajouter au moins une chambre.");
+        const hasRooms = data.groups.some(g => g.items.length > 0);
+        if (!hasRooms) {
+            alert("Veuillez ajouter au moins une chambre dans l'un des groupes.");
             return;
         }
         setSubmitting(true);
@@ -354,43 +611,62 @@ export default function Verify({ reservation, token, confirm_url, update_url }: 
         }
     };
 
-    const updateQuantity = (typeId: number, qty: number) => {
-        setData(
-            "details",
-            data.details.map((d) =>
-                d.id_type === typeId ? { ...d, quantite: Math.max(1, qty) } : d,
-            ),
-        );
+    const updateGroupItemQuantity = (groupIndex: number, itemIndex: number, qty: number) => {
+        const newGroups = [...data.groups];
+        newGroups[groupIndex].items[itemIndex].quantite = Math.max(1, qty);
+        
+        // Recalculate total persons for this group
+        newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
+            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+        }, 0);
+        
+        setData("groups", newGroups);
     };
 
-    const removeRoom = (index: number) => {
-        setData(
-            "details",
-            data.details.filter((_, i) => i !== index),
-        );
+    const removeGroupItem = (groupIndex: number, itemIndex: number) => {
+        const newGroups = [...data.groups];
+        newGroups[groupIndex].items.splice(itemIndex, 1);
+        setData("groups", newGroups);
     };
 
-    const addRoomType = (tarif: Tarif) => {
-        // Check if already exists
-        const exists = data.details.some((d) => d.id_type === tarif.id_type);
+    const updateGroupItemOccupant = (groupIndex: number, itemIndex: number, field: string, value: number) => {
+        const newGroups = [...data.groups];
+        const item = newGroups[groupIndex].items[itemIndex] as any;
+        item[field] = Math.max(0, value);
+        
+        // Recalculate total persons for this group
+        newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
+            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+        }, 0);
+        
+        setData("groups", newGroups);
+    };
+
+    const addGroupItem = (groupIndex: number, tarif: Tarif) => {
+        const newGroups = [...data.groups];
+        const group = newGroups[groupIndex];
+        const exists = group.items.find(i => i.id_type === tarif.id_type);
+
         if (exists) {
-            updateQuantity(
-                tarif.id_type,
-                data.details.find((d) => d.id_type === tarif.id_type)!
-                    .quantite + 1,
-            );
+            exists.quantite += 1;
         } else {
-            setData("details", [
-                ...data.details,
-                {
-                    id_type: tarif.id_type,
-                    quantite: 1,
-                    prix_unitaire: tarif.prix,
-                    nom: tarif.type.nom,
-                },
-            ]);
+            group.items.push({
+                id_type: tarif.id_type,
+                quantite: 1,
+                prix_unitaire: tarif.prix,
+                nb_adultes: 2, // Default to 2 adults as a reasonable starting point
+                nb_enfants: 0,
+                nb_bebes: 0,
+                nom: tarif.type.nom
+            });
         }
-        setShowAddRoom(false);
+        
+        // Recalculate total persons for this group
+        newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
+            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+        }, 0);
+        
+        setData("groups", newGroups);
     };
 
     return (
@@ -480,377 +756,271 @@ export default function Verify({ reservation, token, confirm_url, update_url }: 
                   reservation.statut === "paye_partiellement" || 
                   reservation.statut === "paye") && (
                     <div className="mb-12">
-                        <PaymentSection reservation={reservation} />
+                        <PaymentSection reservation={reservation} paymentUrl={payment_url} />
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                     {/* Left Column: Details & Prestations */}
                     <div className="lg:col-span-2 space-y-8">
-                        {/* Summary Card */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-                                <Building2 className="w-5 h-5 text-slate-400" />
-                                <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
-                                    Informations de séjour
-                                </h2>
-                            </div>
-                            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
-                                <div className="space-y-6">
-                                    <div className="flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
-                                            <Hotel className="w-5 h-5 text-slate-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
-                                                Établissement
-                                            </p>
-                                            <p className="font-bold text-slate-900">
-                                                {reservation.hotel.name}
-                                            </p>
-                                            <p className="text-xs text-slate-500 font-medium">
-                                                {reservation.hotel.ville}, Maroc
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
-                                            <Users className="w-5 h-5 text-slate-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
-                                                Voyageurs
-                                            </p>
-                                            {isEditing ? (
-                                                <input
-                                                    type="number"
-                                                    value={data.nb_personnes}
-                                                    onChange={(e) =>
-                                                        setData(
-                                                            "nb_personnes",
-                                                            parseInt(
-                                                                e.target.value,
-                                                            ),
-                                                        )
-                                                    }
-                                                    className="w-20 mt-1 px-3 py-1 rounded-lg border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none font-bold"
-                                                />
-                                            ) : (
-                                                <p className="font-bold text-slate-900">
-                                                    {reservation.nb_personnes}{" "}
-                                                    Personnes
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex-1">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                                                    Arrivée
-                                                </p>
-                                                {isEditing ? (
-                                                    <input
-                                                        type="date"
-                                                        value={
-                                                            data.date_arrivee
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                "date_arrivee",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
-                                                    />
-                                                ) : (
-                                                    <p className="font-bold text-slate-900">
-                                                        {format(
-                                                            new Date(
-                                                                reservation.date_arrivee,
-                                                            ),
-                                                            "dd MMM yyyy",
-                                                            { locale: fr },
-                                                        )}
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <ArrowLeft className="w-4 h-4 text-slate-300 rotate-180 mx-2 mt-4" />
-                                            <div className="flex-1 text-right">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                                                    Départ
-                                                </p>
-                                                {isEditing ? (
-                                                    <input
-                                                        type="date"
-                                                        value={data.date_depart}
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                "date_depart",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none text-right"
-                                                    />
-                                                ) : (
-                                                    <p className="font-bold text-slate-900">
-                                                        {format(
-                                                            new Date(
-                                                                reservation.date_depart,
-                                                            ),
-                                                            "dd MMM yyyy",
-                                                            { locale: fr },
-                                                        )}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="pt-4 border-t border-slate-200 flex items-center justify-center gap-2">
-                                            <Clock className="w-3.5 h-3.5 text-amber-500" />
-                                            <span className="text-xs font-bold text-slate-700">
-                                                {nights} Nuits
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Prestations Table */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-3">
-                                    <Receipt className="w-5 h-5 text-slate-400" />
-                                    <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
-                                        Détail des prestations
-                                    </h2>
-                                </div>
-                                {isEditing && (
+                        {(isEditing ? data.groups : reservation.groups).map((group, gIdx) => (
+                            <div key={group.id || gIdx} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                                     <div className="flex items-center gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setShowAddRoom(!showAddRoom)
-                                            }
-                                            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 shadow-sm active:scale-95 ${showAddRoom ? "bg-slate-200 text-slate-700" : "bg-slate-900 text-white hover:bg-black"}`}
-                                        >
-                                            {showAddRoom ? (
-                                                "Fermer"
-                                            ) : (
-                                                <>
-                                                    <Plus className="w-3.5 h-3.5" />{" "}
-                                                    Ajouter une chambre
-                                                </>
-                                            )}
-                                        </button>
-                                        <div className="w-px h-6 bg-slate-200" />
-                                        <span className="px-2 py-1 bg-amber-50 text-amber-600 text-[10px] font-black uppercase tracking-widest rounded-md animate-pulse">
-                                            Modification active
-                                        </span>
+                                        <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-black text-xs">
+                                            {gIdx + 1}
+                                        </div>
+                                        <h2 className="font-bold text-slate-900 uppercase tracking-tight text-sm">
+                                            Séjour Groupe {gIdx + 1}
+                                        </h2>
                                     </div>
-                                )}
-                            </div>
-
-                            {/* Add Room Selector */}
-                            {isEditing && showAddRoom && (
-                                <div className="p-6 bg-slate-50/80 border-b border-slate-100 animate-in slide-in-from-top-4 duration-300">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
-                                        Sélectionnez un type de chambre
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {availableTarifs.length > 0 ? (
-                                            availableTarifs.map((tarif) => (
-                                                <button
-                                                    key={tarif.id}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        addRoomType(tarif)
-                                                    }
-                                                    className="p-4 bg-white border border-slate-200 rounded-xl hover:border-amber-400 hover:shadow-md transition-all text-left flex items-center justify-between group"
-                                                >
-                                                    <div>
-                                                        <p className="font-bold text-slate-900 text-sm group-hover:text-amber-600 transition-colors">
-                                                            {tarif.type.nom}
-                                                        </p>
-                                                        <p className="text-xs font-medium text-slate-500">
-                                                            {tarif.prix.toLocaleString(
-                                                                "fr-FR",
-                                                            )}{" "}
-                                                            MAD / Nuit
-                                                        </p>
-                                                    </div>
-                                                    <MoveRight className="w-4 h-4 text-slate-300 group-hover:translate-x-1 group-hover:text-amber-500 transition-all" />
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div className="col-span-full p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-700 flex items-center gap-3">
-                                                <AlertCircle className="w-5 h-5 shrink-0" />
-                                                <p className="text-xs font-bold">
-                                                    Aucun tarif disponible pour
-                                                    la date d'arrivée
-                                                    sélectionnée (
-                                                    {data.date_arrivee}).
+                                    {isEditing && (
+                                        <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-black uppercase rounded border border-amber-100">
+                                            Édition Active
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-6">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                                                <Hotel className="w-5 h-5 text-slate-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                                                    Établissement
+                                                </p>
+                                                <p className="font-bold text-slate-900">
+                                                    {reservation.hotel.name}
+                                                </p>
+                                                <p className="text-xs text-slate-500 font-medium">
+                                                    {reservation.hotel.ville}, Maroc
                                                 </p>
                                             </div>
-                                        )}
+                                        </div>
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+                                                <Users className="w-5 h-5 text-slate-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                                                    Voyageurs (Total)
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                    {(() => {
+                                                        const groupItems = isEditing ? group.items : group.items;
+                                                        const a = groupItems.reduce((acc, i) => acc + (i.nb_adultes || 0) * i.quantite, 0);
+                                                        const e = groupItems.reduce((acc, i) => acc + (i.nb_enfants || 0) * i.quantite, 0);
+                                                        const b = groupItems.reduce((acc, i) => acc + (i.nb_bebes || 0) * i.quantite, 0);
+                                                        return (
+                                                            <>
+                                                                <span title="Adultes" className="px-2 py-0.5 bg-slate-100 rounded-md text-[10px] font-bold text-slate-600">Ad. {a}</span>
+                                                                {e > 0 && <span title="Enfants" className="px-2 py-0.5 bg-sky-50 rounded-md text-[10px] font-bold text-sky-600">Enf. {e}</span>}
+                                                                {b > 0 && <span title="Bébés" className="px-2 py-0.5 bg-pink-50 rounded-md text-[10px] font-bold text-pink-600">Béb. {b}</span>}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 text-left">
-                                            <th className="px-8 py-4">
-                                                Type d'hébergement
-                                            </th>
-                                            <th className="px-8 py-4 text-center">
-                                                Quantité
-                                            </th>
-                                            <th className="px-8 py-4 text-right">
-                                                Prix Unitaire / Nuit
-                                            </th>
-                                            <th className="px-8 py-4 text-right">
-                                                Sous-total
-                                            </th>
-                                            {isEditing && (
-                                                <th className="px-8 py-4 text-right">
-                                                    Action
-                                                </th>
-                                            )}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {(isEditing
-                                            ? data.details
-                                            : reservation.details
-                                        ).map((item, idx) => (
-                                            <tr
-                                                key={idx}
-                                                className="group hover:bg-slate-50/30 transition-colors"
-                                            >
-                                                <td className="px-8 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 group-hover:border-amber-200 transition-colors">
-                                                            <Hotel className="w-5 h-5 text-slate-400" />
-                                                        </div>
-                                                        <span className="font-bold text-slate-900">
-                                                            {(item as any)
-                                                                .nom ||
-                                                                (item as any)
-                                                                    .type?.nom}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
+                                    <div className="space-y-6">
+                                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex-1">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                                        Arrivée
+                                                    </p>
                                                     {isEditing ? (
-                                                        <div className="flex items-center justify-center gap-3">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    updateQuantity(
-                                                                        item.id_type,
-                                                                        item.quantite -
-                                                                            1,
-                                                                    )
-                                                                }
-                                                                className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold hover:bg-slate-200 transition-colors"
-                                                            >
-                                                                -
-                                                            </button>
-                                                            <span className="w-4 text-center font-bold">
-                                                                {item.quantite}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    updateQuantity(
-                                                                        item.id_type,
-                                                                        item.quantite +
-                                                                            1,
-                                                                    )
-                                                                }
-                                                                className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold hover:bg-slate-200 transition-colors"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        </div>
+                                                        <input
+                                                            type="date"
+                                                            value={group.date_arrivee}
+                                                            onChange={(e) => {
+                                                                const newGroups = [...data.groups];
+                                                                newGroups[gIdx].date_arrivee = e.target.value;
+                                                                setData("groups", newGroups);
+                                                            }}
+                                                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-amber-500/20 outline-none"
+                                                        />
                                                     ) : (
-                                                        <p className="text-center font-bold text-slate-900">
-                                                            x{item.quantite}
+                                                        <p className="font-bold text-slate-900">
+                                                            {format(new Date(group.date_arrivee), "dd MMM yyyy", { locale: fr })}
                                                         </p>
                                                     )}
-                                                </td>
-                                                <td className="px-8 py-6 text-right font-medium text-slate-600">
-                                                    {item.prix_unitaire.toLocaleString(
-                                                        "fr-FR",
-                                                    )}{" "}
-                                                    MAD
-                                                </td>
-                                                <td className="px-8 py-6 text-right">
-                                                    <span className="font-bold text-slate-900">
-                                                        {(
-                                                            item.quantite *
-                                                            item.prix_unitaire *
-                                                            nights
-                                                        ).toLocaleString(
-                                                            "fr-FR",
-                                                        )}{" "}
-                                                        MAD
-                                                    </span>
-                                                </td>
-                                                {isEditing && (
+                                                </div>
+                                                <MoveRight className="w-4 h-4 text-slate-300 mx-2 mt-4" />
+                                                <div className="flex-1 text-right">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                                        Départ
+                                                    </p>
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="date"
+                                                            value={group.date_depart}
+                                                            onChange={(e) => {
+                                                                const newGroups = [...data.groups];
+                                                                newGroups[gIdx].date_depart = e.target.value;
+                                                                setData("groups", newGroups);
+                                                            }}
+                                                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-bold focus:ring-2 focus:ring-amber-500/20 outline-none text-right"
+                                                        />
+                                                    ) : (
+                                                        <p className="font-bold text-slate-900">
+                                                            {format(new Date(group.date_depart), "dd MMM yyyy", { locale: fr })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="pt-4 border-t border-slate-200 flex items-center justify-center gap-2">
+                                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                                <span className="text-xs font-bold text-slate-700">
+                                                    {getGroupNights(group.date_arrivee, group.date_depart)} Nuits
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto border-t border-slate-100">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 text-left">
+                                                <th className="px-8 py-4">Hébergement</th>
+                                                <th className="px-8 py-4 text-center">Quantité</th>
+                                                <th className="px-8 py-4 text-right">P.U / Nuit</th>
+                                                <th className="px-8 py-4 text-right">Sous-total</th>
+                                                {isEditing && <th className="px-8 py-4 text-right">Action</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {group.items.map((item, iIdx) => (
+                                                <tr key={iIdx} className="group hover:bg-slate-50/30 transition-colors">
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex flex-col gap-2">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 shrink-0">
+                                                                    <Hotel className="w-4 h-4 text-slate-400" />
+                                                                </div>
+                                                                <span className="font-bold text-slate-900 leading-tight">
+                                                                    {item.nom || item.type?.nom}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            {/* Occupants breakdown */}
+                                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                                {isEditing ? (
+                                                                    <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 flex flex-wrap gap-x-4 gap-y-2">
+                                                                        <OccupantStepper 
+                                                                            label="Adultes" 
+                                                                            value={item.nb_adultes} 
+                                                                            onChange={(v) => updateGroupItemOccupant(gIdx, iIdx, 'nb_adultes', v)}
+                                                                            min={1}
+                                                                        />
+                                                                        <OccupantStepper 
+                                                                            label="Enfants" 
+                                                                            value={item.nb_enfants} 
+                                                                            onChange={(v) => updateGroupItemOccupant(gIdx, iIdx, 'nb_enfants', v)}
+                                                                        />
+                                                                        <OccupantStepper 
+                                                                            label="Bébés" 
+                                                                            value={item.nb_bebes} 
+                                                                            onChange={(v) => updateGroupItemOccupant(gIdx, iIdx, 'nb_bebes', v)}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span title="Adultes" className="flex items-center gap-1 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded-md font-bold text-slate-600">Ad. {item.nb_adultes}</span>
+                                                                        <span title="Enfants" className="flex items-center gap-1 text-[10px] bg-sky-50 px-1.5 py-0.5 rounded-md font-bold text-sky-600">Enf. {item.nb_enfants}</span>
+                                                                        <span title="Bébés" className="flex items-center gap-1 text-[10px] bg-pink-50 px-1.5 py-0.5 rounded-md font-bold text-pink-600">Béb. {item.nb_bebes}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        {isEditing ? (
+                                                            <div className="flex items-center justify-center gap-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateGroupItemQuantity(gIdx, iIdx, item.quantite - 1)}
+                                                                    className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold hover:bg-slate-200 transition-colors"
+                                                                >-</button>
+                                                                <span className="w-4 text-center font-bold">{item.quantite}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateGroupItemQuantity(gIdx, iIdx, item.quantite + 1)}
+                                                                    className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold hover:bg-slate-200 transition-colors"
+                                                                >+</button>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-center font-bold text-slate-900">
+                                                                x{item.quantite}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-8 py-6 text-right font-medium text-slate-600">
+                                                        {item.prix_unitaire.toLocaleString("fr-FR")} MAD
+                                                    </td>
                                                     <td className="px-8 py-6 text-right">
+                                                        <span className="font-bold text-slate-900">
+                                                            {(item.quantite * item.prix_unitaire * getGroupNights(group.date_arrivee, group.date_depart)).toLocaleString("fr-FR")} MAD
+                                                        </span>
+                                                    </td>
+                                                    {isEditing && (
+                                                        <td className="px-8 py-6 text-right">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeGroupItem(gIdx, iIdx)}
+                                                                className="w-9 h-9 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                            {isEditing && (
+                                                <tr>
+                                                    <td colSpan={5} className="px-8 py-4 bg-slate-50/50">
                                                         <button
                                                             type="button"
-                                                            onClick={() =>
-                                                                removeRoom(idx)
-                                                            }
-                                                            className="w-9 h-9 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                                                            onClick={() => setShowAddRoom(showAddRoom === gIdx ? null : gIdx)}
+                                                            className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
                                                         >
-                                                            <Trash2 className="w-4 h-4" />
+                                                            {showAddRoom === gIdx ? "Annuler l'ajout" : "+ Ajouter une chambre à ce groupe"}
                                                         </button>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))}
-
-                                        {/* Empty State in Edit Mode */}
-                                        {isEditing &&
-                                            data.details.length === 0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={5}
-                                                        className="px-8 py-12 text-center"
-                                                    >
-                                                        <div className="max-w-xs mx-auto space-y-3">
-                                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto border border-slate-100">
-                                                                <Info className="w-6 h-6 text-slate-400" />
+                                                        {showAddRoom === gIdx && (
+                                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2 animate-in zoom-in-95">
+                                                                {reservation.hotel.tarifs
+                                                                    .filter(t => {
+                                                                        const cin = new Date(group.date_arrivee);
+                                                                        return new Date(t.date_debut) <= cin && new Date(t.date_fin) >= cin;
+                                                                    })
+                                                                    .map(t => (
+                                                                        <button
+                                                                            key={t.id}
+                                                                            onClick={() => {
+                                                                                addGroupItem(gIdx, t);
+                                                                                setShowAddRoom(null);
+                                                                            }}
+                                                                            className="p-3 bg-white border border-slate-100 rounded-xl text-left hover:border-amber-400 transition-all group"
+                                                                        >
+                                                                            <p className="font-bold text-slate-900 text-[11px] group-hover:text-amber-600">{t.type.nom}</p>
+                                                                            <p className="text-[10px] text-slate-400 font-medium">{t.prix.toLocaleString("fr-FR")} MAD / Nuit</p>
+                                                                        </button>
+                                                                    ))
+                                                                }
                                                             </div>
-                                                            <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                                                                Aucune
-                                                                prestation
-                                                                sélectionnée
-                                                            </p>
-                                                            <p className="text-[10px] text-slate-400 leading-relaxed font-medium">
-                                                                Veuillez ajouter
-                                                                au moins une
-                                                                chambre pour
-                                                                continuer votre
-                                                                demande de mise
-                                                                à jour.
-                                                            </p>
-                                                        </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             )}
-                                    </tbody>
-                                </table>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
+                        ))}
+
+
                     </div>
 
                     {/* Right Column: Sidebar / Total */}

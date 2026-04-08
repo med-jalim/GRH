@@ -8,28 +8,25 @@ export const bookingSchema = z.object({
   email:       z.string().email('Adresse e-mail invalide'),
   phone:       z.string().min(8, 'Numéro de téléphone invalide'),
 
-  // Step 2: Reservation Details
+  // Step 2: Reservation Details (Grouped)
   hotelId:        z.number().positive('Veuillez sélectionner un hôtel'),
-  checkIn:        z.string().min(1, 'La date d\'arrivée est requise'),
-  checkOut:       z.string().min(1, 'La date de départ est requise'),
-  totalOccupants: z.number().min(1, 'Au moins une personne est requise'),
   
-  rooms: z.array(z.object({
-    uid:        z.string(),
-    roomTypeId: z.number().positive(),
-    quantity:   z.number().min(1, 'La quantité doit être au moins 1'),
-  })).min(1, 'Veuillez ajouter au moins une chambre'),
+  groups: z.array(z.object({
+    uid:          z.string(),
+    date_arrivee: z.string().min(1, 'Date arrivée requise'),
+    date_depart:  z.string().min(1, 'Date départ requise'),
+    items: z.array(z.object({
+      uid:        z.string(),
+      id_type:    z.number().positive(),
+      quantite:   z.number().min(1, 'Min 1'),
+      nb_adultes: z.number(),
+      nb_enfants: z.number(),
+      nb_bebes:   z.number(),
+    })).min(1, 'Ajoutez au moins une chambre'),
+  })).min(1, 'Ajoutez au moins une période de séjour'),
 
   // Step 3: Confirmation
   specialRequests: z.string().optional(),
-}).refine(data => {
-  if (data.checkIn && data.checkOut) {
-    return new Date(data.checkOut) > new Date(data.checkIn);
-  }
-  return true;
-}, {
-  message: "La date de départ doit être après la date d'arrivée",
-  path: ["checkOut"]
 });
 
 export type BookingSchemaType = z.infer<typeof bookingSchema>;

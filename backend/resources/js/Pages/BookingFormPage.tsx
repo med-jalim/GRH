@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useForm, FormProvider } from "react-hook-form";
+import { useState, useCallback, useMemo } from "react";
+import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, usePage } from "@inertiajs/react";
 import axios from "axios";
@@ -26,7 +26,7 @@ export default function BookingFormPage({ hotels }: Props) {
 
     // React Hook Form
     const methods = useForm<BookingSchemaType>({
-        resolver: zodResolver(bookingSchema),
+        resolver: zodResolver(bookingSchema) as any,
         defaultValues: {
             agencyName: "",
             agencyCode: "",
@@ -34,44 +34,37 @@ export default function BookingFormPage({ hotels }: Props) {
             email: "",
             phone: "",
             hotelId: undefined,
-            checkIn: "",
-            checkOut: "",
-            totalOccupants: 0,
-            rooms: [],
+            groups: [
+                {
+                    uid: Math.random().toString(36).substr(2, 9),
+                    date_arrivee: "",
+                    date_depart: "",
+                    items: []
+                }
+            ],
             specialRequests: "",
         },
         mode: "onBlur",
     });
 
-    const { watch, trigger, handleSubmit } = methods;
-    const formData = watch();
+    const { trigger, handleSubmit, control } = methods;
+
+    // Specifically watch these fields for real-time reactivity
+    const watchedHotelId = useWatch({ control, name: "hotelId" });
 
     const selectedHotel = useMemo(
-        () => (hotels || []).find((h) => h.id === formData.hotelId) ?? null,
-        [formData.hotelId, hotels],
+        () => (hotels || []).find((h) => h.id === Number(watchedHotelId)) ?? null,
+        [watchedHotelId, hotels],
     );
 
-    const nights = useMemo(() => {
-        if (!formData.checkIn || !formData.checkOut) return 0;
-        const diff =
-            new Date(formData.checkOut).getTime() -
-            new Date(formData.checkIn).getTime();
-        return Math.max(0, Math.round(diff / 86_400_000));
-    }, [formData.checkIn, formData.checkOut]);
+    // These are pushed UP from PriceSummary via onTotalChange
+    const [totalPrice, setTotalPrice] = useState(0);
+    const [nights,     setNights]     = useState(0);
 
-    const totalPrice = useMemo(() => {
-        if (!selectedHotel || nights === 0 || !formData.checkIn) return 0;
-        const checkInDate = new Date(formData.checkIn);
-        return formData.rooms.reduce((sum: number, r: any) => {
-            const tarif = selectedHotel.tarifs.find(
-                (t) =>
-                    t.id_type === r.roomTypeId &&
-                    new Date(t.date_debut) <= checkInDate &&
-                    new Date(t.date_fin) >= checkInDate,
-            );
-            return sum + (tarif ? tarif.prix * nights * r.quantity : 0);
-        }, 0);
-    }, [formData.rooms, selectedHotel, nights, formData.checkIn]);
+    const handleTotalChange = useCallback((total: number, n: number) => {
+        setTotalPrice(total);
+        setNights(n);
+    }, []);
 
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
@@ -87,10 +80,7 @@ export default function BookingFormPage({ hotels }: Props) {
         if (step === 2)
             fieldsToValidate = [
                 "hotelId",
-                "checkIn",
-                "checkOut",
-                "totalOccupants",
-                "rooms",
+                "groups",
             ];
 
         const isValid = await trigger(fieldsToValidate);
@@ -115,25 +105,33 @@ export default function BookingFormPage({ hotels }: Props) {
             email: data.email,
             telephone: data.phone,
             id_hotel: data.hotelId,
-            date_arrivee: data.checkIn,
-            date_depart: data.checkOut,
-            nb_personnes: data.totalOccupants,
             prix_total: totalPrice,
             remarques_speciales: data.specialRequests,
-            details: data.rooms.map((r: any) => {
-                const checkInDate = new Date(data.checkIn);
-                const validTarif = selectedHotel?.tarifs.find(
-                    (t) =>
-                        t.id_type === r.roomTypeId &&
-                        new Date(t.date_debut) <= checkInDate &&
-                        new Date(t.date_fin) >= checkInDate,
-                );
+            groups: data.groups.map((group: any) => {
+                const checkInDate = new Date(group.date_arrivee);
                 return {
-                    id_type: r.roomTypeId,
-                    quantite: r.quantity,
-                    prix_unitaire: validTarif?.prix || 0,
+                    date_arrivee: group.date_arrivee,
+                    date_depart: group.date_depart,
+                    items: group.items.map((r: any) => {
+                        const checkInDate = new Date(group.date_arrivee);
+                        const validTarif = (selectedHotel?.tarifs || []).find(
+                            (t) => {
+                                const start = new Date(t.date_debut.substring(0, 10) + "T00:00:00");
+                                const end = new Date(t.date_fin.substring(0, 10) + "T23:59:59");
+                                return Number(t.id_type) === Number(r.id_type) && start <= checkInDate && end >= checkInDate;
+                            }
+                        );
+                        return {
+                            id_type: r.id_type,
+                            quantite: r.quantite,
+                            prix_unitaire: validTarif?.prix || 0,
+                            nb_adultes: r.nb_adultes,
+                            nb_enfants: r.nb_enfants,
+                            nb_bebes: r.nb_bebes,
+                        };
+                    })
                 };
-            }),
+            })
         };
 
         try {
@@ -198,8 +196,7 @@ export default function BookingFormPage({ hotels }: Props) {
                                     {step === 2 && (
                                         <ReservationDetailsStep
                                             hotels={hotels}
-                                            nights={nights}
-                                            totalPrice={totalPrice}
+                                            onTotalChange={handleTotalChange}
                                         />
                                     )}
                                     {step === 3 && (

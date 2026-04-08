@@ -1,12 +1,15 @@
 import { useForm, router } from "@inertiajs/react";
 import { BedDouble, Check, Edit3, Plus, Trash2, X, Search } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
   const [showModal, setShowModal] = useState(false);
   const [editingChambre, setEditingChambre] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; numero: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const filteredChambres = (hotel.chambres || []).filter((c: any) => {
     const matchesSearch = c.numero.toLowerCase().includes(searchQuery.toLowerCase());
@@ -56,10 +59,15 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
     }
   }
 
-  function handleDelete(id: number) {
-    if (confirm("Supprimer cette chambre définitivement ?")) {
-      router.delete(`/admin/chambres/${id}`);
-    }
+  function handleConfirmDelete() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    router.delete(`/admin/chambres/${confirmDelete.id}`, {
+      onFinish: () => {
+        setConfirmDelete(null);
+        setDeleting(false);
+      },
+    });
   }
 
   return (
@@ -144,7 +152,7 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
                       <button onClick={() => openEdit(c)} className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleDelete(c.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <button onClick={() => setConfirmDelete({ id: c.id, numero: c.numero })} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -194,6 +202,17 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleting}
+        title="Supprimer la chambre"
+        description={`Êtes-vous sûr de vouloir supprimer définitivement la chambre N° ${confirmDelete?.numero} ? Cette action est irréversible.`}
+        confirmLabel="Supprimer définitivement"
+        variant="danger"
+      />
     </div>
   );
 }

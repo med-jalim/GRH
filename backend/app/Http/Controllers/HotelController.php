@@ -17,7 +17,7 @@ class HotelController extends Controller
      */
     public function bookingPage(): Response
     {
-        $hotels = Hotel::with(['chambres.type', 'tarifs.type'])->get();
+        $hotels = Hotel::with(['chambres.type', 'tarifs.type', 'typeCapacities'])->get();
 
         return Inertia::render('BookingFormPage', [
             'hotels' => $hotels,
@@ -86,8 +86,11 @@ class HotelController extends Controller
     public function show(Request $request, string $id): Response|JsonResponse|RedirectResponse
     {
         $hotel = Hotel::with([
+            'mainType',
+            'pricingRules.type',
             'chambres.type',
             'tarifs.type',
+            'typeCapacities',
             'reservations' => fn ($q) => $q->orderByDesc('created_at')->limit(10),
         ])->find($id);
 
@@ -109,6 +112,57 @@ class HotelController extends Controller
             'hotel' => $hotel,
             'types' => $types,
         ]);
+    }
+
+    /**
+     * Admin: update a hotel's pricing rules.
+     */
+    public function updatePricingRules(Request $request, Hotel $hotel): RedirectResponse
+    {
+        $validated = $request->validate([
+            'main_type_id' => 'required|exists:types,id',
+            'rules'        => 'required|array',
+            'rules.*.id_type'    => 'required|exists:types,id',
+            'rules.*.percentage' => 'required|numeric|min:0',
+        ]);
+
+        $hotel->update(['main_type_id' => $validated['main_type_id']]);
+
+        foreach ($validated['rules'] as $ruleData) {
+            $hotel->pricingRules()->updateOrCreate(
+                ['id_type' => $ruleData['id_type']],
+                ['percentage' => $ruleData['percentage']]
+            );
+        }
+
+        return back()->with('success', 'Configuration des prix mise à jour avec succès.');
+    }
+
+    /**
+     * Admin: update a hotel's type capacities.
+     */
+    public function updateTypeCapacities(Request $request, Hotel $hotel): RedirectResponse
+    {
+        $validated = $request->validate([
+            'capacities'                    => 'required|array',
+            'capacities.*.id_type'          => 'required|exists:types,id',
+            'capacities.*.capacite_adultes' => 'required|integer|min:0',
+            'capacities.*.capacite_enfants' => 'required|integer|min:0',
+            'capacities.*.capacite_bebes'   => 'required|integer|min:0',
+        ]);
+
+        foreach ($validated['capacities'] as $cap) {
+            $hotel->typeCapacities()->updateOrCreate(
+                ['id_type' => $cap['id_type']],
+                [
+                    'capacite_adultes' => $cap['capacite_adultes'],
+                    'capacite_enfants' => $cap['capacite_enfants'],
+                    'capacite_bebes'   => $cap['capacite_bebes'],
+                ]
+            );
+        }
+
+        return back()->with('success', 'Capacités mises à jour avec succès.');
     }
 
     /**

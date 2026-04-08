@@ -12,14 +12,29 @@ class ItemReservation extends Model
 
     protected $fillable = [
         'id_reservation',
+        'id_group',
         'id_type',
         'quantite',
-        'prix_unitaire'
+        'prix_unitaire',
+        'nb_adultes',
+        'nb_enfants',
+        'nb_bebes',
     ];
+
+    public function getPrixTotalAttribute(): float
+    {
+        $nights = $this->group ? $this->group->nights : 1;
+        return (float) ($this->quantite ?? 1) * (float) ($this->prix_unitaire ?? 0) * $nights;
+    }
 
     public function reservation(): BelongsTo
     {
         return $this->belongsTo(Reservation::class, 'id_reservation');
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(ReservationGroup::class, 'id_group');
     }
 
     public function type(): BelongsTo

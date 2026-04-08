@@ -8,7 +8,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Hotel extends Model
 {
-    protected $fillable = ['name', 'stars', 'ville', 'description', 'telephone', 'email', 'adresse', 'rib'];
+    protected $fillable = ['name', 'stars', 'ville', 'description', 'telephone', 'email', 'adresse', 'rib', 'main_type_id'];
+
+    public function mainType(): BelongsTo
+    {
+        return $this->belongsTo(Type::class, 'main_type_id');
+    }
+
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(HotelTypePricingRule::class, 'id_hotel');
+    }
 
     public function chambres(): HasMany
     {
@@ -23,5 +33,10 @@ class Hotel extends Model
     public function tarifs(): HasMany
     {
         return $this->hasMany(Tarif::class, 'id_hotel');
+    }
+
+    public function typeCapacities(): HasMany
+    {
+        return $this->hasMany(HotelTypeCapacity::class, 'id_hotel');
     }
 }

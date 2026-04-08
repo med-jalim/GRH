@@ -89,25 +89,33 @@ export function BookingSuccessPage({ reference, formData, hotel, totalPrice, nig
                     <span className="text-sm font-medium text-slate-700">{hotel?.name} — {hotel?.ville}</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Arrivée</span>
-                    <span className="text-sm font-medium text-slate-700">{fmt(formData.checkIn)}</span>
+                    <span className="text-sm text-slate-500">Arrivée (min)</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {formData.groups.length > 0 ? fmt(formData.groups.reduce((min, g) => (g.date_arrivee < min ? g.date_arrivee : min), formData.groups[0].date_arrivee)) : '—'}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Départ</span>
-                    <span className="text-sm font-medium text-slate-700">{fmt(formData.checkOut)}</span>
+                    <span className="text-sm text-slate-500">Départ (max)</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {formData.groups.length > 0 ? fmt(formData.groups.reduce((max, g) => (g.date_depart > max ? g.date_depart : max), formData.groups[0].date_depart)) : '—'}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Durée</span>
+                    <span className="text-sm text-slate-500">Durée globale</span>
                     <span className="text-sm font-medium text-slate-700">{nights} nuit{nights > 1 ? 's' : ''}</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Personnes</span>
-                    <span className="text-sm font-medium text-slate-700">{formData.totalOccupants} personne{formData.totalOccupants > 1 ? 's' : ''}</span>
+                    <span className="text-sm text-slate-500">Personnes (Total)</span>
+                    <span className="text-sm font-medium text-slate-700">
+                      {formData.groups.reduce((acc: number, g: any) => 
+                        acc + g.items.reduce((ra: number, r: any) => 
+                          ra + (Number(r.nb_adultes || 0) + Number(r.nb_enfants || 0) + Number(r.nb_bebes || 0)) * r.quantite, 0), 0)} personnes
+                    </span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-sm text-slate-500">Chambres</span>
+                    <span className="text-sm text-slate-500">Chambres (Total)</span>
                     <span className="text-sm font-medium text-slate-700">
-                      {formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0)} chambre{formData.rooms.reduce((acc: number, r: any) => acc + r.quantity, 0) > 1 ? 's' : ''}
+                      {formData.groups.reduce((acc: number, g: any) => acc + g.items.reduce((ra: number, r: any) => ra + r.quantite, 0), 0)} chambres
                     </span>
                   </div>
 

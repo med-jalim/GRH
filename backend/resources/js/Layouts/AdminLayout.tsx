@@ -12,12 +12,14 @@ import {
     BedDouble,
     HelpCircle,
     LogOut,
+    Mail,
 } from "lucide-react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useFlash } from "@/lib/hooks";
 
 interface Props {
     children: ReactNode;
+    fullScreen?: boolean;
 }
 
 function FlashListener() {
@@ -25,21 +27,14 @@ function FlashListener() {
     return null;
 }
 
-export function AdminLayout({ children }: Props) {
+export function AdminLayout({ children, fullScreen }: Props) {
     const { url } = usePage();
 
     const primaryNav = [
-        {
-            name: "Tableau de bord",
-            href: "/admin/dashboard",
-            icon: LayoutDashboard,
-        },
-        {
-            name: "Réservations",
-            href: "/admin/reservations",
-            icon: CalendarCheck,
-        },
+        { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
+        { name: "Réservations", href: "/admin/reservations", icon: CalendarCheck },
         { name: "Hôtels", href: "/admin/hotels", icon: Building2 },
+        { name: "Modèles d'E-mails", href: "/admin/email-templates", icon: Mail },
     ];
 
     return (
@@ -152,9 +147,15 @@ export function AdminLayout({ children }: Props) {
                     </header>
 
                     {/* Page Content */}
-                    <main className="flex-1 overflow-y-auto p-8">
-                        <div className="max-w-7xl mx-auto">{children}</div>
-                    </main>
+                    {fullScreen ? (
+                        <main className="flex-1 overflow-hidden flex flex-col">
+                            {children}
+                        </main>
+                    ) : (
+                        <main className="flex-1 overflow-y-auto p-8">
+                            <div className="max-w-7xl mx-auto">{children}</div>
+                        </main>
+                    )}
                 </div>
 
                 {/* Global CSS for scrollbar hiding/styling */}

@@ -23,4 +23,9 @@ class Type extends Model
     {
         return $this->hasMany(ItemReservation::class, 'id_type');
     }
+
+    public function hotelCapacities(): HasMany
+    {
+        return $this->hasMany(HotelTypeCapacity::class, 'id_type');
+    }
 }

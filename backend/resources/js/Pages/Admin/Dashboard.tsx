@@ -80,12 +80,14 @@ export default function Dashboard({
                 >
                     <Icon className={`w-5 h-5 ${colorClass}`} />
                 </div>
-                <span
-                    className={`text-sm font-semibold ${isPositive ? "text-green-500 bg-green-50" : "text-red-500 bg-red-50"} px-2 py-1 rounded-lg`}
-                >
-                    {isPositive ? "+" : ""}
-                    {change}%
-                </span>
+                {change && (
+                    <span
+                        className={`text-sm font-semibold ${isPositive ? "text-green-500 bg-green-50" : "text-red-500 bg-red-50"} px-2 py-1 rounded-lg`}
+                    >
+                        {isPositive ? "+" : ""}
+                        {change}%
+                    </span>
+                )}
             </div>
             <div className="mt-4">
                 <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
@@ -98,13 +100,6 @@ export default function Dashboard({
         </div>
     );
 
-    useEffect(() => {
-        console.log(stats);
-        console.log(chartData);
-        console.log(topHotels);
-        console.log(statusDistribution);
-    }, []);
-
     return (
         <AdminLayout>
             {/* Header Actions */}
@@ -115,7 +110,7 @@ export default function Dashboard({
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* <div className="flex items-center gap-3">
                     <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         Cette semaine
@@ -132,7 +127,7 @@ export default function Dashboard({
                         <Settings className="w-4 h-4 text-gray-400" />
                         Paramètres
                     </button>
-                </div>
+                </div> */}
             </div>
 
             {/* Main Grid Layout */}
@@ -145,15 +140,6 @@ export default function Dashboard({
                             <h2 className="text-lg font-bold text-gray-900">
                                 Aperçu des Réservations
                             </h2>
-                            <div className="flex items-center gap-2">
-                                <select className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 outline-none">
-                                    <option>Hebdomadaire</option>
-                                    <option>Mensuel</option>
-                                </select>
-                                <button className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
-                                    <MoreHorizontal className="w-5 h-5" />
-                                </button>
-                            </div>
                         </div>
 
                         <div className="h-72 w-full">
@@ -236,14 +222,14 @@ export default function Dashboard({
                             <h2 className="text-lg font-bold text-gray-900">
                                 Meilleurs Hôtels Formants
                             </h2>
-                            <div className="flex items-center gap-2">
+                            {/* <div className="flex items-center gap-2">
                                 <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">
                                     <Filter className="w-3.5 h-3.5" /> Filtres
                                 </button>
                                 <button className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
                                     <MoreHorizontal className="w-5 h-5" />
                                 </button>
-                            </div>
+                            </div> */}
                         </div>
 
                         <div className="flex gap-4 mb-6">
@@ -327,7 +313,6 @@ export default function Dashboard({
                         <StatCard
                             title="Chambres Réservées"
                             value={stats.booked.toLocaleString()}
-                            change={18.5}
                             isPositive={true}
                             icon={CalendarDays}
                             colorClass="text-green-500"
@@ -336,7 +321,6 @@ export default function Dashboard({
                         <StatCard
                             title="Réservations Annulées"
                             value={stats.cancelled.toLocaleString()}
-                            change={24.8}
                             isPositive={false}
                             icon={Users}
                             colorClass="text-yellow-500"
@@ -345,7 +329,6 @@ export default function Dashboard({
                         <StatCard
                             title="Chiffre d'Affaires"
                             value={`${(stats.revenue * 0.4).toLocaleString()} MAD`}
-                            change={14.6}
                             isPositive={false}
                             icon={Building2}
                             colorClass="text-blue-500"
@@ -354,7 +337,6 @@ export default function Dashboard({
                         <StatCard
                             title="Revenus Attendus"
                             value={`${(stats.revenue * 0.6).toLocaleString()} MAD`}
-                            change={12.8}
                             isPositive={true}
                             icon={TrendingUp}
                             colorClass="text-purple-500"

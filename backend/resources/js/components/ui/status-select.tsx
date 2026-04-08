@@ -140,7 +140,13 @@ export function StatusSelect({
             <Select.Portal>
                 <Select.Positioner className="z-[100] pt-1">
                     <Select.Popup className="bg-white rounded-2xl border border-slate-100 shadow-2xl p-1.5 min-w-[180px] animate-in fade-in zoom-in-95 duration-100">
-                        {STATUS_OPTIONS.map((opt) => (
+                        {STATUS_OPTIONS.filter(
+                            (opt) =>
+                                opt.value === value ||
+                                ["en_verification", "annule"].includes(
+                                    opt.value,
+                                ),
+                        ).map((opt) => (
                             <Select.Item
                                 key={opt.value}
                                 value={opt.value}

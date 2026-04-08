@@ -9,19 +9,24 @@ import {
     Filter,
 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { format } from "date-fns";
 import { PricingCalendar } from "@/components/Calendar/PricingCalendar";
+import { useToast } from "@/components/ui/Toast";
 
 function dateForInput(d: string) {
     return new Date(d).toISOString().split("T")[0];
 }
 
 export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
+    const { error } = useToast();
     const [showModal, setShowModal] = useState(false);
     const [editingTarif, setEditingTarif] = useState<any>(null);
     const [selectedTypeId, setSelectedTypeId] = useState<string>(
         types.length > 0 ? types[0].id.toString() : "all",
     );
+    const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id_type: types.length > 0 ? types[0].id.toString() : "",
@@ -32,6 +37,10 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
     });
 
     function openCreate(startDate?: Date, endDate?: Date) {
+        if (selectedTypeId === "all") {
+            error("Veuillez sélectionner un type de chambre");
+            return;
+        }
         setEditingTarif(null);
         setData({
             id_type:
@@ -51,6 +60,10 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
     }
 
     function openEdit(t: any) {
+        if (selectedTypeId === "all") {
+            error("Veuillez sélectionner un type de chambre");
+            return;
+        }
         setEditingTarif(t);
         setData({
             id_type: t.id_type.toString(),
@@ -81,15 +94,17 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
         }
     }
 
-    function handleDelete(id?: number) {
-        const targetId = id ?? editingTarif?.id;
-        if (!targetId) return;
-
-        if (confirm("Supprimer ce tarif définitivement ?")) {
-            router.delete(`/admin/tarifs/${targetId}`, {
-                onSuccess: () => setShowModal(false),
-            });
-        }
+    function handleConfirmDelete() {
+        if (!confirmDelete) return;
+        setDeleting(true);
+        router.delete(`/admin/tarifs/${confirmDelete}`, {
+            onSuccess: () => {
+                setConfirmDelete(null);
+                setShowModal(false);
+                setDeleting(false);
+            },
+            onFinish: () => setDeleting(false),
+        });
     }
 
     return (
@@ -298,7 +313,9 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
                                 {editingTarif && (
                                     <button
                                         type="button"
-                                        onClick={() => handleDelete()}
+                                        onClick={() =>
+                                            setConfirmDelete(editingTarif.id)
+                                        }
                                         className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-xl transition-colors shadow-sm"
                                     >
                                         <Trash2 className="w-5 h-5" />
@@ -319,6 +336,17 @@ export function TarifsTab({ hotel, types }: { hotel: any; types: any[] }) {
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={handleConfirmDelete}
+                isLoading={deleting}
+                title="Supprimer le tarif"
+                description="Êtes-vous sûr de vouloir supprimer définitivement ce tarif ? Cette action est irréversible."
+                confirmLabel="Supprimer définitivement"
+                variant="danger"
+            />
         </div>
     );
 }

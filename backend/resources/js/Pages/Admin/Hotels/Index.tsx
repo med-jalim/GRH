@@ -14,6 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -256,6 +257,7 @@ export default function HotelsIndex({ hotels, stats }: Props) {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
 
   const filtered = hotels.filter((h) => {
     const q = search.toLowerCase();
@@ -265,12 +267,14 @@ export default function HotelsIndex({ hotels, stats }: Props) {
     );
   });
 
-  function handleDelete(id: number, name: string) {
-    if (!confirm(`Supprimer l'hôtel "${name}" ? Cette action est irréversible.`))
-      return;
-    setDeletingId(id);
-    router.delete(`/admin/hotels/${id}`, {
-      onFinish: () => setDeletingId(null),
+  function handleConfirmDelete() {
+    if (!confirmDelete) return;
+    setDeletingId(confirmDelete.id);
+    router.delete(`/admin/hotels/${confirmDelete.id}`, {
+      onFinish: () => {
+        setConfirmDelete(null);
+        setDeletingId(null);
+      },
     });
   }
 
@@ -414,7 +418,7 @@ export default function HotelsIndex({ hotels, stats }: Props) {
                   </Link>
                   <button
                     disabled={deletingId === hotel.id}
-                    onClick={() => handleDelete(hotel.id, hotel.name)}
+                    onClick={() => setConfirmDelete({ id: hotel.id, name: hotel.name })}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -426,6 +430,17 @@ export default function HotelsIndex({ hotels, stats }: Props) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deletingId !== null}
+        title="Supprimer l'établissement"
+        description={`Êtes-vous sûr de vouloir supprimer l'hôtel "${confirmDelete?.name}" ? Toutes les chambres et données liées seront effacées définitivement.`}
+        confirmLabel="Confirmer la suppression"
+        variant="danger"
+      />
     </AdminLayout>
   );
 }

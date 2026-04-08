@@ -37,20 +37,22 @@ export function InfoRow({
     label,
     value,
     mono = false,
+    small = false,
 }: {
     icon: React.ElementType;
     label: string;
     value: React.ReactNode;
     mono?: boolean;
+    small?: boolean;
 }) {
     return (
-        <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Icon className="w-3.5 h-3.5 text-slate-500" />
+        <div className={`flex items-start gap-3 ${small ? "opacity-90" : ""}`}>
+            <div className={`${small ? "w-6 h-6" : "w-8 h-8"} bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                <Icon className={`${small ? "w-3 h-3" : "w-3.5 h-3.5"} text-slate-500`} />
             </div>
             <div>
-                <p className="text-xs text-slate-400 font-medium">{label}</p>
-                <div className={`text-sm font-semibold text-slate-800 mt-0.5 ${mono ? "font-mono" : ""}`}>
+                <p className={`${small ? "text-[10px]" : "text-xs"} text-slate-400 font-medium`}>{label}</p>
+                <div className={`${small ? "text-[11px]" : "text-sm"} font-semibold text-slate-800 mt-0.5 ${mono ? "font-mono" : ""}`}>
                     {value || <span className="text-slate-400 font-normal italic">—</span>}
                 </div>
             </div>

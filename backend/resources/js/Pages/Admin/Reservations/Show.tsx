@@ -3,6 +3,7 @@ import { Link, router, useForm } from "@inertiajs/react";
 import { ArrowLeft, CreditCard, FileText, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // Partials
 import DetailsTab from "./Partials/DetailsTab";
@@ -26,9 +27,35 @@ export interface Type {
 export interface ItemReservation {
     id: number;
     id_type: number;
+    id_group: number | null;
     quantite: number;
     prix_unitaire: number;
+    nb_adultes: number;
+    nb_enfants: number;
+    nb_bebes: number;
     type: Type | null;
+}
+
+export interface ReservationGroup {
+    id: number;
+    date_arrivee: string;
+    date_depart: string;
+    nb_personnes: number;
+    nights: number;
+    items: ItemReservation[];
+}
+
+export interface Payment {
+    id: number;
+    amount: number;
+    payment_date: string;
+    proof_path: string | null;
+    provenance: "admin" | "client";
+    notes: string | null;
+    is_verified: boolean;
+    status: "pending" | "verified" | "rejected";
+    notes_admin: string | null;
+    created_at: string;
 }
 
 export interface Reservation {
@@ -54,17 +81,13 @@ export interface Reservation {
         | "confirme"
         | "annule";
     lien_paiement: string | null;
-    preuve_paiement: string[] | null;
     montant_paye: number | null;
-    statut_paiement:
-        | "non_paye"
-        | "en_attente_verification"
-        | "paye_partiellement"
-        | "paye";
     created_at: string;
     updated_at: string;
     hotel: Hotel | null;
+    groups: ReservationGroup[];
     details: ItemReservation[];
+    payments: Payment[];
     montant_restant: number;
     pourcentage_paiement: number;
 }
@@ -108,6 +131,7 @@ export default function ReservationShow({ reservation }: Props) {
     const [deleting, setDeleting] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const nights = nightsBetween(
         reservation.date_arrivee,
@@ -121,9 +145,13 @@ export default function ReservationShow({ reservation }: Props) {
     const addPaymentForm = useForm<{
         montant: string;
         preuve_paiement: File | null;
+        payment_date: string;
+        notes: string;
     }>({
-        montant: "",
+        montant: reservation.montant_restant.toString(),
         preuve_paiement: null,
+        payment_date: new Date().toISOString().slice(0, 16), // Local datetime-local format
+        notes: "",
     });
 
     // ── Handlers ──
@@ -155,7 +183,8 @@ export default function ReservationShow({ reservation }: Props) {
         e.preventDefault();
         if (
             !addPaymentForm.data.montant ||
-            !addPaymentForm.data.preuve_paiement
+            !addPaymentForm.data.preuve_paiement ||
+            !addPaymentForm.data.payment_date
         )
             return;
         addPaymentForm.post(
@@ -181,15 +210,33 @@ export default function ReservationShow({ reservation }: Props) {
         }
     }
 
-    function handleDelete() {
-        if (
-            !confirm(
-                `Supprimer définitivement la réservation ${reservation.code_reference} ?`,
-            )
-        )
-            return;
+    function handleConfirmDelete() {
+        setConfirmDelete(false);
         setDeleting(true);
         router.delete(`/admin/reservations/${reservation.id}`);
+    }
+
+    function handleVerifyPayment(paymentId: number) {
+        router.patch(
+            `/admin/payments/${paymentId}/verify`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    }
+
+    function handleRejectPayment(paymentId: number, notesAdmin: string) {
+        if (!notesAdmin) return;
+        router.patch(
+            `/admin/payments/${paymentId}/reject`,
+            {
+                notes_admin: notesAdmin,
+            },
+            {
+                preserveScroll: true,
+            },
+        );
     }
 
     return (
@@ -228,9 +275,9 @@ export default function ReservationShow({ reservation }: Props) {
 
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={handleDelete}
+                            onClick={() => setConfirmDelete(true)}
                             disabled={deleting}
-                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl border border-slate-100 transition-all"
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl border border-slate-100 transition-all font-bold"
                             title="Supprimer la réservation"
                         >
                             <Trash2 className="w-5 h-5" />
@@ -306,9 +353,22 @@ export default function ReservationShow({ reservation }: Props) {
                         handleFileChange={handleFileChange}
                         previewUrl={previewUrl}
                         fileInputRef={fileInputRef}
+                        handleVerifyPayment={handleVerifyPayment}
+                        handleRejectPayment={handleRejectPayment}
                     />
                 )}
             </div>
+
+            <ConfirmDialog
+                isOpen={confirmDelete}
+                onClose={() => setConfirmDelete(false)}
+                onConfirm={handleConfirmDelete}
+                isLoading={deleting}
+                title="Supprimer la réservation"
+                description={`Êtes-vous sûr de vouloir supprimer définitivement la réservation ${reservation.code_reference} ? Cette action est irréversible.`}
+                confirmLabel="Supprimer définitivement"
+                variant="danger"
+            />
         </AdminLayout>
     );
 }

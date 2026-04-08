@@ -183,40 +183,72 @@
             </div>
         </div>
 
-        @if($newStatut === 'en_verification' && $reservation->details->count() > 0)
+        @if(($newStatut === 'en_verification' || $newStatut === 'en_attente_paiement' || $newStatut === 'valide') && $reservation->groups->count() > 0)
         <div style="margin-bottom: 32px;">
-            <p class="details-title">Détail des prestations (Devis)</p>
-            <table style="width:100%; border-collapse:collapse; font-size:12px; border: 1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
-                <thead style="background:#f8fafc;">
-                    <tr>
-                        <th style="padding:10px 12px; text-align:left; border-bottom:1px solid #e2e8f0; color:#64748b;">Type</th>
-                        <th style="padding:10px 12px; text-align:center; border-bottom:1px solid #e2e8f0; color:#64748b;">Qté</th>
-                        <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0; color:#64748b;">Prix Unit.</th>
-                        <th style="padding:10px 12px; text-align:right; border-bottom:1px solid #e2e8f0; color:#64748b;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($reservation->details as $item)
-                    <tr>
-                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; font-weight:600; color:#1e293b;">{{ $item->type?->nom ?? 'Type inconnu' }}</td>
-                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:center; color:#475569;">{{ $item->quantite }}</td>
-                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:right; color:#475569;">{{ number_format($item->prix_unitaire, 0, ',', ' ') }} MAD</td>
-                        <td style="padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700; color:#0f172a;">{{ number_format($item->quantite * $item->prix_unitaire, 0, ',', ' ') }} MAD</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-                <tfoot style="background:#f8fafc;">
-                    <tr>
-                        <td colspan="3" style="padding:10px 12px; text-align:right; font-weight:700; color:#64748b;">Montant Total H.T</td>
-                        <td style="padding:10px 12px; text-align:right; font-weight:800; color:#1e293b; font-size:14px;">{{ number_format($reservation->prix_total, 0, ',', ' ') }} MAD</td>
-                    </tr>
-                </tfoot>
-            </table>
+            <p class="details-title">Résumé de votre séjour par période</p>
+            
+            @foreach($reservation->groups as $group)
+            <div style="margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+                <div style="background: #f8fafc; padding: 10px 16px; border-bottom: 1px solid #e2e8f0;">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td>
+                                <span style="font-size: 13px; font-weight: 800; color: #1e293b;">Période {{ $loop->iteration }}</span>
+                                <span style="font-size: 11px; color: #64748b; margin-left: 8px;">
+                                    ({{ \Carbon\Carbon::parse($group->date_arrivee)->translatedFormat('d M') }} → {{ \Carbon\Carbon::parse($group->date_depart)->translatedFormat('d M Y') }})
+                                </span>
+                            </td>
+                            <td style="text-align: right;">
+                                <span style="font-size: 11px; font-weight: 700; color: #475569; background: #e2e8f0; padding: 2px 8px; border-radius: 4px;">
+                                    {{ $group->nb_personnes }} Pers.
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                    <thead style="background:#ffffff;">
+                        <tr>
+                            <th style="padding:8px 16px; text-align:left; color:#94a3b8; font-size:10px; text-transform:uppercase;">Chambre</th>
+                            <th style="padding:8px 16px; text-align:center; color:#94a3b8; font-size:10px; text-transform:uppercase;">Qté</th>
+                            <th style="padding:8px 16px; text-align:right; color:#94a3b8; font-size:10px; text-transform:uppercase;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @php
+                            $groupNights = max(1, \Carbon\Carbon::parse($group->date_depart)->diffInDays(\Carbon\Carbon::parse($group->date_arrivee)));
+                        @endphp
+                        @foreach($group->items as $item)
+                        <tr>
+                            <td style="padding:8px 16px; border-top:1px solid #f1f5f9; font-weight:600; color:#334155;">
+                                {{ $item->type?->nom ?? 'Type inconnu' }}
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: normal; margin-top: 2px;">
+                                    🧑 {{ $item->nb_adultes }} | 👦 {{ $item->nb_enfants ?: 0 }} | 👶 {{ $item->nb_bebes ?: 0 }}
+                                </div>
+                                <div style="font-size: 10px; color: #94a3b8; font-weight: normal;">
+                                    {{ number_format($item->prix_unitaire, 0, ',', ' ') }} MAD x {{ $groupNights }} nuits
+                                </div>
+                            </td>
+                            <td style="padding:8px 16px; border-top:1px solid #f1f5f9; text-align:center; color:#475569;">{{ $item->quantite }}</td>
+                            <td style="padding:8px 16px; border-top:1px solid #f1f5f9; text-align:right; font-weight:700; color:#0f172a;">
+                                {{ number_format($item->quantite * $item->prix_unitaire * $groupNights, 0, ',', ' ') }} MAD
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endforeach
 
-            <div style="margin-top: 20px; text-align: center;">
+            <div style="background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: right;">
+                <span style="font-size: 13px; font-weight: 700; color: #64748b; margin-right: 12px;">MONTANT TOTAL</span>
+                <span style="font-size: 18px; font-weight: 800; color: #1e293b;">{{ number_format($reservation->prix_total, 0, ',', ' ') }} MAD</span>
+            </div>
+
+            <div style="margin-top: 24px; text-align: center;">
                 <a href="{{ $verify_url }}" 
-                   style="display:inline-block; background: #2563eb; color: #ffffff; font-size:13px; font-weight:700; padding:10px 24px; border-radius:10px; text-decoration:none; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);">
-                    🔍 Vérifier et Confirmer mes détails →
+                   style="display:inline-block; background: #2563eb; color: #ffffff; font-size:13px; font-weight:700; padding:12px 28px; border-radius:12px; text-decoration:none; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                    🔍 Voir les détails complets en ligne →
                 </a>
             </div>
             <div class="divider"></div>
@@ -226,8 +258,12 @@
         {{-- Greeting --}}
         <p class="greeting">Bonjour {{ $reservation->nom_contact }},</p>
         <p class="intro">
-            Le statut de votre réservation a été mis à jour de
-            <strong>{{ $prevLabel }}</strong> vers <strong>{{ $statusLabel }}</strong>.
+            @if($prevLabel === $statusLabel)
+                Nous avons bien enregistré votre nouvelle demande de réservation. Nous sommes ravis de vous accompagner dans l'organisation de votre séjour.
+            @else
+                Le statut de votre réservation a été mis à jour de
+                <strong>{{ $prevLabel }}</strong> vers <strong>{{ $statusLabel }}</strong>.
+            @endif
             Voici le récapitulatif de votre séjour :
         </p>
 

@@ -23,9 +23,7 @@ class Reservation extends Model
         'statut',
         'code_reference',
         'lien_paiement',
-        'preuve_paiement',
         'montant_paye',
-        'statut_paiement',
     ];
 
     protected $appends = [
@@ -37,7 +35,6 @@ class Reservation extends Model
         'date_arrivee'    => 'date',
         'date_depart'     => 'date',
         'montant_paye'    => 'decimal:2',
-        'preuve_paiement' => 'array',
     ];
 
     public function getMontantRestantAttribute(): float
@@ -59,5 +56,15 @@ class Reservation extends Model
     public function details(): HasMany
     {
         return $this->hasMany(ItemReservation::class, 'id_reservation');
+    }
+
+    public function groups(): HasMany
+    {
+        return $this->hasMany(ReservationGroup::class, 'id_reservation');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'id_reservation')->orderByDesc('payment_date');
     }
 }

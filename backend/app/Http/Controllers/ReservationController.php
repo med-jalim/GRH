@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ReservationStatusUpdated;
+use App\Mail\PaymentVerified;
+use App\Mail\PaymentRejected;
 use App\Models\ItemReservation;
 use App\Models\Reservation;
+use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
@@ -42,10 +46,13 @@ class ReservationController extends Controller
         ];
 
         if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
-            $baseQuery->where('statut', $request->statut);
+            $statuses = explode(',', $request->statut);
+            $baseQuery->whereIn('statut', $statuses);
         }
 
         $reservations = $baseQuery->with(['hotel', 'details.type'])
+            ->withCount('groups')
+            ->withSum('details as total_items', 'quantite')
             ->orderByDesc('created_at')
             ->paginate(15);
 
@@ -61,6 +68,43 @@ class ReservationController extends Controller
     }
 
     /**
+     * Get non-paginated reservation data for the calendar view.
+     */
+    public function getCalendarData(Request $request): JsonResponse
+    {
+        $query = Reservation::with(['hotel']);
+
+        if ($request->has('id_hotel') && $request->id_hotel !== null && $request->id_hotel !== '') {
+            $query->where('id_hotel', $request->id_hotel);
+        }
+
+        if ($request->has('statut') && $request->statut !== null && $request->statut !== '' && $request->statut !== 'all') {
+            $statuses = explode(',', $request->statut);
+            $query->whereIn('statut', $statuses);
+        }
+
+        // Ideally, we'd also filter by a date range (start/end) provided by the frontend
+        // to avoid loading the entire database history in production.
+        if ($request->has('start') && $request->has('end')) {
+             $query->where(function($q) use ($request) {
+                 $q->whereBetween('date_arrivee', [$request->start, $request->end])
+                   ->orWhereBetween('date_depart', [$request->start, $request->end])
+                   ->orWhere(function($q2) use ($request) {
+                       $q2->where('date_arrivee', '<=', $request->start)
+                          ->where('date_depart', '>=', $request->end);
+                   });
+             });
+        }
+
+        $reservations = $query->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $reservations
+        ]);
+    }
+
+    /**
      * Store a newly created reservation with its line items.
      */
     public function store(Request $request): JsonResponse|RedirectResponse
@@ -72,43 +116,91 @@ class ReservationController extends Controller
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
             'id_hotel'            => 'required|integer|exists:hotels,id',
-            'date_arrivee'        => 'required|date',
-            'date_depart'         => 'required|date|after:date_arrivee',
-            'nb_personnes'        => 'required|integer|min:1',
-            'prix_total'          => 'required|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
             'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
                                                                                                                                                                                         
-            // Line items
-            'details'                  => 'nullable|array',
-            'details.*.id_type'        => 'required_with:details|integer|exists:types,id',
-            'details.*.quantite'       => 'required_with:details|integer|min:1',
-            'details.*.prix_unitaire'  => 'required_with:details|numeric|min:0',
+            // Nested Groups & Items
+            'groups'                  => 'required|array|min:1',
+            'groups.*.date_arrivee'   => 'required|date',
+            'groups.*.date_depart'    => 'required|date|after:groups.*.date_arrivee',
+            'groups.*.nb_personnes'   => 'nullable|integer|min:0',
+            'groups.*.items'                  => 'required|array|min:1',
+            'groups.*.items.*.id_type'        => 'required|integer|exists:types,id',
+            'groups.*.items.*.quantite'       => 'required|integer|min:1',
+            'groups.*.items.*.prix_unitaire'  => 'required|numeric|min:0',
+            'groups.*.items.*.nb_adultes'     => 'required|integer|min:0',
+            'groups.*.items.*.nb_enfants'     => 'nullable|integer|min:0',
+            'groups.*.items.*.nb_bebes'       => 'nullable|integer|min:0',
         ]);
 
         // Auto-generate a unique reference code
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
-        $nights = $this->calculateNights($validated['date_arrivee'], $validated['date_depart']);
-        // Calculate total price from details (verifying against nights)
-        $prixTotalCalculated = $this->calculateTotalPrice($validated['details'], $nights);
+        
+        $groups = $validated['groups'];
+        
+        // Calculate Global Info (Min Arrivee, Max Depart, Sum Personnes)
+        $globalArrivee = collect($groups)->min('date_arrivee');
+        $globalDepart  = collect($groups)->max('date_depart');
+        $totalPersonnes = collect($groups)->sum(function ($g) {
+            return collect($g['items'])->sum(function ($item) {
+                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
+                      + ($item['nb_bebes'] ?? 0))
+                      * ($item['quantite'] ?? 1);
+            });
+        });
+        
+        // Calculate total price from groups
+        $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
 
-        // We use the calculated price to ensure integrity, 
-        // but we could also validate that $validated['prix_total'] matches $prixTotalCalculated
-        $validated['prix_total'] = $prixTotalCalculated;
+        // Prepare reservation data
+        $reservationData = array_merge($validated, [
+            'date_arrivee' => $globalArrivee,
+            'date_depart'  => $globalDepart,
+            'nb_personnes' => $totalPersonnes,
+            'prix_total'   => $prixTotalCalculated,
+        ]);
+        unset($reservationData['groups']);
 
-        $details = $validated['details'] ?? [];
-        unset($validated['details']);
+        $reservation = Reservation::create($reservationData);
 
-        $reservation = Reservation::create($validated);
-
-        // Create line items
-        foreach ($details as $detail) {
-            $detail['id_reservation'] = $reservation->id;
-            ItemReservation::create($detail);
+        // Create Groups and their items
+        foreach ($groups as $groupData) {
+            $items = $groupData['items'];
+            unset($groupData['items']);
+            
+            // Calculate total pax for this group from items
+            $groupNbPersonnes = collect($items)->sum(function($item) {
+                return (
+                    ($item['nb_adultes'] ?? 0) + 
+                    ($item['nb_enfants'] ?? 0) + 
+                    ($item['nb_bebes'] ?? 0)
+                ) * ($item['quantite'] ?? 1);
+            });
+            
+            $groupData['id_reservation'] = $reservation->id;
+            $groupData['nb_personnes'] = $groupNbPersonnes;
+            $group = \App\Models\ReservationGroup::create($groupData);
+            
+            foreach ($items as $itemData) {
+                $itemData['id_reservation'] = $reservation->id;
+                $itemData['id_group'] = $group->id;
+                ItemReservation::create($itemData);
+            }
         }
 
-        $reservation->load(['hotel', 'details.type']);
+        $reservation->load(['hotel', 'groups.items.type', 'details.type']);
+
+        // Notify client about the new reservation
+        try {
+            Mail::to($reservation->email)
+                ->send(new \App\Mail\ReservationStatusUpdated($reservation, 'en_attente'));
+        } catch (\Throwable $e) {
+            Log::error('Failed to send initial reservation email', [
+                'reservation_id' => $reservation->id,
+                'error'          => $e->getMessage(),
+            ]);
+        }
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
@@ -126,7 +218,7 @@ class ReservationController extends Controller
      */
     public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::with(['hotel', 'details.type'])->find($id);
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'details.type', 'payments'])->find($id);
 
         if (! $reservation) {
             if (request()->wantsJson() && ! request()->header('X-Inertia')) {
@@ -165,27 +257,81 @@ class ReservationController extends Controller
             'email'               => 'sometimes|required|email|max:255',
             'telephone'           => 'sometimes|required|string|max:30',
             'id_hotel'            => 'sometimes|required|integer|exists:hotels,id',
-            'date_arrivee'        => 'sometimes|required|date',
-            'date_depart'         => 'sometimes|required|date|after:date_arrivee',
-            'nb_personnes'        => 'sometimes|required|integer|min:1',
-            'prix_total'          => 'sometimes|numeric|min:0',
             'remarques_speciales' => 'nullable|string',
-            'statut'              => 'nullable|string|in:en_attente,en_attente_paiement,confirme,annule',
+            'statut'              => 'nullable|string|in:en_attente,en_verification,valide,en_attente_paiement,paye_partiellement,confirme,annule',
             'lien_paiement'       => 'nullable|string|max:2000',
+            'groups'              => 'sometimes|required|array|min:1',
+            'groups.*.date_arrivee' => 'required|date',
+            'groups.*.date_depart'  => 'required|date|after:groups.*.date_arrivee',
+            'groups.*.nb_personnes' => 'nullable|integer|min:0',
+            'groups.*.items'        => 'required|array|min:1',
+            'groups.*.items.*.id_type' => 'required|integer|exists:types,id',
+            'groups.*.items.*.quantite' => 'required|integer|min:1',
+            'groups.*.items.*.prix_unitaire' => 'required|numeric|min:0',
+            'groups.*.items.*.nb_adultes'    => 'required|integer|min:0',
+            'groups.*.items.*.nb_enfants'    => 'nullable|integer|min:0',
+            'groups.*.items.*.nb_bebes'      => 'nullable|integer|min:0',
         ]);
 
-        $newStatut = $validated['statut'] ?? $reservation->statut;
-        $newLien   = $validated['lien_paiement'] ?? $reservation->lien_paiement;
+        $groups = $validated['groups'] ?? null;
 
-        if ($newStatut === 'en_attente_paiement' && empty($newLien)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Veuillez d\'abord définir un lien de paiement pour cette réservation.',
-            ], 422);
+        if ($groups) {
+            // Calculate Global Info
+            $globalArrivee = collect($groups)->min('date_arrivee');
+            $globalDepart  = collect($groups)->max('date_depart');
+            $totalPersonnes = collect($groups)->sum(function ($g) {
+                return collect($g['items'])->sum(function ($item) {
+                    return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
+                          + ($item['nb_bebes'] ?? 0))
+                          * ($item['quantite'] ?? 1);
+                });
+            });
+            
+            // Calculate total price using helper
+            $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
+
+            $validated['date_arrivee'] = $globalArrivee;
+            $validated['date_depart']  = $globalDepart;
+            $validated['nb_personnes'] = $totalPersonnes;
+            $validated['prix_total']   = $prixTotalCalculated;
         }
 
         $reservation->update($validated);
-        $reservation->load(['hotel', 'details.type']);
+
+        if ($groups) {
+            // Delete old groups and items
+            $reservation->groups()->each(function($group) {
+                $group->items()->delete();
+                $group->delete();
+            });
+
+            // Create new Groups and Items
+            foreach ($groups as $groupData) {
+                $items = $groupData['items'];
+                unset($groupData['items']);
+                
+                // Calculate total pax for this group from items
+                $groupNbPersonnes = collect($items)->sum(function($item) {
+                    return (
+                        ($item['nb_adultes'] ?? 0) + 
+                        ($item['nb_enfants'] ?? 0) + 
+                            ($item['nb_bebes'] ?? 0)
+                    ) * ($item['quantite'] ?? 1);
+                });
+                
+                $groupData['id_reservation'] = $reservation->id;
+                $groupData['nb_personnes'] = $groupNbPersonnes;
+                $group = \App\Models\ReservationGroup::create($groupData);
+                
+                foreach ($items as $itemData) {
+                    $itemData['id_reservation'] = $reservation->id;
+                    $itemData['id_group'] = $group->id;
+                    ItemReservation::create($itemData);
+                }
+            }
+        }
+
+        $reservation->load(['hotel', 'groups.items.type', 'details.type']);
 
         return response()->json([
             'success' => true,
@@ -292,15 +438,9 @@ class ReservationController extends Controller
         $validated = $request->validate([
             'lien_paiement'   => 'nullable|string|max:2000',
             'montant_paye'    => 'nullable|numeric|min:0',
-            'statut_paiement' => 'nullable|string|in:non_paye,en_attente_verification,paye',
         ]);
 
         $updateData = array_filter($validated, fn($v) => $v !== null);
-
-        // Automation: If payment status is 'paye', set reservation status to 'confirme'
-        if (isset($validated['statut_paiement']) && $validated['statut_paiement'] === 'paye') {
-            $updateData['statut'] = 'confirme';
-        }
 
         $reservation->update($updateData);
 
@@ -352,6 +492,7 @@ class ReservationController extends Controller
         $validated = $request->validate([
             'montant'         => 'required|numeric|min:0.01',
             'preuve_paiement' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:8192',
+            'payment_date'    => 'required|date',
             'notes'           => 'nullable|string|max:500',
         ]);
 
@@ -361,36 +502,39 @@ class ReservationController extends Controller
         $totalPaid   = $currentPaid + $newAmount;
 
         // 2. Check if total exceeds prix_total
-        if ($totalPaid > $reservation->prix_total + 0.01) { // Small epsilon for float comparison
+        if ($totalPaid > $reservation->prix_total ) { 
             return redirect()->back()->with('error', 'Le montant total payé ne peut pas dépasser le prix total de la réservation.');
         }
 
         // 3. Upload new proof
         $path = $request->file('preuve_paiement')->store('proofs', 'public');
 
-        // 4. Update array of proofs
-        $proofs = $reservation->preuve_paiement ?? [];
-        if (!is_array($proofs)) $proofs = [];
-        $proofs[] = $path;
+        // 4. Create Payment Record
+        \App\Models\Payment::create([
+            'id_reservation' => $reservation->id,
+            'amount'         => $newAmount,
+            'payment_date'   => $validated['payment_date'],
+            'proof_path'     => $path,
+            'provenance'     => 'admin',
+            'notes'          => $validated['notes'],
+            'is_verified'    => true,
+            'status'         => 'verified',
+            'verified_at'    => now(),
+            'verified_by'    => auth()->id(),
+        ]);
 
-        // 5. Determine payment status
+        // 5. Update Reservation (Sync cached amount and status)
         $previousStatut = $reservation->statut;
         $statut = $reservation->statut;
-        $statutPaiement = 'en_attente_verification'; // Default for the new payment being verified
 
         if (abs($totalPaid - $reservation->prix_total) < 0.01) {
-            $statutPaiement = 'paye';
-            $statut         = 'confirme';
+            $statut = 'confirme';
         } elseif ($totalPaid > 0) {
-            $statutPaiement = 'paye_partiellement';
-            // We also update the main status to partially paid to reflect progress
-            $statut         = 'paye_partiellement';
+            $statut = 'paye_partiellement';
         }
 
         $reservation->update([
             'montant_paye'    => $totalPaid,
-            'preuve_paiement' => $proofs,
-            'statut_paiement' => $statutPaiement,
             'statut'          => $statut,
         ]);
         if($statut == 'confirme') {
@@ -422,14 +566,132 @@ class ReservationController extends Controller
         }
 
         // Load necessary relations including available tarifs/types for modification
-        $reservation->load(['hotel.tarifs.type', 'details.type']);
+        $reservation->load(['hotel.tarifs.type', 'groups.items.type', 'details.type']);
 
         return Inertia::render('Booking/Verify', [
-            'reservation' => $reservation,
+            'reservation' => $reservation->load(['payments' => function($q) {
+                $q->orderBy('created_at', 'desc');
+            }]),
             'token'       => $reference,
-            'confirm_url' => \Illuminate\Support\Facades\URL::signedRoute('booking.confirm', ['reference' => $reference]),
-            'update_url'  => \Illuminate\Support\Facades\URL::signedRoute('booking.update',  ['reference' => $reference]),
+            'confirm_url' => URL::signedRoute('booking.confirm', ['reference' => $reference]),
+            'update_url'  => URL::signedRoute('booking.update',  ['reference' => $reference]),
+            'payment_url' => URL::signedRoute('booking.addPayment', ['reference' => $reference]),
         ]);
+    }
+
+    /**
+     * Public: Client uploads a payment proof.
+     */
+    public function publicAddPayment(Request $request, string $reference): RedirectResponse
+    {
+        $reservation = $this->getReservationFromReference($reference);
+        if (!$reservation) {
+            return redirect()->back()->with('error', 'Action impossible.');
+        }
+
+        $validated = $request->validate([
+            'amount'          => 'required|numeric|min:1',
+            'preuve_paiement' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:8192',
+            'notes'           => 'nullable|string|max:500',
+        ]);
+
+        $path = $request->file('preuve_paiement')->store('proofs', 'public');
+
+        Payment::create([
+            'id_reservation' => $reservation->id,
+            'amount'         => $validated['amount'],
+            'payment_date'   => now(),
+            'proof_path'     => $path,
+            'provenance'     => 'client',
+            'notes'          => $validated['notes'],
+            'is_verified'    => false,
+            'status'         => 'pending',
+        ]);
+
+        return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès. Elle sera vérifiée par notre équipe très prochainement.');
+    }
+
+    /**
+     * Admin: Verify and accept a payment.
+     */
+    public function verifyPayment(Request $request, string $id): RedirectResponse
+    {
+        $payment = Payment::with('reservation')->findOrFail($id);
+        $reservation = $payment->reservation;
+
+        if ($payment->status === 'verified') {
+            return redirect()->back()->with('error', 'Ce paiement est déjà validé.');
+        }
+
+        // 1. Update Payment
+        $payment->update([
+            'is_verified' => true,
+            'status'      => 'verified',
+            'verified_at' => now(),
+            'verified_by' => auth()->id(),
+        ]);
+
+        // 2. Recalculate Reservation total paid
+        $totalPaid = $reservation->payments()->where('status', 'verified')->sum('amount');
+        
+        // 3. Update Reservation Status
+        $previousStatut = $reservation->statut;
+        $statut = $reservation->statut;
+
+        if (abs($totalPaid - $reservation->prix_total) < 0.01) {
+            $statut = 'confirme';
+        } elseif ($totalPaid > 0) {
+            $statut = 'paye_partiellement';
+        }
+
+        $reservation->update([
+            'montant_paye'    => $totalPaid,
+            'statut'          => $statut,
+        ]);
+
+        // 4. Notify Client
+        try {
+            $verifyUrl = URL::signedRoute('booking.verify', ['reference' => $reservation->code_reference]);
+            Mail::to($reservation->email)->send(new PaymentVerified($reservation, $payment, $verifyUrl));
+            
+            if ($statut === 'confirme' && $previousStatut !== 'confirme') {
+                Mail::to($reservation->email)->send(new ReservationStatusUpdated($reservation, $previousStatut));
+            }
+        } catch (\Throwable $e) {
+            Log::error('Mailing error during payment verification', ['error' => $e->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Paiement validé et crédité au dossier.');
+    }
+
+    /**
+     * Admin: Reject a payment.
+     */
+    public function rejectPayment(Request $request, string $id): RedirectResponse
+    {
+        $payment = Payment::with('reservation')->findOrFail($id);
+        $reservation = $payment->reservation;
+
+        $validated = $request->validate([
+            'notes_admin' => 'required|string|max:500',
+        ]);
+
+        $payment->update([
+            'is_verified' => false,
+            'status'      => 'rejected',
+            'notes_admin' => $validated['notes_admin'],
+            'verified_at' => now(),
+            'verified_by' => auth()->id(),
+        ]);
+
+        try {
+            $verifyUrl = URL::signedRoute('booking.verify', ['reference' => $reservation->code_reference]);
+            Mail::to($reservation->email)->send(new PaymentRejected($reservation, $payment, $verifyUrl));
+        } catch (\Throwable $e) {
+            Log::error('Mailing error during payment rejection', ['error' => $e->getMessage()]);
+        }
+
+        return redirect()->back()->with('success', 'Paiement rejeté et client notifié.');
     }
 
     /**
@@ -464,35 +726,69 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
-            'date_arrivee' => 'required|date',
-            'date_depart'  => 'required|date|after:date_arrivee',
-            'nb_personnes' => 'required|integer|min:1',
-            'details'      => 'required|array|min:1',
-            'details.*.id_type'       => 'required|integer|exists:types,id',
-            'details.*.quantite'      => 'required|integer|min:1',
-            'details.*.prix_unitaire' => 'required|numeric|min:0',
+            'groups'                  => 'required|array|min:1',
+            'groups.*.date_arrivee'   => 'required|date',
+            'groups.*.date_depart'    => 'required|date|after:groups.*.date_arrivee',
+            'groups.*.nb_personnes'   => 'nullable|integer|min:0',
+            'groups.*.items'                  => 'required|array|min:1',
+            'groups.*.items.*.id_type'        => 'required|integer|exists:types,id',
+            'groups.*.items.*.quantite'       => 'required|integer|min:1',
+            'groups.*.items.*.prix_unitaire'  => 'required|numeric|min:0',
+            'groups.*.items.*.nb_adultes'     => 'required|integer|min:0',
+            'groups.*.items.*.nb_enfants'     => 'nullable|integer|min:0',
+            'groups.*.items.*.nb_bebes'       => 'nullable|integer|min:0',
         ]);
 
-        // Calculate nights
-        $nights = $this->calculateNights($validated['date_arrivee'], $validated['date_depart']);
+        $groups = $validated['groups'];
 
-        // Recalculate price
-        $prixTotalCalculated = $this->calculateTotalPrice($validated['details'], $nights);
+        // Recalculate price and global info
+        $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
+        $globalArrivee = collect($groups)->min('date_arrivee');
+        $globalDepart  = collect($groups)->max('date_depart');
+        $totalPersonnes = collect($groups)->sum(function ($g) {
+            return collect($g['items'])->sum(function ($item) {
+                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
+                      + ($item['nb_bebes'] ?? 0))
+                      * ($item['quantite'] ?? 1);
+            });
+        });
 
         // Update reservation
         $reservation->update([
-            'date_arrivee' => $validated['date_arrivee'],
-            'date_depart'  => $validated['date_depart'],
-            'nb_personnes' => $validated['nb_personnes'],
+            'date_arrivee' => $globalArrivee,
+            'date_depart'  => $globalDepart,
+            'nb_personnes' => $totalPersonnes,
             'prix_total'   => $prixTotalCalculated,
             'statut'       => 'en_attente', // Reset cycle
         ]);
 
-        // Sync details
+        // Sync groups and items (Delete old ones)
+        $reservation->groups()->delete(); // Cascades to items if DB set up correctly, 
+                                          // but let's be safe as we added nullable FK
         $reservation->details()->delete();
-        foreach ($validated['details'] as $detail) {
-            $detail['id_reservation'] = $reservation->id;
-            ItemReservation::create($detail);
+
+        foreach ($groups as $groupData) {
+            $items = $groupData['items'];
+            unset($groupData['items']);
+            
+            // Calculate total pax for this group from items
+            $groupNbPersonnes = collect($items)->sum(function($item) {
+                return (
+                    ($item['nb_adultes'] ?? 0) + 
+                    ($item['nb_enfants'] ?? 0) + 
+                    ($item['nb_bebes'] ?? 0)
+                ) * ($item['quantite'] ?? 1);
+            });
+            
+            $groupData['id_reservation'] = $reservation->id;
+            $groupData['nb_personnes'] = $groupNbPersonnes;
+            $group = \App\Models\ReservationGroup::create($groupData);
+            
+            foreach ($items as $itemData) {
+                $itemData['id_reservation'] = $reservation->id;
+                $itemData['id_group'] = $group->id;
+                ItemReservation::create($itemData);
+            }
         }
 
         return response()->json([
@@ -508,6 +804,21 @@ class ReservationController extends Controller
     private function getReservationFromReference(string $reference): ?Reservation
     {
         return Reservation::where('code_reference', $reference)->first();
+    }
+
+    /**
+     * Helper to calculate total price from nested groups.
+     */
+    private function calculateTotalPriceFromGroups(array $groups): float
+    {
+        $total = 0;
+        foreach ($groups as $group) {
+            $nights = $this->calculateNights($group['date_arrivee'], $group['date_depart']);
+            foreach ($group['items'] as $item) {
+                $total += (float) ($item['quantite'] * $item['prix_unitaire'] * $nights);
+            }
+        }
+        return (float) $total;
     }
 
     /**
