@@ -4,13 +4,14 @@ import {
     CalendarDays,
     TrendingUp,
     Users,
-    Settings,
     Filter,
     ArrowUpDown,
-    Calendar,
-    MoreHorizontal,
+    ChevronDown,
+    TrendingDown,
+    Hotel,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { router } from "@inertiajs/react";
 import {
     LineChart,
     Line,
@@ -24,11 +25,19 @@ import {
     Cell,
 } from "recharts";
 
+// ─── Interfaces ────────────────────────────────────────────────────────────────
+
 interface StatData {
     booked: number;
     cancelled: number;
     revenue: number;
+    expected_revenue: number;
     pending: number;
+    booked_change: number | null;
+    cancelled_change: number | null;
+    revenue_change: number | null;
+    expected_revenue_change: number | null;
+    pending_change: number | null;
 }
 
 interface ChartData {
@@ -49,110 +58,314 @@ interface StatusDist {
     fill: string;
 }
 
+interface HotelOption {
+    id: number;
+    name: string;
+}
+
+interface Filters {
+    period: string;
+    hotel_id: number | null;
+}
+
 interface Props {
     stats: StatData;
     chartData: ChartData[];
     topHotels: TopHotel[];
     statusDistribution: StatusDist[];
+    hotels: HotelOption[];
+    filters: Filters;
 }
+
+// ─── Dropdown Component ─────────────────────────────────────────────────────────
+
+function Dropdown({
+    trigger,
+    children,
+}: {
+    trigger: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <div onClick={() => setOpen((v) => !v)}>{trigger}</div>
+            {open && (
+                <div
+                    className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 min-w-[180px] py-1 overflow-hidden"
+                    onClick={() => setOpen(false)}
+                >
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── StatCard ──────────────────────────────────────────────────────────────────
+
+function StatCard({
+    title,
+    value,
+    change,
+    icon: Icon,
+    colorClass,
+    borderClass,
+    bgClass,
+}: {
+    title: string;
+    value: string;
+    change: number | null;
+    icon: React.ElementType;
+    colorClass: string;
+    borderClass: string;
+    bgClass: string;
+}) {
+    const isPositive = change !== null && change >= 0;
+    const noData = change === null;
+
+    return (
+        <div
+            className={`bg-white p-5 rounded-3xl shadow-sm border ${borderClass} flex flex-col justify-between`}
+        >
+            <div className="flex justify-between items-start">
+                <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgClass}`}
+                >
+                    <Icon className={`w-5 h-5 ${colorClass}`} />
+                </div>
+                {noData ? (
+                    <span className="text-xs font-medium text-gray-400 px-2 py-1 bg-gray-50 rounded-lg">
+                        Tout le temps
+                    </span>
+                ) : (
+                    <span
+                        className={`text-sm font-semibold flex items-center gap-1 ${
+                            isPositive
+                                ? "text-green-600 bg-green-50"
+                                : "text-red-500 bg-red-50"
+                        } px-2 py-1 rounded-lg`}
+                    >
+                        {isPositive ? (
+                            <TrendingUp className="w-3.5 h-3.5" />
+                        ) : (
+                            <TrendingDown className="w-3.5 h-3.5" />
+                        )}
+                        {isPositive ? "+" : ""}
+                        {change}%
+                    </span>
+                )}
+            </div>
+            <div className="mt-4">
+                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
+                    {value}
+                </h3>
+                <p className="text-sm font-medium text-gray-400 mt-1">{title}</p>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard({
     stats,
     chartData,
     topHotels,
     statusDistribution,
+    hotels,
+    filters,
 }: Props) {
-    const StatCard = ({
-        title,
-        value,
-        change,
-        isPositive,
-        icon: Icon,
-        colorClass,
-        borderClass,
-    }: any) => (
-        <div
-            className={`bg-white p-5 rounded-3xl shadow-sm border ${borderClass} flex flex-col justify-between`}
-        >
-            <div className="flex justify-between items-start">
-                <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gray-50`}
-                >
-                    <Icon className={`w-5 h-5 ${colorClass}`} />
-                </div>
-                <span
-                    className={`text-sm font-semibold ${isPositive ? "text-green-500 bg-green-50" : "text-red-500 bg-red-50"} px-2 py-1 rounded-lg`}
-                >
-                    {isPositive ? "+" : ""}
-                    {change}%
-                </span>
-            </div>
-            <div className="mt-4">
-                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
-                    {value}
-                </h3>
-                <p className="text-sm font-medium text-gray-400 mt-1">
-                    {title}
-                </p>
-            </div>
-        </div>
-    );
+    const periodOptions = [
+        { value: "today", label: "Aujourd'hui" },
+        { value: "this_week", label: "Cette Semaine" },
+        { value: "this_month", label: "Ce Mois" },
+        { value: "this_year", label: "Cette Année" },
+        { value: "all", label: "Tout le temps" },
+    ];
 
-    useEffect(() => {
-        console.log(stats);
-        console.log(chartData);
-        console.log(topHotels);
-        console.log(statusDistribution);
-    }, []);
+    const currentPeriodLabel =
+        periodOptions.find((p) => p.value === filters.period)?.label ??
+        "Ce Mois";
+
+    const currentHotelLabel =
+        hotels.find((h) => h.id === filters.hotel_id)?.name ?? "Tous les Hôtels";
+
+    function applyFilter(params: Partial<Filters>) {
+        router.get(
+            "/admin/dashboard",
+            { ...filters, ...params },
+            { preserveState: true, preserveScroll: true }
+        );
+    }
+
+    const barColors = [
+        { bar: "bg-green-500", text: "text-green-600" },
+        { bar: "bg-blue-500", text: "text-blue-600" },
+        { bar: "bg-purple-500", text: "text-purple-600" },
+        { bar: "bg-amber-400", text: "text-amber-600" },
+        { bar: "bg-rose-400", text: "text-rose-600" },
+    ];
+
+    const totalDistribution = statusDistribution.reduce(
+        (sum, s) => sum + s.value,
+        0
+    );
 
     return (
         <AdminLayout>
-            {/* Header Actions */}
+            {/* ── Header ───────────────────────────────────────────────────── */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
                         Bonjour ! <span className="text-2xl">👋</span>
                     </h1>
+                    <p className="text-sm text-gray-400 mt-1 font-medium">
+                        Période affichée :{" "}
+                        <span className="text-gray-700">{currentPeriodLabel}</span>
+                        {filters.hotel_id && (
+                            <>
+                                {" · "}
+                                <span className="text-gray-700">
+                                    {currentHotelLabel}
+                                </span>
+                            </>
+                        )}
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        Cette semaine
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                        <Filter className="w-4 h-4 text-gray-400" />
-                        Filtrer
-                    </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Period Filter */}
+                    <Dropdown
+                        trigger={
+                            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer">
+                                <CalendarDays className="w-4 h-4 text-gray-400" />
+                                {currentPeriodLabel}
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                            </button>
+                        }
+                    >
+                        {periodOptions.map((opt) => (
+                            <button
+                                key={opt.value}
+                                onClick={() =>
+                                    applyFilter({ period: opt.value })
+                                }
+                                className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 ${
+                                    filters.period === opt.value
+                                        ? "text-green-600 bg-green-50"
+                                        : "text-gray-700"
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </Dropdown>
+
+                    {/* Hotel Filter */}
+                    <Dropdown
+                        trigger={
+                            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer">
+                                <Hotel className="w-4 h-4 text-gray-400" />
+                                {currentHotelLabel}
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                            </button>
+                        }
+                    >
+                        <button
+                            onClick={() => applyFilter({ hotel_id: null })}
+                            className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 ${
+                                !filters.hotel_id
+                                    ? "text-green-600 bg-green-50"
+                                    : "text-gray-700"
+                            }`}
+                        >
+                            Tous les Hôtels
+                        </button>
+                        {hotels.map((h) => (
+                            <button
+                                key={h.id}
+                                onClick={() =>
+                                    applyFilter({ hotel_id: h.id })
+                                }
+                                className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 ${
+                                    filters.hotel_id === h.id
+                                        ? "text-green-600 bg-green-50"
+                                        : "text-gray-700"
+                                }`}
+                            >
+                                {h.name}
+                            </button>
+                        ))}
+                    </Dropdown>
+
+                    {/* Sort button (visual) */}
                     <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
                         <ArrowUpDown className="w-4 h-4 text-gray-400" />
                         Trier
                     </button>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                        <Settings className="w-4 h-4 text-gray-400" />
-                        Paramètres
-                    </button>
+
+                    {/* Active filter badge */}
+                    {(filters.hotel_id || filters.period !== "this_month") && (
+                        <button
+                            onClick={() =>
+                                applyFilter({
+                                    period: "this_month",
+                                    hotel_id: null,
+                                })
+                            }
+                            className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm font-medium text-red-600 hover:bg-red-100 transition-colors shadow-sm"
+                        >
+                            <Filter className="w-4 h-4" />
+                            Réinitialiser
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Main Grid Layout */}
+            {/* ── Main Grid ────────────────────────────────────────────────── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column (Chart + Guests) */}
+                {/* ── Left Column ───────────────────────────────────────────── */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Campaign Overview Chart */}
+                    {/* Line Chart */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-bold text-gray-900">
-                                Aperçu des Réservations
-                            </h2>
-                            <div className="flex items-center gap-2">
-                                <select className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 outline-none">
-                                    <option>Hebdomadaire</option>
-                                    <option>Mensuel</option>
-                                </select>
-                                <button className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
-                                    <MoreHorizontal className="w-5 h-5" />
-                                </button>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">
+                                    Aperçu des Réservations
+                                </h2>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    {currentPeriodLabel}
+                                    {filters.hotel_id
+                                        ? ` · ${currentHotelLabel}`
+                                        : ""}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-full bg-green-500 inline-block" />
+                                    <span className="text-xs text-gray-500">
+                                        Total
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
+                                    <span className="text-xs text-gray-500">
+                                        Confirmées
+                                    </span>
+                                </div>
                             </div>
                         </div>
 
@@ -176,14 +389,22 @@ export default function Dashboard({
                                         dataKey="name"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: "#9ca3af", fontSize: 12 }}
+                                        tick={{ fill: "#9ca3af", fontSize: 11 }}
                                         dy={10}
+                                        interval={
+                                            chartData.length > 15
+                                                ? Math.floor(
+                                                      chartData.length / 10
+                                                  )
+                                                : 0
+                                        }
                                     />
                                     <YAxis
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: "#9ca3af", fontSize: 12 }}
+                                        tick={{ fill: "#9ca3af", fontSize: 11 }}
                                         dx={-10}
+                                        allowDecimals={false}
                                     />
                                     <Tooltip
                                         contentStyle={{
@@ -203,12 +424,7 @@ export default function Dashboard({
                                         dataKey="Booked"
                                         stroke="#10b981"
                                         strokeWidth={3}
-                                        dot={{
-                                            r: 4,
-                                            fill: "#10b981",
-                                            strokeWidth: 2,
-                                            stroke: "#fff",
-                                        }}
+                                        dot={false}
                                         activeDot={{ r: 6 }}
                                     />
                                     <Line
@@ -217,12 +433,7 @@ export default function Dashboard({
                                         dataKey="Visited"
                                         stroke="#f59e0b"
                                         strokeWidth={3}
-                                        dot={{
-                                            r: 4,
-                                            fill: "#f59e0b",
-                                            strokeWidth: 2,
-                                            stroke: "#fff",
-                                        }}
+                                        dot={false}
                                         activeDot={{ r: 6 }}
                                     />
                                 </LineChart>
@@ -230,35 +441,31 @@ export default function Dashboard({
                         </div>
                     </div>
 
-                    {/* Current Guests (Top Hotels Replacement) */}
+                    {/* Top Hotels + quick summary */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-lg font-bold text-gray-900">
-                                Meilleurs Hôtels Formants
+                                Meilleurs Hôtels
                             </h2>
-                            <div className="flex items-center gap-2">
-                                <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700">
-                                    <Filter className="w-3.5 h-3.5" /> Filtres
-                                </button>
-                                <button className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
-                                    <MoreHorizontal className="w-5 h-5" />
-                                </button>
-                            </div>
+                            <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                {currentPeriodLabel}
+                            </span>
                         </div>
 
+                        {/* Mini summary */}
                         <div className="flex gap-4 mb-6">
                             <div className="bg-green-50 px-4 py-3 rounded-xl flex-1 border border-green-100/50">
-                                <p className="text-sm font-semibold text-gray-500 mb-1 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-green-500 rounded-full block"></span>
+                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
+                                    <span className="w-2 h-6 bg-green-500 rounded-full block" />
                                     {stats?.booked}
                                 </p>
                                 <p className="text-xs text-gray-400">
-                                    Total des réservations
+                                    Total réservations
                                 </p>
                             </div>
                             <div className="bg-blue-50 px-4 py-3 rounded-xl flex-1 border border-blue-100/50">
-                                <p className="text-sm font-semibold text-gray-500 mb-1 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-blue-500 rounded-full block"></span>
+                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
+                                    <span className="w-2 h-6 bg-blue-500 rounded-full block" />
                                     {stats?.pending}
                                 </p>
                                 <p className="text-xs text-gray-400">
@@ -266,8 +473,8 @@ export default function Dashboard({
                                 </p>
                             </div>
                             <div className="bg-yellow-50 px-4 py-3 rounded-xl flex-1 border border-yellow-100/50">
-                                <p className="text-sm font-semibold text-gray-500 mb-1 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-yellow-400 rounded-full block"></span>
+                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
+                                    <span className="w-2 h-6 bg-yellow-400 rounded-full block" />
                                     {stats?.cancelled}
                                 </p>
                                 <p className="text-xs text-gray-400">
@@ -276,15 +483,11 @@ export default function Dashboard({
                             </div>
                         </div>
 
+                        {/* Progress bars */}
                         <div className="space-y-5">
                             {topHotels?.map((hotel, index) => {
-                                const colors = [
-                                    "bg-green-500",
-                                    "bg-blue-500",
-                                    "bg-yellow-400",
-                                ];
-                                const colorClass =
-                                    colors[index % colors.length];
+                                const color =
+                                    barColors[index % barColors.length];
                                 return (
                                     <div key={hotel.name}>
                                         <div className="flex justify-between items-end mb-2">
@@ -293,84 +496,88 @@ export default function Dashboard({
                                             </span>
                                             <div className="text-right">
                                                 <span className="text-xs text-gray-400 mr-2">
-                                                    {hotel.total} Réservations
+                                                    {hotel.total} rés.
                                                 </span>
-                                                <span className="text-sm font-bold text-gray-900">
+                                                <span
+                                                    className={`text-sm font-bold ${color.text}`}
+                                                >
                                                     {hotel.percentage}%
                                                 </span>
                                             </div>
                                         </div>
                                         <div className="w-full bg-gray-100 rounded-full h-2.5">
                                             <div
-                                                className={`${colorClass} h-2.5 rounded-full`}
+                                                className={`${color.bar} h-2.5 rounded-full transition-all duration-700`}
                                                 style={{
                                                     width: `${hotel.percentage}%`,
                                                 }}
-                                            ></div>
+                                            />
                                         </div>
                                     </div>
                                 );
                             })}
                             {(!topHotels || topHotels.length === 0) && (
-                                <div className="text-center text-sm text-gray-400 py-4">
-                                    Aucune donnée disponible.
+                                <div className="text-center text-sm text-gray-400 py-8">
+                                    <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-200" />
+                                    Aucune réservation sur cette période.
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Right Column (Stats Grid + Revenue) */}
+                {/* ── Right Column ──────────────────────────────────────────── */}
                 <div className="space-y-6">
-                    {/* 4 Stats Grid */}
+                    {/* 4 Stat Cards */}
                     <div className="grid grid-cols-2 gap-4">
                         <StatCard
-                            title="Chambres Réservées"
-                            value={stats.booked.toLocaleString()}
-                            change={18.5}
-                            isPositive={true}
+                            title="Total Réservations"
+                            value={stats.booked.toLocaleString("fr-MA")}
+                            change={stats.booked_change}
                             icon={CalendarDays}
-                            colorClass="text-green-500"
+                            colorClass="text-green-600"
                             borderClass="border-green-100"
+                            bgClass="bg-green-50"
                         />
                         <StatCard
-                            title="Réservations Annulées"
-                            value={stats.cancelled.toLocaleString()}
-                            change={24.8}
-                            isPositive={false}
+                            title="Annulées"
+                            value={stats.cancelled.toLocaleString("fr-MA")}
+                            change={
+                                stats.cancelled_change !== null
+                                    ? -stats.cancelled_change
+                                    : null
+                            }
                             icon={Users}
-                            colorClass="text-yellow-500"
-                            borderClass="border-yellow-100"
+                            colorClass="text-amber-500"
+                            borderClass="border-amber-100"
+                            bgClass="bg-amber-50"
                         />
                         <StatCard
-                            title="Chiffre d'Affaires"
-                            value={`${(stats.revenue * 0.4).toLocaleString()} MAD`}
-                            change={14.6}
-                            isPositive={false}
+                            title="Revenu Perçu"
+                            value={`${stats.revenue.toLocaleString("fr-MA")} MAD`}
+                            change={stats.revenue_change}
                             icon={Building2}
                             colorClass="text-blue-500"
                             borderClass="border-blue-100"
+                            bgClass="bg-blue-50"
                         />
                         <StatCard
-                            title="Revenus Attendus"
-                            value={`${(stats.revenue * 0.6).toLocaleString()} MAD`}
-                            change={12.8}
-                            isPositive={true}
+                            title="Reste à Percevoir"
+                            value={`${stats.expected_revenue.toLocaleString("fr-MA")} MAD`}
+                            change={stats.expected_revenue_change}
                             icon={TrendingUp}
                             colorClass="text-purple-500"
                             borderClass="border-purple-100"
+                            bgClass="bg-purple-50"
                         />
                     </div>
 
-                    {/* Revenue Stat */}
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-[380px]">
+                    {/* Pie Chart — Distribution des statuts */}
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-[390px]">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-bold text-gray-900">
-                                Statistiques des Revenus
+                                Distribution des Statuts
                             </h2>
-                            <button className="p-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
-                                <MoreHorizontal className="w-5 h-5" />
-                            </button>
                         </div>
 
                         <div className="flex-1 relative flex items-center justify-center">
@@ -382,9 +589,9 @@ export default function Dashboard({
                                         cy="60%"
                                         startAngle={180}
                                         endAngle={0}
-                                        innerRadius={80}
-                                        outerRadius={110}
-                                        paddingAngle={5}
+                                        innerRadius={75}
+                                        outerRadius={105}
+                                        paddingAngle={4}
                                         dataKey="value"
                                         stroke="none"
                                     >
@@ -394,50 +601,79 @@ export default function Dashboard({
                                                     key={`cell-${index}`}
                                                     fill={entry.fill}
                                                 />
-                                            ),
+                                            )
                                         )}
                                     </Pie>
                                 </PieChart>
                             </ResponsiveContainer>
 
-                            {/* Total Revenue Center Text */}
-                            <div className="absolute top-[60%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                            {/* Center label */}
+                            <div className="absolute top-[58%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
                                 <p className="text-xs font-semibold text-gray-400 mb-1">
-                                    Revenu Total
+                                    Total
                                 </p>
                                 <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    {stats.revenue.toLocaleString()} MAD
+                                    {totalDistribution.toLocaleString("fr-MA")}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    réservations
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex justify-center gap-6 mt-4 mb-6">
-                            {statusDistribution?.map((stat) => (
-                                <div
-                                    key={stat.name}
-                                    className="flex items-center gap-2"
-                                >
-                                    <span
-                                        className="w-2.5 h-2.5 rounded-full"
-                                        style={{ backgroundColor: stat.fill }}
-                                    ></span>
-                                    <span className="text-xs font-medium text-gray-500">
-                                        {stat.name}
-                                    </span>
-                                </div>
-                            ))}
+                        {/* Legend */}
+                        <div className="flex flex-col gap-2 mt-2 mb-4">
+                            {statusDistribution?.map((stat) => {
+                                const pct =
+                                    totalDistribution > 0
+                                        ? Math.round(
+                                              (stat.value /
+                                                  totalDistribution) *
+                                                  100
+                                          )
+                                        : 0;
+                                return (
+                                    <div
+                                        key={stat.name}
+                                        className="flex items-center justify-between"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                style={{
+                                                    backgroundColor: stat.fill,
+                                                }}
+                                            />
+                                            <span className="text-xs font-medium text-gray-500">
+                                                {stat.name}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-gray-700">
+                                                {stat.value}
+                                            </span>
+                                            <span className="text-xs text-gray-400">
+                                                ({pct}%)
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
 
+                        {/* Revenue banner */}
                         <div className="mt-auto bg-green-50 rounded-xl p-3 flex items-center gap-3">
-                            <span className="text-green-600 text-xs font-bold px-2 py-1 bg-green-100 rounded-md">
-                                +16.2%
+                            <span className="text-green-600 text-xs font-bold px-2 py-1 bg-green-100 rounded-md shrink-0">
+                                {stats.revenue_change !== null
+                                    ? `${stats.revenue_change >= 0 ? "+" : ""}${stats.revenue_change}%`
+                                    : "—"}
                             </span>
                             <p className="text-xs font-medium text-gray-600">
-                                Vous avez obtenu{" "}
+                                Revenu perçu :{" "}
                                 <span className="text-gray-900 font-bold">
-                                    {stats.booked} réservations
+                                    {stats.revenue.toLocaleString("fr-MA")} MAD
                                 </span>{" "}
-                                par rapport au mois précédent
+                                vs période précédente
                             </p>
                         </div>
                     </div>
