@@ -14,8 +14,12 @@ import {
     ClipboardCheck,
     UserCheck,
     Wallet,
-    ShieldAlert
+    ShieldAlert,
+    LayoutGrid,
+    List,
+    CalendarDays
 } from "lucide-react";
+import { ReservationCalendar } from "@/components/Calendar/ReservationCalendar";
 import { useState, useEffect } from "react";
 import { StatusSelect } from "@/components/ui/status-select";
 import { X, CheckCircle as CheckCircleIcon, XCircle, CreditCard, ExternalLink, Info, RefreshCw, Mail, AlertTriangle } from "lucide-react";
@@ -147,6 +151,9 @@ export default function ReservationsIndex({
     filters,
     stats,
 }: Props) {
+    const [viewType, setViewType] = useState<"table" | "calendar">((filters as any).view === "calendar" ? "calendar" : "table");
+    const [calendarDateMode, setCalendarDateMode] = useState<"check_in" | "check_out">("check_in");
+
     const [search, setSearch] = useState("");
     const [selectedStatut, setSelectedStatut] = useState(
         filters.statut ?? "all",
@@ -193,8 +200,21 @@ export default function ReservationsIndex({
             {
                 statut: statut === "all" ? "" : statut,
                 id_hotel: filters.id_hotel ?? "",
+                view: viewType === "calendar" ? "calendar" : "",
             },
             { preserveState: true, replace: true },
+        );
+    }
+
+    function toggleView(type: "table" | "calendar") {
+        setViewType(type);
+        router.get(
+            "/admin/reservations",
+            {
+                ...filters,
+                view: type === "calendar" ? "calendar" : "",
+            },
+            { preserveState: true, replace: true }
         );
     }
 
@@ -477,10 +497,74 @@ export default function ReservationsIndex({
                         </button>
                     ))}
                 </div>
+
+                {/* View Switcher */}
+                <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 border border-slate-200 shadow-sm">
+                    <button
+                        onClick={() => toggleView("table")}
+                        className={`p-1.5 rounded-lg transition-all ${
+                            viewType === "table"
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-slate-400 hover:text-slate-600"
+                        }`}
+                        title="Vue Liste"
+                    >
+                        <List className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => toggleView("calendar")}
+                        className={`p-1.5 rounded-lg transition-all ${
+                            viewType === "calendar"
+                                ? "bg-white text-slate-900 shadow-sm"
+                                : "text-slate-400 hover:text-slate-600"
+                        }`}
+                        title="Vue Calendrier"
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
-            {/* ── Table ── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
+            {/* ── Calendar Controls (Conditional) ── */}
+            {viewType === "calendar" && (
+                <div className="mb-6 flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100">
+                             <CalendarDays className="w-5 h-5 text-indigo-600" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-slate-900">Base de date du calendrier</p>
+                            <p className="text-xs text-slate-500">Visualisez les réservations selon le flux d'entrée ou de sortie</p>
+                        </div>
+                    </div>
+                    <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                        <button
+                            onClick={() => setCalendarDateMode("check_in")}
+                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                                calendarDateMode === "check_in"
+                                    ? "bg-white text-indigo-600 shadow-sm"
+                                    : "text-slate-500 hover:text-slate-700"
+                            }`}
+                        >
+                            Check-In
+                        </button>
+                        <button
+                            onClick={() => setCalendarDateMode("check_out")}
+                            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
+                                calendarDateMode === "check_out"
+                                    ? "bg-white text-indigo-600 shadow-sm"
+                                    : "text-slate-500 hover:text-slate-700"
+                            }`}
+                        >
+                            Check-Out
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Content View (Table or Calendar) ── */}
+            {viewType === "table" ? (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
                 {filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
                         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
@@ -720,8 +804,12 @@ export default function ReservationsIndex({
                     </div>
                 )}
             </div>
-
-            {/* ── Cancellation Reason Modal ── */}
+            ) : (
+                <ReservationCalendar
+                    reservations={reservations.data}
+                    dateMode={calendarDateMode}
+                />
+            )}
             {isCancelModalOpen && (
                 <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">

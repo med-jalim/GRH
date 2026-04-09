@@ -58,9 +58,24 @@ class ReservationController extends Controller
             $baseQuery->where('statut', $request->statut);
         }
 
-        $reservations = $baseQuery->with(['hotel', 'groups.items.type'])
-            ->orderByDesc('created_at')
-            ->paginate(15);
+        $query = $baseQuery->with(['hotel', 'groups.items.type'])
+            ->orderByDesc('created_at');
+
+        if ($request->view === 'calendar') {
+            $reservations_data = $query->get();
+            // To maintain consistency with the Paginated structure that Index.tsx expects, 
+            // we wrap the collection in a similar object or handle it in Frontend.
+            // However, Inertia expects 'reservations' prop to have 'data'.
+            $reservations = [
+                'data' => $reservations_data,
+                'total' => $reservations_data->count(),
+                'last_page' => 1,
+                'current_page' => 1,
+                'links' => [],
+            ];
+        } else {
+            $reservations = $query->paginate(15);
+        }
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservations, 'Liste des réservations récupérée avec succès.');
