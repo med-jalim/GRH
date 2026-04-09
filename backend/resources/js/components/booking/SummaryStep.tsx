@@ -36,9 +36,9 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
       <div className="mb-10">
         <div className="flex items-center gap-4 mb-2">
           <div className="w-9 h-9 rounded-xl bg-[#54b172] flex items-center justify-center text-white text-xs font-black shadow-lg shadow-emerald-500/20">3</div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">Récapitulatif de la demande</h2>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">Estimation des Frais</h2>
         </div>
-        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-[52px]">Veuillez vérifier vos informations avant validation</p>
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-[52px]">Veuillez vérifier votre estimation avant validation</p>
       </div>
 
       <div className="space-y-6">

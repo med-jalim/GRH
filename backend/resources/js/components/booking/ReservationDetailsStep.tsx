@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import type { Hotel, GroupSelection, RoomSelection } from "@/types/booking";
 import type { BookingSchemaType } from "@/lib/schemas";
 import { GroupRow } from "./GroupRow";
-import { PriceSummary } from "./PriceSummary";
 import { computeDynamicPrice } from "@/lib/utils";
 
 interface Props {
@@ -155,29 +154,7 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
            defaultTypeId = newlySelectedHotel.chambres[0]?.id_type || 0;
         }
 
-        const checkInDate = new Date(today);
-        const checkOutDate = new Date(checkInDate);
-        checkOutDate.setDate(checkOutDate.getDate() + 1);
-
-        setValue("groups", [
-            {
-                uid: Math.random().toString(36).substr(2, 9),
-                checkIn: today,
-                checkOut: checkOutDate.toISOString().split("T")[0],
-                occupants: 2,
-                rooms: [
-                    {
-                        uid: Math.random().toString(36).substr(2, 9),
-                        roomTypeId: defaultTypeId,
-                        subTypeId: 0,
-                        quantity: 1,
-                        adults: 2,
-                        children: 0,
-                        babies: 0,
-                    }
-                ]
-            }
-        ]);
+        setValue("groups", []);
         
         // Let react-hook-form revalidate the step 2 since we forcibly changed values
         setTimeout(() => trigger(["hotelId", "groups"]), 50);
@@ -193,18 +170,8 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
             uid: Math.random().toString(36).substr(2, 9),
             checkIn: today,
             checkOut: checkOutDate.toISOString().split("T")[0],
-            occupants: 2,
-            rooms: [
-                {
-                    uid: Math.random().toString(36).substr(2, 9),
-                    roomTypeId: allTypes[0]?.type.id || 0,
-                    subTypeId: 0,
-                    quantity: 1,
-                    adults: 2,
-                    children: 0,
-                    babies: 0,
-                }
-            ]
+            occupants: 0,
+            rooms: []
         };
         setValue("groups", [...(formData.groups || []), newGroup]);
     };
@@ -223,9 +190,12 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
         const updated = formData.groups.map(g => {
             if (g.uid !== groupUid) return g;
             
-            const selectedTypeIds = g.rooms.map(r => r.roomTypeId);
-            const firstAvailable = allTypes.find(t => !selectedTypeIds.includes(t.type.id));
-            const nextTypeId = firstAvailable?.type.id || 0;
+            const nextType = allTypes.find(opt => {
+                const subTypes = opt.type.sub_types || [];
+                const roomsUsingType = g.rooms.filter(r => r.roomTypeId === opt.type.id);
+                return subTypes.length > roomsUsingType.length;
+            });
+            const nextTypeId = nextType?.type.id || allTypes[0]?.type.id || 0;
 
             return {
                 ...g,
@@ -264,6 +234,11 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 if (r.uid !== roomUid) return r;
                 
                 let updatedRoom = { ...r, [field]: value };
+
+                // If room type changes, reset sub-type
+                if (field === 'roomTypeId') {
+                    updatedRoom.subTypeId = 0;
+                }
 
                 // If sub-type changes, default to its first available occupancy criteria
                 if (field === 'subTypeId' && value > 0 && selectedHotel) {
@@ -386,8 +361,6 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                             </div>
                             <span className="text-[10px] uppercase tracking-widest">Ajouter un nouveau groupe de voyageurs</span>
                         </button>
-                        
-                        <PriceSummary totalPrice={totalPrice} groups={formData.groups} hotel={selectedHotel} />
                     </div>
                 ) : (
                     <div className="py-20 flex flex-col items-center justify-center text-center bg-slate-50/50 rounded-[40px] border-2 border-dashed border-slate-200 animate-in fade-in zoom-in-95 duration-500">

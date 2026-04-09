@@ -122,18 +122,25 @@ export function GroupRow({
         </div>
         
         <div className="flex flex-col gap-3">
-          {group.rooms.map((room) => {
-            const filteredOptions = availableOptions.filter(opt => 
-                !group.rooms.some(r => r.uid !== room.uid && r.roomTypeId === opt.type.id)
-            );
+          {group.rooms.map((room, roomIdx) => {
+            const roomsUsingType = group.rooms.filter(r => r.uid !== room.uid && r.roomTypeId === room.roomTypeId);
+            const disabledSubTypeIds = roomsUsingType.map(r => r.subTypeId).filter(id => id > 0);
+
+            const filteredOptions = availableOptions.filter(opt => {
+                const subTypes = opt.type.sub_types || [];
+                const roomsWithThisType = group.rooms.filter(r => r.uid !== room.uid && r.roomTypeId === opt.type.id);
+                return subTypes.length > roomsWithThisType.length;
+            });
             
             return (
               <RoomRow
                 key={room.uid}
+                index={roomIdx}
                 hotel={hotel}
                 checkInDate={group.checkIn}
                 room={room}
                 availableOptions={filteredOptions}
+                disabledSubTypeIds={disabledSubTypeIds}
                 onChange={(ruid, field, val) => onUpdateRoom(group.uid, ruid, field, val)}
                 onRemove={(ruid) => onRemoveRoom(group.uid, ruid)}
                 availability={availabilityData ? availabilityData[room.uid] : null}
@@ -142,7 +149,7 @@ export function GroupRow({
           })}
         </div>
 
-        {group.rooms.length < availableOptions.length && (
+        {group.rooms.length < availableOptions.reduce((acc, opt) => acc + (opt.type.sub_types?.length || 1), 0) && (
           <button
             type="button"
             onClick={() => onAddRoom(group.uid)}

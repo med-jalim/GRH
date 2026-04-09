@@ -59,7 +59,7 @@ class Hotel extends Model
     public function scopeWithBookingData($query)
     {
         return $query->with([
-            'chambres.type.subTypes',
+            'chambres.type.subTypes.occupancies',
             'chambres.subType',
             'tarifs.type',
             'tarifs.subType',

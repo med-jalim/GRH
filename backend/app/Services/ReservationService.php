@@ -31,7 +31,7 @@ class ReservationService
                 $valid = false;
                 foreach ($subType->occupancies as $occ) {
                     // Check if current selection matches this occupancy criteria
-                    if ($adults == $occ->adults && $children <= $occ->children_max && $babies <= $occ->babies_max) {
+                    if ($adults >= 1 && $adults <= $occ->adults && $children <= $occ->children_max && $babies <= $occ->babies_max) {
                         $valid = true;
                         break;
                     }
@@ -63,15 +63,13 @@ class ReservationService
                 $subTypeId = $room['id_sub_type'] ?? $room['subTypeId'] ?? 0;
                 $requestedQty = $room['quantite'] ?? $room['quantity'];
 
-                // 1. Total rooms of this type AND sub-type in this hotel
+                // 1. Total rooms of this type in this hotel
                 $totalRooms = Chambre::where('id_hotel', $hotelId)
                     ->where('id_type', $typeId)
-                    ->where('id_sub_type', $subTypeId)
                     ->count();
 
-                // 2. Occupied rooms in DB for this period and sub-type
+                // 2. Occupied rooms in DB for this period
                 $occupiedInDB = ItemReservation::where('id_type', $typeId)
-                    ->where('id_sub_type', $subTypeId)
                     ->whereHas('group.reservation', function($query) use ($hotelId, $excludeReservationId) {
                         $query->where('id_hotel', $hotelId)
                               ->whereNotIn('statut', ['annule', 'refuse']);
@@ -99,8 +97,7 @@ class ReservationService
                         $otherRooms = $otherGroup['details'] ?? $otherGroup['rooms'] ?? [];
                         foreach ($otherRooms as $otherRoom) {
                             $oTypeId = $otherRoom['id_type'] ?? $otherRoom['roomTypeId'];
-                            $oSubTypeId = $otherRoom['id_sub_type'] ?? $otherRoom['subTypeId'] ?? 0;
-                            if ($oTypeId == $typeId && $oSubTypeId == $subTypeId) {
+                            if ($oTypeId == $typeId) {
                                 $currentRequestConsumption += ($otherRoom['quantite'] ?? $otherRoom['quantity'] ?? 0);
                             }
                         }
@@ -141,15 +138,13 @@ class ReservationService
                     continue;
                 }
 
-                // Total rooms of this type and sub-type
+                // Total rooms of this type
                 $totalRooms = Chambre::where('id_hotel', $hotelId)
                     ->where('id_type', $typeId)
-                    ->where('id_sub_type', $subTypeId)
                     ->count();
 
-                // Occupied in DB with same sub-type
+                // Occupied in DB with same type
                 $occupiedInDB = ItemReservation::where('id_type', $typeId)
-                    ->where('id_sub_type', $subTypeId)
                     ->whereHas('group.reservation', function($query) use ($hotelId, $excludeReservationId) {
                         $query->where('id_hotel', $hotelId)
                               ->whereNotIn('statut', ['annule', 'refuse']);
@@ -175,8 +170,7 @@ class ReservationService
                         $otherRooms = $otherGroup['details'] ?? $otherGroup['rooms'] ?? [];
                         foreach ($otherRooms as $otherRoom) {
                             $oTypeId = $otherRoom['id_type'] ?? $otherRoom['roomTypeId'];
-                            $oSubTypeId = $otherRoom['id_sub_type'] ?? $otherRoom['subTypeId'] ?? 0;
-                            if ($oTypeId == $typeId && $oSubTypeId == $subTypeId) {
+                            if ($oTypeId == $typeId) {
                                 $requestConsumption += ($otherRoom['quantite'] ?? $otherRoom['quantity'] ?? 0);
                             }
                         }

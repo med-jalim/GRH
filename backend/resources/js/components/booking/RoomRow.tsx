@@ -12,12 +12,14 @@ interface RoomOption {
 }
 
 interface Props {
+  index:            number;
   hotel:            Hotel | null;
   checkInDate:      string;
   room:             RoomSelection;
   availableOptions: RoomOption[]; 
   onChange:         (uid: string, field: keyof RoomSelection, value: any) => void;
   onRemove:         (uid: string) => void;
+  disabledSubTypeIds?: number[];
   availability?: {
     available: boolean;
     remaining: number;
@@ -26,7 +28,7 @@ interface Props {
   } | null;
 }
 
-export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, onRemove, availability }: Props) {
+export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onChange, onRemove, availability, disabledSubTypeIds = [] }: Props) {
   const optionsWithDynamicPrices = useMemo(() => {
     return availableOptions.map(opt => ({
       ...opt,
@@ -50,12 +52,14 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
       
       return selectedSubType.occupancies.some((occ: any) => {
         // Find if this occ can fit in at least one room
-        // Since we have "children_max", we test if we can take up to occ.children_max
-        for (let c = 0; c <= occ.children_max; c++) {
-          for (let b = 0; b <= occ.babies_max; b++) {
-             if (remAdults >= occ.adults && remChildren >= c && remBabies >= b) {
-                if (canPartition(remAdults - occ.adults, remChildren - c, remBabies - b, remRooms - 1)) return true;
-             }
+        // Since we have max limits, we test all valid combinations
+        for (let a = 1; a <= occ.adults; a++) {
+          for (let c = 0; c <= occ.children_max; c++) {
+            for (let b = 0; b <= occ.babies_max; b++) {
+               if (remAdults >= a && remChildren >= c && remBabies >= b) {
+                  if (canPartition(remAdults - a, remChildren - c, remBabies - b, remRooms - 1)) return true;
+               }
+            }
           }
         }
         return false;
@@ -77,10 +81,10 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
           </div>
           <div>
             <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">
-              {selectedOption ? selectedOption.type.nom : "Type d'Hébergement"}
+              Chambre #{index + 1}
             </h4>
             <div className="mt-1">
-                {availability && room.roomTypeId > 0 ? (
+                {availability && room.roomTypeId > 0 && room.subTypeId > 0 ? (
                     <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${availability.available ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} animate-in fade-in zoom-in duration-300`}>
                         <div className={`w-1 h-1 rounded-full ${availability.available ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         <span className="text-[10px] font-black uppercase tracking-tighter">
@@ -115,8 +119,6 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
                 onChange={e => {
                   const val = Number(e.target.value);
                   onChange(room.uid, 'roomTypeId', val);
-                  // Reset sub-type when type changes
-                  onChange(room.uid, 'subTypeId', 0);
                 }}
                 className="w-full h-12 rounded-2xl border border-slate-200 bg-slate-50/50 px-5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#54b172]/10 focus:border-[#54b172] transition-all cursor-pointer hover:bg-white"
             >
@@ -138,7 +140,9 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
                   className="w-full h-12 rounded-2xl border border-slate-200 bg-slate-50/50 px-5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#54b172]/10 focus:border-[#54b172] transition-all cursor-pointer hover:bg-white"
               >
                   <option value={0} disabled>-- Choisir l'occupation --</option>
-                  {selectedOption?.type.sub_types?.map((st: any) => {
+                  {selectedOption?.type.sub_types
+                      ?.filter((st: any) => !disabledSubTypeIds.includes(st.id))
+                      .map((st: any) => {
                       const dynamicPrice = hotel ? computeDynamicPrice(hotel, room.roomTypeId, st.id, checkInDate) : 0;
                       return (
                         <option key={st.id} value={st.id}>
