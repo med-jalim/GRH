@@ -85,11 +85,11 @@ class ClientReservationController extends Controller
      */
     public function show($token)
     {
-        $reservation = Reservation::with(['hotel', 'groups.items.type', 'payments'])->where('token', $token)->firstOrFail();
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'groups.items.subType', 'payments'])->where('token', $token)->firstOrFail();
 
         // We fetch all hotels only to show the selected one as locked, 
         // or we just fetch the selected hotel to keep it simple.
-        $hotels = Hotel::with(['chambres.type', 'tarifs.type', 'typeTarifications.type'])->get();
+        $hotels = Hotel::withBookingData()->get();
 
         return Inertia::render('PublicReservationPortal', [
             'reservation' => $reservation,
@@ -117,6 +117,7 @@ class ClientReservationController extends Controller
             'groups.*.nb_personnes'   => 'required|integer|min:1',
             'groups.*.rooms'          => 'required|array|min:1',
             'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
+            'groups.*.rooms.*.id_sub_type'   => 'required|integer|exists:sub_types,id',
             'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
             'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
             'groups.*.rooms.*.nb_adultes'    => 'required|integer|min:0',
@@ -168,6 +169,7 @@ class ClientReservationController extends Controller
                 ItemReservation::create([
                     'id_group'      => $group->id,
                     'id_type'       => $roomData['id_type'],
+                    'id_sub_type'   => $roomData['id_sub_type'],
                     'quantite'      => $roomData['quantite'],
                     'prix_unitaire' => $roomData['prix_unitaire'],
                     'nb_adultes'    => $roomData['nb_adultes'],

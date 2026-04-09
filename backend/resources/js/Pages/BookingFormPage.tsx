@@ -74,7 +74,7 @@ export default function BookingFormPage({ hotels }: Props) {
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
                 return rSum + (prix * nights * r.quantity);
             }, 0);
 
@@ -130,9 +130,10 @@ export default function BookingFormPage({ hotels }: Props) {
                 nb_personnes: g.occupants,
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
                     return {
                         id_type: r.roomTypeId,
+                        id_sub_type: r.subTypeId,
                         quantite: r.quantity,
                         prix_unitaire: prix,
                         nb_adultes: r.adults,

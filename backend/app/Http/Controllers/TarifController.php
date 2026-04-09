@@ -18,17 +18,19 @@ class TarifController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'id_hotel'   => 'required|integer|exists:hotels,id',
-            'id_type'    => 'required|integer|exists:types,id',
-            'prix'       => 'required|numeric|min:0',
-            'date_debut' => 'required|date',
-            'date_fin'   => 'required|date|after_or_equal:date_debut',
+            'id_hotel'    => 'required|integer|exists:hotels,id',
+            'id_type'     => 'required|integer|exists:types,id',
+            'id_sub_type' => 'required|integer|exists:sub_types,id',
+            'prix'        => 'required|numeric|min:0',
+            'date_debut'  => 'required|date',
+            'date_fin'    => 'required|date|after_or_equal:date_debut',
         ]);
 
         DB::transaction(function () use ($validated) {
             $this->applyRangeSplit(
                 hotelId:   $validated['id_hotel'],
                 typeId:    $validated['id_type'],
+                subTypeId: $validated['id_sub_type'],
                 newStart:  Carbon::parse($validated['date_debut']),
                 newEnd:    Carbon::parse($validated['date_fin']),
                 newPrice:  $validated['prix'],
@@ -49,11 +51,12 @@ class TarifController extends Controller
         $tarif = Tarif::findOrFail($id);
 
         $validated = $request->validate([
-            'id_hotel'   => 'sometimes|required|integer|exists:hotels,id',
-            'id_type'    => 'sometimes|required|integer|exists:types,id',
-            'prix'       => 'sometimes|required|numeric|min:0',
-            'date_debut' => 'sometimes|required|date',
-            'date_fin'   => 'sometimes|required|date|after_or_equal:date_debut',
+            'id_hotel'    => 'sometimes|required|integer|exists:hotels,id',
+            'id_type'     => 'sometimes|required|integer|exists:types,id',
+            'id_sub_type' => 'sometimes|required|integer|exists:sub_types,id',
+            'prix'        => 'sometimes|required|numeric|min:0',
+            'date_debut'  => 'sometimes|required|date',
+            'date_fin'    => 'sometimes|required|date|after_or_equal:date_debut',
         ]);
 
         DB::transaction(function () use ($validated, $tarif) {
@@ -61,8 +64,9 @@ class TarifController extends Controller
             $tarif->delete();
 
             $this->applyRangeSplit(
-                hotelId:   $validated['id_hotel']   ?? $tarif->id_hotel,
+                hotelId:   $validated['id_hotel']    ?? $tarif->id_hotel,
                 typeId:    $validated['id_type']     ?? $tarif->id_type,
+                subTypeId: $validated['id_sub_type'] ?? $tarif->id_sub_type,
                 newStart:  Carbon::parse($validated['date_debut'] ?? $tarif->date_debut),
                 newEnd:    Carbon::parse($validated['date_fin']   ?? $tarif->date_fin),
                 newPrice:  $validated['prix']        ?? $tarif->prix,
@@ -108,14 +112,16 @@ class TarifController extends Controller
     private function applyRangeSplit(
         int    $hotelId,
         int    $typeId,
+        int    $subTypeId,
         Carbon $newStart,
         Carbon $newEnd,
         float  $newPrice,
         ?int   $excludeId
     ): void {
-        // Fetch all overlapping tarifs for the same hotel+type
+        // Fetch all overlapping tarifs for the same hotel+type+sub_type
         $overlapping = Tarif::where('id_hotel', $hotelId)
             ->where('id_type', $typeId)
+            ->where('id_sub_type', $subTypeId)
             ->where('date_debut', '<=', $newEnd->toDateString())
             ->where('date_fin',   '>=', $newStart->toDateString())
             ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId))
@@ -138,11 +144,12 @@ class TarifController extends Controller
 
                 // Right piece: newEnd + 1 → exEnd (new record)
                 Tarif::create([
-                    'id_hotel'   => $existing->id_hotel,
-                    'id_type'    => $existing->id_type,
-                    'prix'       => $existing->prix,
-                    'date_debut' => $rightStart->toDateString(),
-                    'date_fin'   => $exEnd->toDateString(),
+                    'id_hotel'    => $existing->id_hotel,
+                    'id_type'     => $existing->id_type,
+                    'id_sub_type' => $existing->id_sub_type,
+                    'prix'        => $existing->prix,
+                    'date_debut'  => $rightStart->toDateString(),
+                    'date_fin'    => $exEnd->toDateString(),
                 ]);
             } elseif ($hasLeft) {
                 // Case B: Trim the end of existing period
@@ -158,11 +165,12 @@ class TarifController extends Controller
 
         // Finally, create the new tarif
         Tarif::create([
-            'id_hotel'   => $hotelId,
-            'id_type'    => $typeId,
-            'prix'       => $newPrice,
-            'date_debut' => $newStart->toDateString(),
-            'date_fin'   => $newEnd->toDateString(),
+            'id_hotel'    => $hotelId,
+            'id_type'     => $typeId,
+            'id_sub_type' => $subTypeId,
+            'prix'        => $newPrice,
+            'date_debut'  => $newStart->toDateString(),
+            'date_fin'    => $newEnd->toDateString(),
         ]);
     }
 }

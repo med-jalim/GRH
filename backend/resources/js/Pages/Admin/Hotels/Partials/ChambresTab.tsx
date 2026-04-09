@@ -17,13 +17,19 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
   const { data, setData, post, put, processing, errors, reset } = useForm({
     numero: "",
     id_type: types.length > 0 ? types[0].id.toString() : "",
+    id_sub_type: "",
     id_hotel: hotel.id.toString(), // context
   });
 
   function openCreate() {
     setEditingChambre(null);
-    setData("numero", "");
-    if (types.length > 0) setData("id_type", types[0].id.toString());
+    reset();
+    setData({
+      numero: "",
+      id_type: types.length > 0 ? types[0].id.toString() : "",
+      id_sub_type: "",
+      id_hotel: hotel.id.toString(),
+    });
     setShowModal(true);
   }
 
@@ -32,6 +38,7 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
     setData({
       numero: c.numero,
       id_type: c.id_type.toString(),
+      id_sub_type: c.id_sub_type?.toString() ?? "",
       id_hotel: hotel.id.toString(),
     });
     setShowModal(true);
@@ -128,16 +135,23 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
                 <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-6 py-4 font-bold text-slate-700">N° {c.numero}</td>
                   <td className="px-6 py-4 text-slate-500">
-                    <span 
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border"
-                      style={{
-                        backgroundColor: (c.type?.color || "#6366f1") + "10", // 10 is ~6% opacity in hex
-                        color: c.type?.color || "#6366f1",
-                        borderColor: (c.type?.color || "#6366f1") + "30" // 30 is ~18% opacity
-                      }}
-                    >
-                      {c.type?.nom ?? `Type #${c.id_type}`}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span 
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg border w-fit"
+                        style={{
+                          backgroundColor: (c.type?.color || "#6366f1") + "10",
+                          color: c.type?.color || "#6366f1",
+                          borderColor: (c.type?.color || "#6366f1") + "30"
+                        }}
+                      >
+                        {c.type?.nom ?? `Type #${c.id_type}`}
+                      </span>
+                      {c.sub_type && (
+                        <span className="text-[10px] font-semibold text-slate-400 ml-1">
+                         ↳ {c.sub_type.nom}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -176,13 +190,38 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Type de chambre <span className="text-red-400">*</span></label>
-                <select value={data.id_type} onChange={(e) => setData("id_type", e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none">
-                  {types.length === 0 && <option value="" disabled>Aucun type disponible, créez-en un d'abord.</option>}
+                <select 
+                  value={data.id_type} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setData((prev: any) => ({ ...prev, id_type: val, id_sub_type: "" }));
+                  }} 
+                  required 
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none"
+                >
+                  <option value="" disabled>-- Choisir le type --</option>
                   {types.map((t) => (
                     <option key={t.id} value={t.id}>{t.nom}</option>
                   ))}
                 </select>
                 {errors.id_type && <p className="text-red-500 text-xs mt-1">{errors.id_type}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Occupation spécifiée <span className="text-red-400">*</span></label>
+                <select 
+                  value={data.id_sub_type} 
+                  onChange={(e) => setData("id_sub_type", e.target.value)} 
+                  required 
+                  disabled={!data.id_type}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none disabled:opacity-50"
+                >
+                  <option value="" disabled>-- Choisir l'occupation --</option>
+                  {types.find(t => t.id.toString() === data.id_type)?.sub_types?.map((st: any) => (
+                    <option key={st.id} value={st.id}>{st.nom}</option>
+                  ))}
+                </select>
+                {errors.id_sub_type && <p className="text-red-500 text-xs mt-1">{errors.id_sub_type}</p>}
               </div>
 
               <div className="flex gap-3 pt-2">

@@ -87,12 +87,12 @@ export function PricingCalendar({
                 return day >= start && day <= end;
             });
 
-            // Déduplication par type de chambre: on priorise toujours l'explicite sur le virtuel
+            // Déduplication par sous-type: on montre chaque occupation pour le type sélectionné
             const mapped = new Map<number, any>();
             for (const t of raw) {
-                const existing = mapped.get(t.id_type);
-                if (!existing || (!t.is_virtual && existing.is_virtual)) {
-                    mapped.set(t.id_type, t);
+                const key = t.id_sub_type || t.id_type;
+                if (!mapped.has(key)) {
+                    mapped.set(key, t);
                 }
             }
             return Array.from(mapped.values());
@@ -301,11 +301,9 @@ export function PricingCalendar({
                             <span className="text-[9px] font-semibold opacity-60">
                                 MAD
                             </span>
-                            {selectedTypeId === "all" && (
-                                <div className="text-[9px] font-medium opacity-70 mt-0.5 truncate">
-                                    {t.type?.nom}
-                                </div>
-                            )}
+                            <div className="text-[9px] font-medium opacity-70 mt-0.5 truncate">
+                                {t.sub_type?.nom || t.type?.nom}
+                            </div>
                         </div>
                     ))}
                 </div>

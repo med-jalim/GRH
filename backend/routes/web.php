@@ -10,6 +10,7 @@ use App\Http\Controllers\PaymentVerificationController;
 use App\Http\Controllers\ClientReservationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HotelTypeTarificationController;
+use App\Http\Controllers\SubTypeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -22,6 +23,7 @@ Route::post('/booking/check-availability', [ReservationController::class, 'check
 
 // ----- Public Reservation Actions (via Token) -----
 Route::get('/reservation/{token}', [ClientReservationController::class, 'show'])->name('reservation.show');
+// ... other public routes ...
 Route::post('/reservation/{token}/confirm', [ClientReservationController::class, 'confirm'])->name('reservation.confirm');
 Route::post('/reservation/{token}/cancel', [ClientReservationController::class, 'cancel'])->name('reservation.cancel');
 Route::post('/reservation/{token}/update', [ClientReservationController::class, 'update'])->name('reservation.update');
@@ -50,6 +52,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::resource('hotels', HotelController::class);
     Route::resource('chambres', ChambreController::class);
     Route::resource('types', TypeController::class);
+    Route::resource('sub_types', SubTypeController::class);
     Route::resource('tarifs', TarifController::class);
 
     // Tarification par chambre essentielle + pourcentages

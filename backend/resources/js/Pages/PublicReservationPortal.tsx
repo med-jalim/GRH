@@ -58,6 +58,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                 rooms: g.items?.map((i: any) => ({
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: i.id_type,
+                    subTypeId: i.id_sub_type || 0,
                     quantity: i.quantite,
                     adults: i.nb_adultes ?? 2,
                     children: i.nb_enfants ?? 0,
@@ -88,7 +89,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
                 return rSum + (prix * nights * r.quantity);
             }, 0);
 
@@ -132,9 +133,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                 nb_personnes: g.occupants,
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, checkInDate);
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
                     return {
                         id_type: r.roomTypeId,
+                        id_sub_type: r.subTypeId,
                         quantite: r.quantity,
                         prix_unitaire: prix,
                         nb_adultes: r.adults,
@@ -391,7 +393,14 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                 return g.items.map((i: any) => (
                                                                     <tr key={i.id} className="bg-white">
                                                                         <td className="px-6 py-4">
-                                                                            <p className="font-bold text-slate-700">{i.type?.nom ?? 'Chambre'}</p>
+                                                                            <p className="font-bold text-slate-700">
+                                                                                {i.type?.nom ?? 'Chambre'} 
+                                                                                {i.sub_type && (
+                                                                                    <span className="text-[#54b172] ml-1.5 font-bold">
+                                                                                        ({i.sub_type.nom})
+                                                                                    </span>
+                                                                                )}
+                                                                            </p>
                                                                             <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
                                                                                 {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`} {i.nb_bebes > 0 && `· ${i.nb_bebes} Bébés`}
                                                                             </p>

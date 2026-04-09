@@ -13,21 +13,31 @@ import {
   Layers,
   BedDouble,
   Tag,
-  Calendar as CalendarIcon,
-  Percent
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { useState } from "react";
 import { ApercuTab } from "./Partials/ApercuTab";
 import { TypesTab } from "./Partials/TypesTab";
 import { ChambresTab } from "./Partials/ChambresTab";
 import { TarifsTab } from "./Partials/TarifsTab";
+import { MultiplicateursTab } from "./Partials/MultiplicateursTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
+
+interface SubType {
+  id: number;
+  id_type: number;
+  nom: string;
+  cap_adultes: number;
+  cap_enfants: number;
+  cap_bebes: number;
+}
 
 interface Type {
   id: number;
   nom: string;
   description: string | null;
+  sub_types?: SubType[];
 }
 
 interface Chambre {
@@ -35,15 +45,18 @@ interface Chambre {
   numero: string;
   id_type: number;
   type: Type | null;
+  sub_type?: SubType | null;
 }
 
 interface Tarif {
   id: number;
   id_type: number;
+  id_sub_type: number | null;
   prix: number;
   date_debut: string;
   date_fin: string;
   type: Type | null;
+  sub_type?: SubType | null;
 }
 
 interface Reservation {
@@ -71,17 +84,20 @@ interface Hotel {
   reservations: Reservation[];
 }
 
-interface Tarification {
+interface TarificationLine {
   id_type: number;
   type_nom: string | null;
   is_essentiel: boolean;
   pourcentage: number;
+  cap_adultes: number;
+  cap_enfants: number;
+  cap_bebes: number;
 }
 
 interface Props {
   hotel: Hotel;
   types: Type[];
-  tarification: Tarification[];
+  tarification: TarificationLine[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -143,10 +159,11 @@ function EditHotelModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden z-10">
-        <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
+    <div className="fixed inset-0 z-[60] overflow-y-auto p-4">
+      <div className="flex min-h-full items-center justify-center py-6 sm:py-12">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg z-10">
+        <div className="flex items-center justify-between px-7 py-3.5 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
               <Edit3 className="w-4 h-4 text-amber-600" />
@@ -157,17 +174,18 @@ function EditHotelModal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <form onSubmit={submit} className="px-7 py-6 flex flex-col gap-5">
+        <form onSubmit={submit} className="px-7 py-5 flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nom <span className="text-red-400">*</span></label>
-            <input type="text" value={data.name} onChange={(e) => setData("name", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nom de l'hôtel <span className="text-red-400">*</span></label>
+            <input type="text" value={data.name} onChange={(e) => setData("name", e.target.value)} placeholder="Ex : Hôtel El Djazaïr" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Ville</label>
-              <input type="text" value={data.ville} onChange={(e) => setData("ville", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              <input type="text" value={data.ville} onChange={(e) => setData("ville", e.target.value)} placeholder="Ex : Alger" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              {errors.ville && <p className="text-red-500 text-xs mt-1">{errors.ville}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Étoiles</label>
@@ -176,36 +194,38 @@ function EditHotelModal({
                   <option key={n} value={String(n)}>{"★".repeat(n)} {n} étoile{n > 1 ? "s" : ""}</option>
                 ))}
               </select>
+              {errors.stars && <p className="text-red-500 text-xs mt-1">{errors.stars}</p>}
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Description</label>
-            <textarea value={data.description} onChange={(e) => setData("description", e.target.value)} rows={3} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition resize-none" />
+            <textarea value={data.description} onChange={(e) => setData("description", e.target.value)} rows={3} placeholder="Courte description de l'établissement..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition resize-none" />
+            {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Téléphone</label>
-              <input type="text" value={data.telephone} onChange={(e) => setData("telephone", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              <input type="text" value={data.telephone} onChange={(e) => setData("telephone", e.target.value)} placeholder="Ex : 0522..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
               {errors.telephone && <p className="text-red-500 text-xs mt-1">{errors.telephone}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Email</label>
-              <input type="email" value={data.email} onChange={(e) => setData("email", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+              <input type="email" value={data.email} onChange={(e) => setData("email", e.target.value)} placeholder="contact@hotel.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
               {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Adresse</label>
-            <input type="text" value={data.adresse} onChange={(e) => setData("adresse", e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
+            <input type="text" value={data.adresse} onChange={(e) => setData("adresse", e.target.value)} placeholder="Adresse complète" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition" />
             {errors.adresse && <p className="text-red-500 text-xs mt-1">{errors.adresse}</p>}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">R.I.B (24 Chiffres)</label>
-            <input type="text" maxLength={24} value={data.rib} onChange={(e) => setData("rib", e.target.value.replace(/\D/g, ''))} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition font-mono tracking-widest" />
+            <input type="text" maxLength={24} value={data.rib} onChange={(e) => setData("rib", e.target.value.replace(/\D/g, ''))} placeholder="012345678901234567890123" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 transition tracking-widest font-mono" />
             {errors.rib && <p className="text-red-500 text-xs mt-1">{errors.rib}</p>}
           </div>
 
@@ -217,6 +237,7 @@ function EditHotelModal({
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -248,8 +269,8 @@ export default function HotelShow({ hotel, types, tarification }: Props) {
     { id: "apercu", label: "Aperçu Global", icon: LayoutDashboard },
     { id: "types", label: "Types de Chambres", icon: Layers },
     { id: "chambres", label: "Chambres", icon: BedDouble },
-    { id: "calendrier", label: "Tarif Essentiel", icon: CalendarIcon },
-    { id: "multiplicateurs", label: "Multiplicateurs", icon: Percent },
+    { id: "calendrier", label: "Tarifs", icon: CalendarIcon },
+    { id: "multiplicateurs", label: "Grille Tarification", icon: Tag },
   ] as const;
 
   return (
@@ -334,10 +355,10 @@ export default function HotelShow({ hotel, types, tarification }: Props) {
         {activeTab === "types" && <TypesTab types={types} />}
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
         {activeTab === "calendrier" && (
-          <TarifsTab section="calendrier" hotel={hotel} types={types} tarification={tarification} />
+          <TarifsTab hotel={hotel} types={types} />
         )}
         {activeTab === "multiplicateurs" && (
-          <TarifsTab section="multiplicateurs" hotel={hotel} types={types} tarification={tarification} />
+          <MultiplicateursTab hotelId={hotel.id} tarification={tarification} types={types} />
         )}
       </div>
 

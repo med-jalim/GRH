@@ -1,11 +1,24 @@
+export interface SubType {
+  id: number;
+  id_type: number;
+  nom: string;
+  cap_adultes: number;
+  cap_enfants: number;
+  cap_bebes: number;
+  color?: string;
+}
+
 export interface RoomType {
   id: number;
   nom: string;
   description: string;
+  sub_types?: SubType[];
 }
 
 export interface Tarif {
+  id: number;
   id_type: number;
+  id_sub_type: number;
   id_hotel: number;
   prix: number;
   date_debut: string;
@@ -14,9 +27,12 @@ export interface Tarif {
 
 export interface Chambre {
   id: number;
+  numero: string;
   id_type: number;
+  id_sub_type: number;
   id_hotel: number;
   type: RoomType;
+  sub_type?: SubType;
 }
 
 export interface Hotel {
@@ -32,6 +48,7 @@ export interface Hotel {
 export interface RoomSelection {
   uid: string;
   roomTypeId: number;
+  subTypeId: number;
   quantity: number;
   adults: number;
   children: number;

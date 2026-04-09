@@ -9,6 +9,7 @@ class Tarif extends Model
 {
     protected $fillable = [
         'id_type',
+        'id_sub_type',
         'id_hotel',
         'prix',
         'date_debut',
@@ -23,6 +24,11 @@ class Tarif extends Model
     public function hotel(): BelongsTo
     {
         return $this->belongsTo(Hotel::class, 'id_hotel');
+    }
+
+    public function subType(): BelongsTo
+    {
+        return $this->belongsTo(SubType::class, 'id_sub_type');
     }
 
     public function type(): BelongsTo

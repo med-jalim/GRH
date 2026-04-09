@@ -58,7 +58,7 @@ class ReservationController extends Controller
             $baseQuery->where('statut', $request->statut);
         }
 
-        $query = $baseQuery->with(['hotel', 'groups.items.type'])
+        $query = $baseQuery->with(['hotel', 'groups.items.type', 'groups.items.subType'])
             ->orderByDesc('created_at');
 
         if ($request->view === 'calendar') {
@@ -110,12 +110,23 @@ class ReservationController extends Controller
             'groups.*.nb_personnes'          => 'required|integer|min:1',
             'groups.*.rooms'                 => 'required|array|min:1',
             'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
+            'groups.*.rooms.*.id_sub_type'   => 'required|integer|exists:sub_types,id',
             'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
             'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
             'groups.*.rooms.*.nb_adultes'    => 'required|integer|min:0',
             'groups.*.rooms.*.nb_enfants'    => 'required|integer|min:0',
             'groups.*.rooms.*.nb_bebes'      => 'required|integer|min:0',
         ]);
+
+        // Occupancy validation
+        $occupancyFailures = $this->reservationService->validateOccupancyCount($validated['groups']);
+        if (!empty($occupancyFailures)) {
+            return response()->json([
+                'success' => false,
+                'message' => "La capacité maximale d'une ou plusieurs chambres a été dépassée.",
+                'errors'  => $occupancyFailures
+            ], 422);
+        }
 
         // Availability check
         $failures = $this->reservationService->checkAvailability($validated['id_hotel'], $validated['groups']);
@@ -174,6 +185,7 @@ class ReservationController extends Controller
                 ItemReservation::create([
                     'id_group'      => $group->id,
                     'id_type'       => $roomData['id_type'],
+                    'id_sub_type'   => $roomData['id_sub_type'],
                     'quantite'      => $roomData['quantite'],
                     'prix_unitaire' => $roomData['prix_unitaire'],
                     'nb_adultes'    => $roomData['nb_adultes'],
@@ -183,7 +195,7 @@ class ReservationController extends Controller
             }
         }
 
-        $reservation->load(['hotel', 'groups.items.type']);
+        $reservation->load(['hotel', 'groups.items.type', 'groups.items.subType']);
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse($reservation, 'Réservation créée avec succès.', 201);
@@ -224,7 +236,7 @@ class ReservationController extends Controller
      */
     public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::with(['hotel', 'groups.items.type', 'payments'])->find($id);
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'groups.items.subType', 'payments'])->find($id);
 
         if (! $reservation) {
             if (request()->wantsJson() && ! request()->header('X-Inertia')) {
@@ -287,7 +299,7 @@ class ReservationController extends Controller
         $reservation->nb_personnes = $totalPersonnes;
         $reservation->save();
 
-        $reservation->load(['hotel', 'groups.items.type']);
+        $reservation->load(['hotel', 'groups.items.type', 'groups.items.subType']);
 
         return response()->json([
             'success' => true,

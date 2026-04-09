@@ -82,17 +82,18 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4">
+      <div className="flex min-h-full items-center justify-center py-6 sm:py-12">
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"
+          onClick={onClose}
+        />
 
-      {/* Panel */}
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden z-10">
+        {/* Panel */}
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg z-10">
         {/* Header */}
-        <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
+        <div className="flex items-center justify-between px-7 py-3.5 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center">
               <Building2 className="w-5 h-5 text-amber-600" />
@@ -108,7 +109,7 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Body */}
-        <form onSubmit={submit} className="px-7 py-6 flex flex-col gap-5">
+        <form onSubmit={submit} className="px-7 py-5 flex flex-col gap-4">
           {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
@@ -158,6 +159,9 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
                   </option>
                 ))}
               </select>
+              {errors.stars && (
+                <p className="text-red-500 text-xs mt-1">{errors.stars}</p>
+              )}
             </div>
           </div>
 
@@ -173,6 +177,9 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
               placeholder="Courte description de l'établissement..."
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 transition bg-slate-50 resize-none"
             />
+            {errors.description && (
+              <p className="text-red-500 text-xs mt-1">{errors.description}</p>
+            )}
           </div>
 
           {/* Contact Fields */}
@@ -245,6 +252,7 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -279,10 +287,10 @@ export default function HotelsIndex({ hotels, stats }: Props) {
       {showCreate && <CreateHotelModal onClose={() => setShowCreate(false)} />}
 
       {/* ── Header ── */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Hôtels</h1>
-          <p className="text-slate-500 mt-1 text-sm">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Hôtels</h1>
+          <p className="text-slate-500 mt-0.5 text-sm">
             {stats.total} établissement{stats.total !== 1 ? "s" : ""} enregistré{stats.total !== 1 ? "s" : ""}
           </p>
         </div>
@@ -296,7 +304,7 @@ export default function HotelsIndex({ hotels, stats }: Props) {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: "Hôtels", value: stats.total, icon: Building2, color: "text-indigo-700", bg: "bg-indigo-50" },
           { label: "Villes", value: stats.villes, icon: MapPin, color: "text-violet-700", bg: "bg-violet-50" },
@@ -319,7 +327,7 @@ export default function HotelsIndex({ hotels, stats }: Props) {
       </div>
 
       {/* ── Search ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] p-4 mb-6">
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] p-3 mb-5">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input

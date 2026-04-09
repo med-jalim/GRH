@@ -18,7 +18,7 @@ class HotelController extends Controller
      */
     public function bookingPage(): Response
     {
-        $hotels = Hotel::with(['chambres.type', 'tarifs.type', 'typeTarifications.type'])->get();
+        $hotels = Hotel::withBookingData()->get();
 
         return Inertia::render('BookingFormPage', [
             'hotels' => $hotels,
@@ -32,13 +32,13 @@ class HotelController extends Controller
     {
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return $this->sendResponse(
-                Hotel::with('chambres.type', 'tarifs.type', 'typeTarifications.type')->get(),
+                Hotel::withBookingData()->get(),
                 'Liste des hôtels récupérée avec succès.'
             );
         }
 
         $hotels = Hotel::withCount(['chambres', 'reservations'])
-            ->with(['tarifs.type', 'typeTarifications.type'])
+            ->withBookingData()
             ->orderBy('name')
             ->get();
 
@@ -68,7 +68,7 @@ class HotelController extends Controller
             'telephone'   => 'nullable|string|max:20',
             'email'       => 'nullable|email|max:255',
             'adresse'     => 'nullable|string|max:1000',
-            'rib'         => 'nullable|digits:24',
+            'rib'         => 'nullable|string|min:10|max:24',
         ]);
 
         $hotel = Hotel::create($validated);
@@ -86,12 +86,9 @@ class HotelController extends Controller
      */
     public function show(Request $request, string $id): Response|JsonResponse|RedirectResponse
     {
-        $hotel = Hotel::with([
-            'chambres.type',
-            'tarifs.type',
-            'typeTarifications.type',
-            'reservations' => fn ($q) => $q->orderByDesc('created_at')->limit(10),
-        ])->find($id);
+        $hotel = Hotel::withBookingData()
+            ->with(['reservations' => fn ($q) => $q->orderByDesc('created_at')->limit(10)])
+            ->find($id);
 
         if (! $hotel) {
             if ($request->wantsJson() && ! $request->header('X-Inertia')) {
@@ -105,7 +102,7 @@ class HotelController extends Controller
             return $this->sendResponse($hotel, 'Hôtel récupéré avec succès.');
         }
 
-        $types = Type::orderBy('nom')->get();
+        $types = Type::with('subTypes')->orderBy('nom')->get();
 
         return Inertia::render('Admin/Hotels/Show', [
             'hotel'          => $hotel,
@@ -145,7 +142,7 @@ class HotelController extends Controller
             'telephone'   => 'nullable|string|max:20',
             'email'       => 'nullable|email|max:255',
             'adresse'     => 'nullable|string|max:1000',
-            'rib'         => 'nullable|digits:24',
+            'rib'         => 'nullable|string|min:10|max:24',
         ]);
 
         $hotel->update($validated);

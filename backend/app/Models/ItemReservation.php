@@ -13,6 +13,7 @@ class ItemReservation extends Model
     protected $fillable = [
         'id_group',
         'id_type',
+        'id_sub_type',
         'quantite',
         'prix_unitaire',
         'nb_adultes',
@@ -32,5 +33,10 @@ class ItemReservation extends Model
     public function type(): BelongsTo
     {
         return $this->belongsTo(Type::class, 'id_type');
+    }
+
+    public function subType(): BelongsTo
+    {
+        return $this->belongsTo(SubType::class, 'id_sub_type');
     }
 }

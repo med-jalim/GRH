@@ -51,7 +51,7 @@ export function AdminLayout({ children }: Props) {
       <div className="flex h-screen bg-[#f3f4f6] font-sans overflow-hidden">
         {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-gray-100 flex flex-col flex-shrink-0">
-          <div className="p-6">
+          <div className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">
                 G
@@ -104,8 +104,8 @@ export function AdminLayout({ children }: Props) {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#f8f9fa]">
           {/* Top Header */}
-          <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-40">
-            <div className="flex items-center text-xl font-bold text-gray-900">
+          <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-40">
+            <div className="flex items-center text-lg font-bold text-gray-900">
               Tableau de Bord
             </div>
             

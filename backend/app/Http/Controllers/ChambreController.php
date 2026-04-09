@@ -20,6 +20,7 @@ class ChambreController extends Controller
             'numero'   => 'required|string|max:50|unique:chambres,numero,NULL,id,id_hotel,' . $request->id_hotel,
             'id_hotel' => 'required|integer|exists:hotels,id',
             'id_type'  => 'required|integer|exists:types,id',
+            'id_sub_type' => 'required|integer|exists:sub_types,id',
         ]);
 
         Chambre::create($validated);
@@ -40,6 +41,7 @@ class ChambreController extends Controller
             'numero'   => 'sometimes|required|string|max:50|unique:chambres,numero,' . $id . ',id,id_hotel,' . ($request->id_hotel ?? $chambre->id_hotel),
             'id_hotel' => 'sometimes|required|integer|exists:hotels,id',
             'id_type'  => 'sometimes|required|integer|exists:types,id',
+            'id_sub_type' => 'sometimes|required|integer|exists:sub_types,id',
         ]);
 
         $chambre->update($validated);

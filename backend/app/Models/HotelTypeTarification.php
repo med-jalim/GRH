@@ -13,15 +13,10 @@ class HotelTypeTarification extends Model
         'id_hotel',
         'id_type',
         'is_essentiel',
-        'pourcentage',
-        'cap_adultes',
-        'cap_enfants',
-        'cap_bebes',
     ];
 
     protected $casts = [
         'is_essentiel' => 'boolean',
-        'pourcentage'  => 'float',
     ];
 
     public function hotel(): BelongsTo

@@ -106,9 +106,14 @@ export function ApercuTab({ hotel, chambresByType }: any) {
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{typeName}</p>
                   <div className="flex flex-wrap gap-2">
                     {rooms.map((c: any) => (
-                      <span key={c.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg border border-blue-100">
-                        <BedDouble className="w-3 h-3" />
-                        N° {c.numero}
+                      <span key={c.id} className="inline-flex flex-col px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-1.5">
+                          <BedDouble className="w-3 h-3" />
+                          N° {c.numero}
+                        </div>
+                        {c.sub_type && (
+                          <span className="text-[9px] text-blue-400 font-bold uppercase mt-0.5">{c.sub_type.nom}</span>
+                        )}
                       </span>
                     ))}
                   </div>

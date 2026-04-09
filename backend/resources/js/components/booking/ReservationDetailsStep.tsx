@@ -104,32 +104,31 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 
                 if (!chambre?.type) return null;
                 
-                
-                const dynamicPrice = computeDynamicPrice(selectedHotel, tid, today);
-
-                return { type: chambre.type, price: dynamicPrice };
+                return { type: chambre.type, price: 0 }; // Price is now calculated per sub-type in RoomRow
             })
             .filter(Boolean) as { type: any; price: number }[];
     }, [selectedHotel]);
 
-    // Capacity Validation Logic
+    // Capacity Validation Logic (Real-time Local Check)
     const hasCapacityError = useMemo(() => {
-        if (!availabilityMap) return false;
+        if (!selectedHotel || !formData.groups) return false;
         
         return formData.groups.some(group => 
             group.rooms.some(room => {
-                const avail = availabilityMap[room.uid];
-                if (!avail || !avail.capacities) return false;
+                // Find sub-type capacity from local hotel data
+                const chambre = selectedHotel.chambres.find(c => c.id_type === room.roomTypeId);
+                const subType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
                 
-                const caps = avail.capacities;
+                if (!subType) return false;
+                
                 return (
-                    room.adults > (caps.cap_adultes * room.quantity) ||
-                    room.children > (caps.cap_enfants * room.quantity) ||
-                    room.babies > (caps.cap_bebes * room.quantity)
+                    room.adults > (subType.cap_adultes * room.quantity) ||
+                    room.children > (subType.cap_enfants * room.quantity) ||
+                    room.babies > (subType.cap_bebes * room.quantity)
                 );
             })
         );
-    }, [formData.groups, availabilityMap]);
+    }, [formData.groups, selectedHotel]);
 
     useEffect(() => {
         onCapacityErrorChange?.(hasCapacityError);
@@ -159,6 +158,7 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                     {
                         uid: Math.random().toString(36).substr(2, 9),
                         roomTypeId: defaultTypeId,
+                        subTypeId: 0,
                         quantity: 1,
                         adults: 2,
                         children: 0,
@@ -187,6 +187,7 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 {
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: allTypes[0]?.type.id || 0,
+                    subTypeId: 0,
                     quantity: 1,
                     adults: 2,
                     children: 0,
@@ -220,6 +221,7 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 rooms: [...g.rooms, {
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: nextTypeId,
+                    subTypeId: 0,
                     quantity: 1,
                     adults: 2,
                     children: 0,
@@ -247,7 +249,25 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
         const updated = formData.groups.map(g => {
             if (g.uid !== groupUid) return g;
             
-            const newRooms = g.rooms.map(r => r.uid === roomUid ? { ...r, [field]: value } : r);
+            const newRooms = g.rooms.map(r => {
+                if (r.uid !== roomUid) return r;
+                
+                let updatedRoom = { ...r, [field]: value };
+
+                // If sub-type changes, default to its maximum capacities
+                if (field === 'subTypeId' && value > 0 && selectedHotel) {
+                    const roomType = selectedHotel.chambres.find(c => c.id_type === r.roomTypeId)?.type;
+                    const subType = roomType?.sub_types?.find((st: any) => st.id === value);
+                    if (subType) {
+                        updatedRoom.adults = subType.cap_adultes;
+                        updatedRoom.children = subType.cap_enfants;
+                        updatedRoom.babies = subType.cap_bebes;
+                    }
+                }
+
+                return updatedRoom;
+            });
+
             const totalOccupants = newRooms.reduce((acc, r) => acc + (r.adults + r.children + r.babies), 0);
 
             return {

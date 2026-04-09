@@ -91,7 +91,8 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                 <div className="space-y-4">
                     {group.rooms.map((room) => {
                         const chambre = hotel.chambres.find(c => c.id_type === room.roomTypeId);
-                        const price = computeDynamicPrice(hotel, room.roomTypeId, checkInDate);
+                        const selectedSubType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
+                        const price = computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, checkInDate);
                         const sub = price * groupNights * room.quantity;
 
                         return (
@@ -103,7 +104,14 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                                         </svg>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">{chambre?.type.nom ?? '—'}</p>
+                                        <p className="text-sm font-bold text-slate-800">
+                                            {chambre?.type.nom ?? '—'} 
+                                            {selectedSubType && (
+                                                <span className="text-[#54b172] ml-1.5">
+                                                    ({selectedSubType.nom})
+                                                </span>
+                                            )}
+                                        </p>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                             {room.quantity} unité(s) · {formatPrice(price)}/nuit
                                         </p>

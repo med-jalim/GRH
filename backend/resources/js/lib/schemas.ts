@@ -19,6 +19,7 @@ export const bookingSchema = z.object({
     rooms: z.array(z.object({
       uid:        z.string(),
       roomTypeId: z.number().positive(),
+      subTypeId:  z.number().positive(),
       quantity:   z.number().min(1, 'La quantité doit être au moins 1'),
       adults:     z.number().min(0),
       children:   z.number().min(0),

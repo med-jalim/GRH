@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class SubType extends Model
+{
+    protected $fillable = [
+        'id_type',
+        'nom',
+        'cap_adultes',
+        'cap_enfants',
+        'cap_bebes'
+    ];
+
+    public function type(): BelongsTo
+    {
+        return $this->belongsTo(Type::class, 'id_type');
+    }
+
+    public function tarifs(): HasMany
+    {
+        return $this->hasMany(Tarif::class, 'id_sub_type');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(ItemReservation::class, 'id_sub_type');
+    }
+}

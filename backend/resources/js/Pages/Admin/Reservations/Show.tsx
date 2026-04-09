@@ -43,16 +43,23 @@ interface Type {
   nom: string;
 }
 
+interface SubType {
+  id: number;
+  nom: string;
+}
+
 interface ItemReservation {
   id: number;
   id_group: number;
   id_type: number;
+  id_sub_type: number;
   quantite: number;
   prix_unitaire: number;
   nb_adultes: number;
   nb_enfants: number;
   nb_bebes: number;
   type: Type | null;
+  sub_type?: SubType | null;
 }
 
 interface ReservationGroup {
@@ -643,7 +650,14 @@ export default function ReservationShow({ reservation }: Props) {
                                           <BedDouble className="w-4 h-4" />
                                         </div>
                                         <div>
-                                          <span className="font-bold text-slate-700 block text-sm">{item.type?.nom ?? `Type #${item.id_type}`}</span>
+                                          <span className="font-bold text-slate-700 block text-sm">
+                                            {item.type?.nom ?? `Type #${item.id_type}`}
+                                            {item.sub_type && (
+                                              <span className="text-[#54b172] ml-1.5 font-bold">
+                                                ({item.sub_type.nom})
+                                              </span>
+                                            )}
+                                          </span>
                                           <div className="flex items-center gap-2 mt-0.5">
                                             <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Prix unitaire: {formatPrice(item.prix_unitaire)}</span>
                                             <span className="h-1 w-1 bg-slate-300 rounded-full" />

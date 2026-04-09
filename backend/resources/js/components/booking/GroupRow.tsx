@@ -43,7 +43,7 @@ export function GroupRow({
   const nights = Math.max(1, Math.round(diff / 86_400_000));
   
   const groupTotal = group.rooms.reduce((acc, room) => {
-    const price = hotel ? computeDynamicPrice(hotel, room.roomTypeId, group.checkIn) : 0;
+    const price = hotel ? computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, group.checkIn) : 0;
     return acc + price * room.quantity * nights;
   }, 0);
 

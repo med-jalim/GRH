@@ -9,6 +9,11 @@ class Type extends Model
 {
     protected $fillable = ['nom', 'description', 'color'];
 
+    public function subTypes(): HasMany
+    {
+        return $this->hasMany(SubType::class, 'id_type');
+    }
+
     public function chambres(): HasMany
     {
         return $this->hasMany(Chambre::class, 'id_type');
