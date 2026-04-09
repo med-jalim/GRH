@@ -14,6 +14,9 @@ class HotelTypeTarification extends Model
         'id_type',
         'is_essentiel',
         'pourcentage',
+        'cap_adultes',
+        'cap_enfants',
+        'cap_bebes',
     ];
 
     protected $casts = [

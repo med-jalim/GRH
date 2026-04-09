@@ -15,14 +15,13 @@ class ItemReservation extends Model
         'id_type',
         'quantite',
         'prix_unitaire',
-        'date_arrivee',
-        'date_depart',
-        'nb_personnes'
+        'nb_adultes',
+        'nb_enfants',
+        'nb_bebes'
     ];
 
     protected $casts = [
-        'date_arrivee' => 'date',
-        'date_depart'  => 'date',
+        // No dates to cast anymore in this model
     ];
 
     public function group(): BelongsTo

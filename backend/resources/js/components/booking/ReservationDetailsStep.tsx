@@ -15,9 +15,10 @@ interface Props {
     reservationId?: number;
     onAvailabilityChange?: (isAvailable: boolean) => void;
     onCheckingChange?: (isChecking: boolean) => void;
+    onCapacityErrorChange?: (hasError: boolean) => void;
 }
 
-export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = false, reservationId, onAvailabilityChange, onCheckingChange }: Props) {
+export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = false, reservationId, onAvailabilityChange, onCheckingChange, onCapacityErrorChange }: Props) {
     const {
         register,
         watch,
@@ -111,6 +112,29 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
             .filter(Boolean) as { type: any; price: number }[];
     }, [selectedHotel]);
 
+    // Capacity Validation Logic
+    const hasCapacityError = useMemo(() => {
+        if (!availabilityMap) return false;
+        
+        return formData.groups.some(group => 
+            group.rooms.some(room => {
+                const avail = availabilityMap[room.uid];
+                if (!avail || !avail.capacities) return false;
+                
+                const caps = avail.capacities;
+                return (
+                    room.adults > (caps.cap_adultes * room.quantity) ||
+                    room.children > (caps.cap_enfants * room.quantity) ||
+                    room.babies > (caps.cap_bebes * room.quantity)
+                );
+            })
+        );
+    }, [formData.groups, availabilityMap]);
+
+    useEffect(() => {
+        onCapacityErrorChange?.(hasCapacityError);
+    }, [hasCapacityError, onCapacityErrorChange]);
+
     const handleHotelChange = (id: number | null) => {
         setValue("hotelId", id as any);
         
@@ -130,12 +154,15 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 uid: Math.random().toString(36).substr(2, 9),
                 checkIn: today,
                 checkOut: checkOutDate.toISOString().split("T")[0],
-                occupants: 1,
+                occupants: 2,
                 rooms: [
                     {
                         uid: Math.random().toString(36).substr(2, 9),
                         roomTypeId: defaultTypeId,
-                        quantity: 1
+                        quantity: 1,
+                        adults: 2,
+                        children: 0,
+                        babies: 0,
                     }
                 ]
             }
@@ -155,12 +182,15 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
             uid: Math.random().toString(36).substr(2, 9),
             checkIn: today,
             checkOut: checkOutDate.toISOString().split("T")[0],
-            occupants: 1,
+            occupants: 2,
             rooms: [
                 {
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: allTypes[0]?.type.id || 0,
-                    quantity: 1
+                    quantity: 1,
+                    adults: 2,
+                    children: 0,
+                    babies: 0,
                 }
             ]
         };
@@ -190,7 +220,10 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 rooms: [...g.rooms, {
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: nextTypeId,
-                    quantity: 1
+                    quantity: 1,
+                    adults: 2,
+                    children: 0,
+                    babies: 0,
                 }]
             };
         });
@@ -213,9 +246,14 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
     const updateRoomInGroup = (groupUid: string, roomUid: string, field: keyof RoomSelection, value: any) => {
         const updated = formData.groups.map(g => {
             if (g.uid !== groupUid) return g;
+            
+            const newRooms = g.rooms.map(r => r.uid === roomUid ? { ...r, [field]: value } : r);
+            const totalOccupants = newRooms.reduce((acc, r) => acc + (r.adults + r.children + r.babies), 0);
+
             return {
                 ...g,
-                rooms: g.rooms.map(r => r.uid === roomUid ? { ...r, [field]: value } : r)
+                occupants: totalOccupants,
+                rooms: newRooms
             };
         });
         setValue("groups", updated);
@@ -272,9 +310,26 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 {/* Groups Section */}
                 {formData.hotelId ? (
                     <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                        {hasCapacityError && (
+                            <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl flex gap-3 animate-in fade-in slide-in-from-left-2">
+                                <div className="w-8 h-8 rounded-xl bg-rose-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-200">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none mb-1">Capacité dépassée</p>
+                                    <p className="text-xs font-bold text-rose-600 leading-tight">
+                                        Certaines de vos sélections dépassent le nombre maximum d'occupants autorisés pour ces chambres. Veuillez corriger les valeurs en rouge.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {formData.groups?.map((group, idx) => (
                             <GroupRow
                                 key={group.uid}
+                                hotel={selectedHotel}
                                 group={group}
                                 availableOptions={allTypes}
                                 index={idx}

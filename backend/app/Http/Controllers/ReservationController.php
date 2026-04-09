@@ -97,6 +97,9 @@ class ReservationController extends Controller
             'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
             'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
             'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
+            'groups.*.rooms.*.nb_adultes'    => 'required|integer|min:0',
+            'groups.*.rooms.*.nb_enfants'    => 'required|integer|min:0',
+            'groups.*.rooms.*.nb_bebes'      => 'required|integer|min:0',
         ]);
 
         // Availability check
@@ -158,6 +161,9 @@ class ReservationController extends Controller
                     'id_type'       => $roomData['id_type'],
                     'quantite'      => $roomData['quantite'],
                     'prix_unitaire' => $roomData['prix_unitaire'],
+                    'nb_adultes'    => $roomData['nb_adultes'],
+                    'nb_enfants'    => $roomData['nb_enfants'],
+                    'nb_bebes'      => $roomData['nb_bebes'],
                 ]);
             }
         }

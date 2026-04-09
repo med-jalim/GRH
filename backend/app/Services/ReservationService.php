@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Chambre;
 use App\Models\ItemReservation;
+use App\Models\HotelTypeTarification;
 use Carbon\Carbon;
 
 class ReservationService
@@ -139,11 +140,21 @@ class ReservationService
 
                 $effectiveRemaining = $totalRooms - $occupiedInDB - $requestConsumption;
                 
+                // Fetch capacities for this hotel/type
+                $tarification = HotelTypeTarification::where('id_hotel', $hotelId)
+                    ->where('id_type', $typeId)
+                    ->first();
+
                 $groupResults[] = [
                     'uid' => $roomUid,
                     'available' => $effectiveRemaining >= $requestedQty,
                     'remaining' => max(0, $effectiveRemaining),
-                    'total' => $totalRooms
+                    'total' => $totalRooms,
+                    'capacities' => $tarification ? [
+                        'cap_adultes' => $tarification->cap_adultes,
+                        'cap_enfants' => $tarification->cap_enfants,
+                        'cap_bebes'   => $tarification->cap_bebes,
+                    ] : null
                 ];
             }
             $results[] = [

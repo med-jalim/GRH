@@ -24,6 +24,7 @@ export default function BookingFormPage({ hotels }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState<string[]>([]);
     const [isAvailable, setIsAvailable] = useState(true);
+    const [isCapacityValid, setIsCapacityValid] = useState(true);
     const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
     const [successData, setSuccessData] = useState<{
         reference: string;
@@ -134,6 +135,9 @@ export default function BookingFormPage({ hotels }: Props) {
                         id_type: r.roomTypeId,
                         quantite: r.quantity,
                         prix_unitaire: prix,
+                        nb_adultes: r.adults,
+                        nb_enfants: r.children,
+                        nb_bebes: r.babies,
                     };
                 })
             }))
@@ -217,6 +221,7 @@ export default function BookingFormPage({ hotels }: Props) {
                                             totalPrice={totalPrice}
                                             onAvailabilityChange={setIsAvailable}
                                             onCheckingChange={setIsCheckingAvailability}
+                                            onCapacityErrorChange={(hasError) => setIsCapacityValid(!hasError)}
                                         />
                                     )}
                                     {step === 3 && (
@@ -265,7 +270,7 @@ export default function BookingFormPage({ hotels }: Props) {
                                     <button
                                         type="button"
                                         onClick={handleNext}
-                                        disabled={!isAvailable || isCheckingAvailability}
+                                        disabled={!isAvailable || !isCapacityValid || isCheckingAvailability}
                                         className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
                                     >
                                         {isCheckingAvailability ? (

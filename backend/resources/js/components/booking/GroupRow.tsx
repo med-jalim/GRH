@@ -3,6 +3,8 @@ import { RoomRow } from './RoomRow';
 import { Input } from '@/components/ui/input';
 import { formatPrice } from '@/data/mockData';
 import { nanoid } from 'nanoid';
+import { computeDynamicPrice } from '@/lib/utils';
+import type { Hotel } from '@/types/booking';
 
 interface RoomOption {
   type: RoomType;
@@ -10,6 +12,7 @@ interface RoomOption {
 }
 
 interface Props {
+  hotel:            Hotel | null;
   group:            GroupSelection;
   availableOptions: RoomOption[];
   index:            number;
@@ -22,6 +25,7 @@ interface Props {
 }
 
 export function GroupRow({ 
+  hotel,
   group, 
   availableOptions, 
   index, 
@@ -39,8 +43,12 @@ export function GroupRow({
   const nights = Math.max(1, Math.round(diff / 86_400_000));
   
   const groupTotal = group.rooms.reduce((acc, room) => {
-    const opt = availableOptions.find(o => o.type.id === room.roomTypeId);
-    return acc + (opt?.price || 0) * room.quantity * nights;
+    const price = hotel ? computeDynamicPrice(hotel, room.roomTypeId, group.checkIn) : 0;
+    return acc + price * room.quantity * nights;
+  }, 0);
+
+  const totalOccupants = group.rooms.reduce((acc, room) => {
+    return acc + (room.adults + room.children + room.babies);
   }, 0);
 
   return (
@@ -93,18 +101,14 @@ export function GroupRow({
           />
         </div>
         <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nombre de Voyageurs</label>
-          <div className="relative">
-            <Input
-              type="number"
-              min="1"
-              value={group.occupants}
-              onChange={e => onUpdateGroup(group.uid, 'occupants', Math.max(1, Number(e.target.value)))}
-              className="h-12 bg-white rounded-xl border-slate-200 font-bold text-sm focus:ring-[#54b172]/20 focus:border-[#54b172] pl-10 shadow-sm"
-            />
-            <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 005.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
+          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Total Occupants</label>
+          <div className="h-12 bg-white rounded-xl border border-slate-200 flex items-center px-4 shadow-sm">
+             <div className="flex items-center gap-2">
+               <svg className="w-4 h-4 text-[#54b172]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 005.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+               </svg>
+               <span className="text-sm font-black text-slate-900">{totalOccupants} Personnes</span>
+             </div>
           </div>
         </div>
       </div>
@@ -126,6 +130,8 @@ export function GroupRow({
             return (
               <RoomRow
                 key={room.uid}
+                hotel={hotel}
+                checkInDate={group.checkIn}
                 room={room}
                 availableOptions={filteredOptions}
                 onChange={(ruid, field, val) => onUpdateRoom(group.uid, ruid, field, val)}

@@ -32,6 +32,9 @@ class HotelTypeTarificationController extends Controller
             'types'             => 'required|array|min:1',
             'types.*.id_type'   => 'required|integer|exists:types,id',
             'types.*.pourcentage' => 'required|numeric|min:1|max:10000',
+            'types.*.cap_adultes' => 'required|integer|min:0',
+            'types.*.cap_enfants' => 'required|integer|min:0',
+            'types.*.cap_bebes'   => 'required|integer|min:0',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -47,6 +50,9 @@ class HotelTypeTarificationController extends Controller
                     [
                         'is_essentiel' => ($typeConfig['id_type'] == $essentielTypeId),
                         'pourcentage'  => $typeConfig['pourcentage'],
+                        'cap_adultes'  => $typeConfig['cap_adultes'],
+                        'cap_enfants'  => $typeConfig['cap_enfants'],
+                        'cap_bebes'    => $typeConfig['cap_bebes'],
                     ]
                 );
             }

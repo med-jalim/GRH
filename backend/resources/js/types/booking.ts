@@ -33,6 +33,9 @@ export interface RoomSelection {
   uid: string;
   roomTypeId: number;
   quantity: number;
+  adults: number;
+  children: number;
+  babies: number;
 }
 
 export interface GroupSelection {

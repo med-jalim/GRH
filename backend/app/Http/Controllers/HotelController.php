@@ -115,6 +115,9 @@ class HotelController extends Controller
                 'type_nom'     => $t->type?->nom,
                 'is_essentiel' => $t->is_essentiel,
                 'pourcentage'  => $t->pourcentage,
+                'cap_adultes'  => $t->cap_adultes,
+                'cap_enfants'  => $t->cap_enfants,
+                'cap_bebes'    => $t->cap_bebes,
             ]),
         ]);
     }

@@ -32,6 +32,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [isAvailable, setIsAvailable] = useState(true);
+    const [isCapacityValid, setIsCapacityValid] = useState(true);
     const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
     // Action State
@@ -58,6 +59,9 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                     uid: Math.random().toString(36).substr(2, 9),
                     roomTypeId: i.id_type,
                     quantity: i.quantite,
+                    adults: i.nb_adultes ?? 2,
+                    children: i.nb_enfants ?? 0,
+                    babies: i.nb_bebes ?? 0,
                 })) || [],
             })) || [],
             specialRequests: reservation.remarques_speciales || "",
@@ -133,6 +137,9 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                         id_type: r.roomTypeId,
                         quantite: r.quantity,
                         prix_unitaire: prix,
+                        nb_adultes: r.adults,
+                        nb_enfants: r.children,
+                        nb_bebes: r.babies,
                     };
                 })
             }))
@@ -385,6 +392,9 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                     <tr key={i.id} className="bg-white">
                                                                         <td className="px-6 py-4">
                                                                             <p className="font-bold text-slate-700">{i.type?.nom ?? 'Chambre'}</p>
+                                                                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                                                                                {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`} {i.nb_bebes > 0 && `· ${i.nb_bebes} Bébés`}
+                                                                            </p>
                                                                             <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
                                                                         </td>
                                                                         <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
@@ -553,6 +563,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                 reservationId={reservation.id}
                                                 onAvailabilityChange={setIsAvailable}
                                                 onCheckingChange={setIsCheckingAvailability}
+                                                onCapacityErrorChange={(hasError) => setIsCapacityValid(!hasError)}
                                             />
                                         )}
                                         {step === 3 && <SummaryStep hotel={selectedHotel} totalPrice={totalPrice} />}
@@ -591,7 +602,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         <button
                                             type="button"
                                             onClick={handleNext}
-                                            disabled={!isAvailable || isCheckingAvailability || (step === 2 && !formData.hotelId)}
+                                            disabled={!isAvailable || !isCapacityValid || isCheckingAvailability || (step === 2 && !formData.hotelId)}
                                             className="px-10 py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold tracking-widest uppercase transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10 flex items-center gap-2"
                                         >
                                             {isCheckingAvailability ? (

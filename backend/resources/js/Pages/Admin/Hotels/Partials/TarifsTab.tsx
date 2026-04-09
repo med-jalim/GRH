@@ -25,6 +25,9 @@ interface TarificationLine {
     type_nom: string | null;
     is_essentiel: boolean;
     pourcentage: number;
+    cap_adultes: number;
+    cap_enfants: number;
+    cap_bebes: number;
 }
 
 interface TarifsTabProps {
@@ -397,9 +400,24 @@ function PourcentagesConfig({
         tarification.forEach((t) => {
             init[t.id_type] = t.pourcentage;
         });
-        // Init missing types to 100%
         types.forEach((t) => {
             if (!(t.id in init)) init[t.id] = 100;
+        });
+        return init;
+    });
+
+    // Track capacities per type
+    const [capacities, setCapacities] = useState<Record<number, { adults: number; children: number; babies: number }>>(() => {
+        const init: Record<number, { adults: number; children: number; babies: number }> = {};
+        tarification.forEach((t) => {
+            init[t.id_type] = { 
+                adults: t.cap_adultes ?? 2, 
+                children: t.cap_enfants ?? 0, 
+                babies: t.cap_bebes ?? 0 
+            };
+        });
+        types.forEach((t) => {
+            if (!(t.id in init)) init[t.id] = { adults: 2, children: 0, babies: 0 };
         });
         return init;
     });
@@ -435,6 +453,9 @@ function PourcentagesConfig({
             types: types.map((t) => ({
                 id_type: t.id,
                 pourcentage: t.id === essentielTypeId ? 100 : (percentages[t.id] ?? 100),
+                cap_adultes: capacities[t.id]?.adults ?? 2,
+                cap_enfants: capacities[t.id]?.children ?? 0,
+                cap_bebes: capacities[t.id]?.babies ?? 0,
             })),
         };
 
@@ -520,6 +541,9 @@ function PourcentagesConfig({
                                 <th className="text-center px-5 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">
                                     Pourcentage
                                 </th>
+                                <th className="text-center px-5 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">
+                                    Capacité (A / E / B)
+                                </th>
                                 <th className="text-right px-5 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">
                                     Prix calculé / nuit
                                 </th>
@@ -588,11 +612,50 @@ function PourcentagesConfig({
                                                                     [t.id]: Number(e.target.value),
                                                                 }))
                                                             }
-                                                            className="w-24 text-center pr-7 pl-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-white shadow-sm"
+                                                            className="w-20 text-center pr-6 pl-2 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 bg-white shadow-sm"
                                                         />
-                                                        <span className="absolute right-2.5 text-slate-400 font-bold text-xs">%</span>
+                                                        <span className="absolute right-2 text-slate-400 font-bold text-xs">%</span>
                                                     </div>
                                                 )}
+                                            </td>
+
+                                            {/* Capacity inputs */}
+                                            <td className="px-5 py-3.5 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={capacities[t.id]?.adults ?? 2}
+                                                        title="Adultes"
+                                                        onChange={(e) => setCapacities(prev => ({ 
+                                                            ...prev, 
+                                                            [t.id]: { ...prev[t.id], adults: Number(e.target.value) } 
+                                                        }))}
+                                                        className="w-10 text-center py-1 rounded border border-slate-200 text-xs font-bold"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={capacities[t.id]?.children ?? 0}
+                                                        title="Enfants"
+                                                        onChange={(e) => setCapacities(prev => ({ 
+                                                            ...prev, 
+                                                            [t.id]: { ...prev[t.id], children: Number(e.target.value) } 
+                                                        }))}
+                                                        className="w-10 text-center py-1 rounded border border-slate-200 text-xs font-bold text-blue-600"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={capacities[t.id]?.babies ?? 0}
+                                                        title="Bébés"
+                                                        onChange={(e) => setCapacities(prev => ({ 
+                                                            ...prev, 
+                                                            [t.id]: { ...prev[t.id], babies: Number(e.target.value) } 
+                                                        }))}
+                                                        className="w-10 text-center py-1 rounded border border-slate-200 text-xs font-bold text-amber-600"
+                                                    />
+                                                </div>
                                             </td>
 
                                             {/* Prix calculé */}

@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import type { Hotel } from '@/types/booking';
 import { formatPrice } from '@/data/mockData';
 import type { BookingSchemaType } from '@/lib/schemas';
+import { computeDynamicPrice } from '@/lib/utils';
 
 interface Props {
   hotel:      Hotel | null;
@@ -25,6 +26,8 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
 export function SummaryStep({ hotel, totalPrice }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
+
+  console.log(formData) ;
 
   const totalOccupants = formData.groups?.reduce((acc, g) => acc + (Number(g.occupants) || 0), 0) || 0;
 
@@ -88,13 +91,7 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                 <div className="space-y-4">
                     {group.rooms.map((room) => {
                         const chambre = hotel.chambres.find(c => c.id_type === room.roomTypeId);
-                        const tarif = hotel.tarifs.find(
-                            (t) =>
-                                t.id_type === room.roomTypeId &&
-                                new Date(t.date_debut) <= checkInDate &&
-                                new Date(t.date_fin) >= checkInDate,
-                        );
-                        const price = tarif?.prix || 0;
+                        const price = computeDynamicPrice(hotel, room.roomTypeId, checkInDate);
                         const sub = price * groupNights * room.quantity;
 
                         return (
@@ -109,6 +106,9 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                                         <p className="text-sm font-bold text-slate-800">{chambre?.type.nom ?? '—'}</p>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                                             {room.quantity} unité(s) · {formatPrice(price)}/nuit
+                                        </p>
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
+                                            {room.adults}A {room.children > 0 && `· ${room.children}E`} {room.babies > 0 && `· ${room.babies}B`} per chambre
                                         </p>
                                     </div>
                                 </div>

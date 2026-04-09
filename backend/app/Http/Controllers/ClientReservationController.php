@@ -10,6 +10,10 @@ use App\Models\ItemReservation;
 use App\Services\ReservationService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use App\Models\User;
+use App\Notifications\AdminNotification;
+use App\Models\ReservationGroup;
+use App\Models\PaymentVerification;
 
 class ClientReservationController extends Controller
 {
@@ -39,14 +43,14 @@ class ClientReservationController extends Controller
 
         // Notify admins about the confirmation
         try {
-            $admins = \App\Models\User::all();
-            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+            $admins = User::all();
+            Notification::send($admins, new AdminNotification(
                 'Réservation Confirmée',
                 'Le client ' . $reservation->nom_contact . ' a confirmé sa réservation (' . $reservation->code_reference . ').',
                 route('admin.reservations.show', $reservation->id)
             ));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation confirmation: ' . $e->getMessage());
+            Log::error('Failed to send admin notification for reservation confirmation: ' . $e->getMessage());
         }
 
         return redirect()->route('reservation.show', $token)->with('success', 'Votre réservation a été confirmée avec succès. Nous reviendrons vers vous pour la suite.');
@@ -63,14 +67,14 @@ class ClientReservationController extends Controller
 
         // Notify admins about the cancellation
         try {
-            $admins = \App\Models\User::all();
-            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+            $admins = User::all();
+            Notification::send($admins, new AdminNotification(
                 'Réservation Annulée par le client',
                 'Le client ' . $reservation->nom_contact . ' a annulé sa réservation (' . $reservation->code_reference . ').',
                 route('admin.reservations.show', $reservation->id)
             ));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation cancellation: ' . $e->getMessage());
+            Log::error('Failed to send admin notification for reservation cancellation: ' . $e->getMessage());
         }
 
         return redirect()->route('reservation.show', $token)->with('success', 'Votre réservation a été annulée conformément à votre demande.');
@@ -115,6 +119,9 @@ class ClientReservationController extends Controller
             'groups.*.rooms.*.id_type'       => 'required|integer|exists:types,id',
             'groups.*.rooms.*.quantite'      => 'required|integer|min:1',
             'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
+            'groups.*.rooms.*.nb_adultes'    => 'required|integer|min:0',
+            'groups.*.rooms.*.nb_enfants'    => 'required|integer|min:0',
+            'groups.*.rooms.*.nb_bebes'      => 'required|integer|min:0',
         ]);
 
         // Availability check
@@ -150,7 +157,7 @@ class ClientReservationController extends Controller
         }
 
         foreach ($groupsData as $groupData) {
-            $group = \App\Models\ReservationGroup::create([
+            $group = ReservationGroup::create([
                 'id_reservation' => $reservation->id,
                 'date_arrivee'   => $groupData['date_arrivee'],
                 'date_depart'    => $groupData['date_depart'],
@@ -163,20 +170,23 @@ class ClientReservationController extends Controller
                     'id_type'       => $roomData['id_type'],
                     'quantite'      => $roomData['quantite'],
                     'prix_unitaire' => $roomData['prix_unitaire'],
+                    'nb_adultes'    => $roomData['nb_adultes'],
+                    'nb_enfants'    => $roomData['nb_enfants'],
+                    'nb_bebes'      => $roomData['nb_bebes'],
                 ]);
             }
         }
 
         // Notify admins about the modification
         try {
-            $admins = \App\Models\User::all();
-            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+            $admins = User::all();
+            Notification::send($admins, new AdminNotification(
                 'Réservation Modifiée',
                 'Le client ' . $reservation->nom_contact . ' a modifié les détails de sa réservation (' . $reservation->code_reference . ').',
                 route('admin.reservations.show', $reservation->id)
             ));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for reservation modification: ' . $e->getMessage());
+            Log::error('Failed to send admin notification for reservation modification: ' . $e->getMessage());
         }
 
         return redirect()->route('reservation.show', $token)->with('success', 'Vos modifications ont été enregistrées. Notre équipe va les examiner.');
@@ -196,7 +206,7 @@ class ClientReservationController extends Controller
 
         $path = $request->file('document')->store('payments', 'public');
 
-        $payment = \App\Models\PaymentVerification::create([
+        $payment = PaymentVerification::create([
             'id_reservation' => $reservation->id,
             'document_path'  => $path,
             'amount'         => $request->amount,
@@ -205,14 +215,14 @@ class ClientReservationController extends Controller
 
         // Notify admins about the new payment
         try {
-            $admins = \App\Models\User::all();
-            \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\AdminNotification(
+            $admins = User::all();
+            Notification::send($admins, new AdminNotification(
                 'Nouveau Paiement',
                 'Un nouveau paiement (' . number_format($request->amount, 2) . ' DH) a été soumis pour la réservation ' . $reservation->code_reference . '.',
                 route('admin.reservations.show', $reservation->id)
             ));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send admin notification for new payment: ' . $e->getMessage());
+            Log::error('Failed to send admin notification for new payment: ' . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès et est en attente de vérification par notre équipe.');
