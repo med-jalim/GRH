@@ -2,7 +2,7 @@ import { useForm, router } from "@inertiajs/react";
 import { Check, Edit3, Plus, Trash2, X } from "lucide-react";
 import React, { useState } from "react";
 
-export function TypesTab({ types }: { types: any[] }) {
+export function TypesTab({ types, hotel }: { types: any[], hotel: any }) {
   const [activeTypeId, setActiveTypeId] = useState<number | null>(types[0]?.id || null);
   const [showModal, setShowModal] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
@@ -76,6 +76,7 @@ export function TypesTab({ types }: { types: any[] }) {
       router.delete(`/admin/types/${id}`);
     }
   }
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col lg:flex-row-reverse gap-6 min-h-[600px]">
       {/* ── Sidebar: Global Types (Right Side) ── */}
@@ -171,7 +172,7 @@ export function TypesTab({ types }: { types: any[] }) {
             {/* Sub-types Section */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Occupations (Sous-types)</h3>
+                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Occupations pour cet hôtel</h3>
                 <button
                   onClick={() => openCreateSubType(activeType.id)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-amber-200"
@@ -183,7 +184,7 @@ export function TypesTab({ types }: { types: any[] }) {
               <div className="p-6">
                 {(activeType.sub_types || []).length === 0 ? (
                   <div className="py-12 flex flex-col items-center justify-center text-center">
-                    <p className="text-slate-400 mb-4 max-w-xs">Aucune occupation n'est définie pour ce type. Ajoutez-en une pour définir les capacités d'accueil.</p>
+                    <p className="text-slate-400 mb-4 max-w-xs">Aucune occupation n'est définie pour ce type dans cet hôtel.</p>
                     <button
                       onClick={() => openCreateSubType(activeType.id)}
                       className="text-amber-600 text-sm font-bold hover:underline"
@@ -196,10 +197,18 @@ export function TypesTab({ types }: { types: any[] }) {
                     {activeType.sub_types.map((st: any) => (
                       <div key={st.id} className="group relative bg-slate-50/50 hover:bg-white rounded-2xl border border-slate-100 hover:border-amber-200 p-5 transition-all hover:shadow-lg hover:shadow-slate-100 overflow-hidden">
                         {/* Status bar */}
-                        <div className="absolute top-0 left-0 bottom-0 w-1 bg-amber-400 opacity-20 group-hover:opacity-100 transition-opacity" />
+                        <div 
+                          className="absolute top-0 left-0 bottom-0 w-1 opacity-20 group-hover:opacity-100 transition-opacity" 
+                          style={{ backgroundColor: st.color || "#f59e0b" }}
+                        />
                         
                         <div className="flex items-start justify-between mb-4">
-                          <h4 className="font-bold text-slate-800">{st.nom}</h4>
+                          <div className="flex items-center gap-2">
+                             {st.color && (
+                               <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: st.color }} />
+                             )}
+                             <h4 className="font-bold text-slate-800">{st.nom}</h4>
+                          </div>
                           <div className="flex items-center gap-1">
                             <button 
                               onClick={() => openEditSubType(st)} 
@@ -216,19 +225,16 @@ export function TypesTab({ types }: { types: any[] }) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="px-3 py-2 bg-white rounded-xl border border-slate-100 text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Adultes</p>
-                            <p className="text-sm font-bold text-slate-700">{st.cap_adultes}</p>
-                          </div>
-                          <div className="px-3 py-2 bg-white rounded-xl border border-slate-100 text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Enfants</p>
-                            <p className="text-sm font-bold text-slate-700">{st.cap_enfants}</p>
-                          </div>
-                          <div className="px-3 py-2 bg-white rounded-xl border border-slate-100 text-center">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Bébés</p>
-                            <p className="text-sm font-bold text-slate-700">{st.cap_bebes} </p>
-                          </div>
+                        <div className="flex flex-wrap gap-2">
+                           {(st.occupancies || []).map((occ: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 px-2.5 py-1.5 bg-white rounded-lg border border-slate-100 text-[11px] font-bold text-slate-600 shadow-sm">
+                                <span>{occ.adults}A</span>
+                                {occ.children_max > 0 && <span className="text-slate-300">|</span>}
+                                {occ.children_max > 0 && <span>{occ.children_max}E</span>}
+                                {occ.babies_max > 0 && <span className="text-slate-300">|</span>}
+                                {occ.babies_max > 0 && <span>{occ.babies_max}B</span>}
+                              </div>
+                           ))}
                         </div>
                       </div>
                     ))}
@@ -256,6 +262,7 @@ export function TypesTab({ types }: { types: any[] }) {
         <SubTypeModal 
           editingSubType={editingSubType}
           typeId={currentTypeId}
+          hotelId={hotel.id}
           onClose={() => setShowSubTypeModal(false)}
         />
       )}
@@ -302,14 +309,30 @@ function TypeModal({ editingType, data, setData, submit, processing, errors, onC
     );
 }
 
-function SubTypeModal({ editingSubType, typeId, onClose }: any) {
+function SubTypeModal({ editingSubType, typeId, hotelId, onClose }: any) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id_type: typeId || (editingSubType?.id_type ?? ""),
+        id_hotel: hotelId,
         nom: editingSubType?.nom ?? "",
-        cap_adultes: editingSubType?.cap_adultes ?? 2,
-        cap_enfants: editingSubType?.cap_enfants ?? 0,
-        cap_bebes: editingSubType?.cap_bebes ?? 0,
+        color: editingSubType?.color ?? "#f59e0b", // default to amber
+        occupancies: editingSubType?.occupancies ?? [
+            { adults: 2, children_max: 0, babies_max: 0 }
+        ],
     });
+
+    function addOccupancy() {
+      setData("occupancies", [...data.occupancies, { adults: 2, children_max: 0, babies_max: 0 }]);
+    }
+
+    function removeOccupancy(index: number) {
+      setData("occupancies", data.occupancies.filter((_: any, i: number) => i !== index));
+    }
+
+    function updateOccupancy(index: number, field: string, value: number) {
+      const newOccs = [...data.occupancies];
+      newOccs[index] = { ...newOccs[index], [field]: value };
+      setData("occupancies", newOccs);
+    }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -327,34 +350,59 @@ function SubTypeModal({ editingSubType, typeId, onClose }: any) {
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden z-10">
-            <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-800">{editingSubType ? "Modifier le sous-type" : "Nouveau sous-type"}</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden z-10 flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100 shrink-0">
+              <h2 className="text-lg font-bold text-slate-800">{editingSubType ? "Modifier l'occupation" : "Nouvelle occupation"}</h2>
+              <button type="button" onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={submit} className="p-7 flex flex-col gap-4">
-              <input type="hidden" value={data.id_type} />
+            <form onSubmit={submit} className="p-7 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nom de l'occupation <span className="text-red-400">*</span></label>
-                <input type="text" value={data.nom} onChange={(e) => setData("nom", e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none" placeholder="Ex: Double usage Single, 2 Adultes + 1 Enfant" />
+                <input type="text" value={data.nom} onChange={(e) => setData("nom", e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none" placeholder="Ex: GDH 2" />
                 {errors.nom && <p className="text-red-500 text-xs mt-1">{errors.nom}</p>}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                   <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Adultes</label>
-                   <input type="number" value={data.cap_adultes} onChange={(e) => setData("cap_adultes", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 outline-none bg-slate-50" />
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Couleur d'affichage</label>
+                <div className="flex items-center gap-3">
+                  <input type="color" value={data.color} onChange={(e) => setData("color", e.target.value)} className="w-12 h-12 rounded-xl border border-slate-200 cursor-pointer bg-white p-1" />
+                  <input type="text" value={data.color} onChange={(e) => setData("color", e.target.value)} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 outline-none font-mono tracking-tighter" placeholder="#f59e0b" />
                 </div>
-                <div>
-                   <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Enfants</label>
-                   <input type="number" value={data.cap_enfants} onChange={(e) => setData("cap_enfants", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 outline-none bg-slate-50" />
-                </div>
-                <div>
-                   <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">Bébés</label>
-                   <input type="number" value={data.cap_bebes} onChange={(e) => setData("cap_bebes", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 outline-none bg-slate-50" />
-                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                 <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Critères d'occupation</label>
+                    <button type="button" onClick={addOccupancy} className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1">
+                       <Plus className="w-3.5 h-3.5" /> Ajouter un critère
+                    </button>
+                 </div>
+
+                 <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1">
+                    {data.occupancies.map((occ: any, idx: number) => (
+                       <div key={idx} className="flex items-end gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group">
+                          <div className="flex-1">
+                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Adultes</label>
+                             <input type="number" value={occ.adults} onChange={(e) => updateOccupancy(idx, "adults", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
+                          </div>
+                          <div className="flex-1">
+                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Enfants Max</label>
+                             <input type="number" value={occ.children_max} onChange={(e) => updateOccupancy(idx, "children_max", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
+                          </div>
+                          <div className="flex-1">
+                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Bébés Max</label>
+                             <input type="number" value={occ.babies_max} onChange={(e) => updateOccupancy(idx, "babies_max", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
+                          </div>
+                          {data.occupancies.length > 1 && (
+                             <button type="button" onClick={() => removeOccupancy(idx)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                                <Trash2 className="w-4 h-4" />
+                             </button>
+                          )}
+                       </div>
+                    ))}
+                 </div>
               </div>
 
               <div className="flex gap-3 pt-2">

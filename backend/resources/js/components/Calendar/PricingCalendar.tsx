@@ -284,16 +284,18 @@ export function PricingCalendar({
                 </div>
 
                 <div className="flex flex-col gap-1.5 mt-auto">
-                    {tarifsDuJour.map((t) => (
+                    {tarifsDuJour.map((t) => {
+                        const cellColor = t.sub_type?.color || t.type?.color;
+                        return (
                         <div
                             key={t.id}
                             className={`
                                 px-2 py-1.5 rounded text-[11px] font-bold truncate text-center shadow-sm select-none border
                             `}
                             style={{ 
-                                backgroundColor: t.type?.color ? `${t.type.color}15` : '#f8fafc',
-                                color: t.type?.color || '#334155',
-                                borderColor: t.type?.color ? `${t.type.color}40` : '#e2e8f0'
+                                backgroundColor: cellColor ? `${cellColor}15` : '#f8fafc',
+                                color: cellColor || '#334155',
+                                borderColor: cellColor ? `${cellColor}40` : '#e2e8f0'
                             }}
                             title={selectedTypeId === 'all' ? t.type?.nom : undefined}
                         >
@@ -305,7 +307,8 @@ export function PricingCalendar({
                                 {t.sub_type?.nom || t.type?.nom}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );
@@ -403,7 +406,7 @@ export function PricingCalendar({
                                     const hasTarifs = tarifsDuJour.length > 0;
                                     const inDrag = isDayInDragRange(day);
 
-                                    const firstTarifColor = hasTarifs ? tarifsDuJour[0].type?.color : null;
+                                    const firstTarifColor = hasTarifs ? (tarifsDuJour[0].sub_type?.color || tarifsDuJour[0].type?.color) : null;
 
                                     return (
                                         <div

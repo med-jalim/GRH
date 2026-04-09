@@ -1,4 +1,4 @@
-import type { RoomSelection, RoomType } from '@/types/booking';
+import type { RoomSelection, RoomType, Occupancy } from '@/types/booking';
 import { formatPrice } from '@/data/mockData';
 import { Input } from '@/components/ui/input';
 import { BedDouble } from 'lucide-react';
@@ -22,11 +22,7 @@ interface Props {
     available: boolean;
     remaining: number;
     total: number;
-    capacities?: {
-      cap_adultes: number;
-      cap_enfants: number;
-      cap_bebes: number;
-    }
+    occupancies?: Occupancy[];
   } | null;
 }
 
@@ -41,6 +37,34 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
   const selectedOption = optionsWithDynamicPrices.find(opt => opt.type.id === room.roomTypeId);
   const selectedSubType = selectedOption?.type.sub_types?.find((st: any) => st.id === room.subTypeId);
   const price = selectedOption?.dynamicPrice || 0;
+
+  // Validation logic for multiple criteria
+  const occupancyErrors = useMemo(() => {
+    if (!selectedSubType || !selectedSubType.occupancies) return null;
+    
+    // Check if the combination of (adults, children, babies) can be distributed
+    // across (quantity) rooms such that each room matches at least one criteria.
+    // For small quantities, we can use a simple recursive check.
+    const canPartition = (remAdults: number, remChildren: number, remBabies: number, remRooms: number): boolean => {
+      if (remRooms === 0) return remAdults === 0 && remChildren === 0 && remBabies === 0;
+      
+      return selectedSubType.occupancies.some((occ: any) => {
+        // Find if this occ can fit in at least one room
+        // Since we have "children_max", we test if we can take up to occ.children_max
+        for (let c = 0; c <= occ.children_max; c++) {
+          for (let b = 0; b <= occ.babies_max; b++) {
+             if (remAdults >= occ.adults && remChildren >= c && remBabies >= b) {
+                if (canPartition(remAdults - occ.adults, remChildren - c, remBabies - b, remRooms - 1)) return true;
+             }
+          }
+        }
+        return false;
+      });
+    };
+
+    const valid = canPartition(room.adults, room.children, room.babies, room.quantity);
+    return !valid;
+  }, [selectedSubType, room.adults, room.children, room.babies, room.quantity]);
 
   return (
     <div className={`flex flex-col gap-5 p-6 bg-white rounded-[2rem] border ${availability && !availability.available ? 'border-rose-200 bg-rose-50/10' : 'border-slate-100 shadow-sm'} group-room relative hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500`}>
@@ -146,8 +170,8 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
          <div className="space-y-1.5">
             <div className="flex justify-between items-end mb-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre d'adultes">Adultes</label>
-                {selectedSubType && (room.adults > selectedSubType.cap_adultes * room.quantity) && (
-                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Dépassement !</span>
+                {selectedSubType && occupancyErrors && (
+                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
                 )}
             </div>
             <div className="relative">
@@ -157,14 +181,11 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
                    value={room.adults}
                    onChange={e => onChange(room.uid, 'adults', Math.max(0, Number(e.target.value)))}
                    className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-emerald-800 transition-all focus:ring-4 ${
-                       selectedSubType && (room.adults > selectedSubType.cap_adultes * room.quantity)
+                       selectedSubType && occupancyErrors
                        ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
                        : 'border-slate-200 focus:ring-emerald-500/10 focus:border-emerald-500'
                    }`}
                 />
-                {selectedSubType && (
-                   <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-slate-400 whitespace-nowrap">MAX: {selectedSubType.cap_adultes * room.quantity}</span>
-                )}
             </div>
          </div>
 
@@ -172,8 +193,8 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
          <div className="space-y-1.5">
             <div className="flex justify-between items-end mb-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre d'enfants">Enfants</label>
-                {selectedSubType && (room.children > selectedSubType.cap_enfants * room.quantity) && (
-                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Dépassement !</span>
+                {selectedSubType && occupancyErrors && (
+                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
                 )}
             </div>
             <div className="relative">
@@ -183,14 +204,11 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
                    value={room.children}
                    onChange={e => onChange(room.uid, 'children', Math.max(0, Number(e.target.value)))}
                    className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-blue-600 transition-all focus:ring-4 ${
-                       selectedSubType && (room.children > selectedSubType.cap_enfants * room.quantity)
+                       selectedSubType && occupancyErrors
                        ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
                        : 'border-slate-200 focus:ring-blue-500/10 focus:border-blue-500'
                    }`}
                 />
-                {selectedSubType && (
-                   <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-blue-400 whitespace-nowrap">MAX: {selectedSubType.cap_enfants * room.quantity}</span>
-                )}
             </div>
          </div>
 
@@ -198,8 +216,8 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
          <div className="space-y-1.5">
             <div className="flex justify-between items-end mb-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre de bébés">Bébés</label>
-                {selectedSubType && (room.babies > selectedSubType.cap_bebes * room.quantity) && (
-                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Dépassement !</span>
+                {selectedSubType && occupancyErrors && (
+                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
                 )}
             </div>
             <div className="relative">
@@ -209,14 +227,11 @@ export function RoomRow({ hotel, checkInDate, room, availableOptions, onChange, 
                    value={room.babies}
                    onChange={e => onChange(room.uid, 'babies', Math.max(0, Number(e.target.value)))}
                    className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-amber-600 transition-all focus:ring-4 ${
-                       selectedSubType && (room.babies > selectedSubType.cap_bebes * room.quantity)
+                       selectedSubType && occupancyErrors
                        ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
                        : 'border-slate-200 focus:ring-amber-500/10 focus:border-amber-500'
                    }`}
                 />
-                {selectedSubType && (
-                   <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] font-bold text-amber-400 whitespace-nowrap">MAX: {selectedSubType.cap_bebes * room.quantity}</span>
-                )}
             </div>
          </div>
       </div>

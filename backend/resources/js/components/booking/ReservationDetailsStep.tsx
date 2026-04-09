@@ -115,17 +115,28 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
         
         return formData.groups.some(group => 
             group.rooms.some(room => {
-                // Find sub-type capacity from local hotel data
                 const chambre = selectedHotel.chambres.find(c => c.id_type === room.roomTypeId);
                 const subType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
                 
-                if (!subType) return false;
-                
-                return (
-                    room.adults > (subType.cap_adultes * room.quantity) ||
-                    room.children > (subType.cap_enfants * room.quantity) ||
-                    room.babies > (subType.cap_bebes * room.quantity)
-                );
+                if (!subType || !subType.occupancies) return false;
+
+                // Recursive partition check
+                const canPartition = (remAdults: number, remChildren: number, remBabies: number, remRooms: number): boolean => {
+                    if (remRooms === 0) return remAdults === 0 && remChildren === 0 && remBabies === 0;
+                    
+                    return subType.occupancies.some((occ: any) => {
+                        for (let c = 0; c <= occ.children_max; c++) {
+                            for (let b = 0; b <= occ.babies_max; b++) {
+                                if (remAdults >= occ.adults && remChildren >= c && remBabies >= b) {
+                                    if (canPartition(remAdults - occ.adults, remChildren - c, remBabies - b, remRooms - 1)) return true;
+                                }
+                            }
+                        }
+                        return false;
+                    });
+                };
+
+                return !canPartition(room.adults, room.children, room.babies, room.quantity);
             })
         );
     }, [formData.groups, selectedHotel]);
@@ -254,14 +265,15 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                 
                 let updatedRoom = { ...r, [field]: value };
 
-                // If sub-type changes, default to its maximum capacities
+                // If sub-type changes, default to its first available occupancy criteria
                 if (field === 'subTypeId' && value > 0 && selectedHotel) {
                     const roomType = selectedHotel.chambres.find(c => c.id_type === r.roomTypeId)?.type;
-                    const subType = roomType?.sub_types?.find((st: any) => st.id === value);
-                    if (subType) {
-                        updatedRoom.adults = subType.cap_adultes;
-                        updatedRoom.children = subType.cap_enfants;
-                        updatedRoom.babies = subType.cap_bebes;
+                    const subType = (roomType as any)?.sub_types?.find((st: any) => st.id === value);
+                    if (subType && subType.occupancies?.length > 0) {
+                        const firstOcc = subType.occupancies[0];
+                        updatedRoom.adults = firstOcc.adults;
+                        updatedRoom.children = 0;
+                        updatedRoom.babies = 0;
                     }
                 }
 

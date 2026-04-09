@@ -9,12 +9,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SubType extends Model
 {
     protected $fillable = [
+        'id_hotel',
         'id_type',
         'nom',
-        'cap_adultes',
-        'cap_enfants',
-        'cap_bebes'
+        'color',
     ];
+
+    public function hotel(): BelongsTo
+    {
+        return $this->belongsTo(Hotel::class, 'id_hotel');
+    }
+
+    public function occupancies(): HasMany
+    {
+        return $this->hasMany(SubTypeOccupancy::class, 'id_sub_type');
+    }
 
     public function type(): BelongsTo
     {

@@ -102,7 +102,9 @@ class HotelController extends Controller
             return $this->sendResponse($hotel, 'Hôtel récupéré avec succès.');
         }
 
-        $types = Type::with('subTypes')->orderBy('nom')->get();
+        $types = Type::with(['subTypes' => function($q) use ($id) {
+            $q->where('id_hotel', $id)->with('occupancies');
+        }])->orderBy('nom')->get();
 
         return Inertia::render('Admin/Hotels/Show', [
             'hotel'          => $hotel,

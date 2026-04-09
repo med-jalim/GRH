@@ -24,13 +24,18 @@ import { MultiplicateursTab } from "./Partials/MultiplicateursTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+interface Occupancy {
+  adults: number;
+  children_max: number;
+  babies_max: number;
+}
+
 interface SubType {
   id: number;
+  id_hotel: number;
   id_type: number;
   nom: string;
-  cap_adultes: number;
-  cap_enfants: number;
-  cap_bebes: number;
+  occupancies: Occupancy[];
 }
 
 interface Type {
@@ -352,7 +357,7 @@ export default function HotelShow({ hotel, types, tarification }: Props) {
       {/* ── TAB CONTENT ── */}
       <div className="min-h-[400px]">
         {activeTab === "apercu" && <ApercuTab hotel={hotel} chambresByType={chambresByType} />}
-        {activeTab === "types" && <TypesTab types={types} />}
+        {activeTab === "types" && <TypesTab types={types} hotel={hotel} />}
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
         {activeTab === "calendrier" && (
           <TarifsTab hotel={hotel} types={types} />

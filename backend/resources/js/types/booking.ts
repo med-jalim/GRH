@@ -1,10 +1,15 @@
+export interface Occupancy {
+  adults: number;
+  children_max: number;
+  babies_max: number;
+}
+
 export interface SubType {
   id: number;
   id_type: number;
+  id_hotel: number;
   nom: string;
-  cap_adultes: number;
-  cap_enfants: number;
-  cap_bebes: number;
+  occupancies: Occupancy[];
   color?: string;
 }
 

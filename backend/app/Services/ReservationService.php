@@ -20,23 +20,25 @@ class ReservationService
             $groupRooms = $group['rooms'] ?? [];
             foreach ($groupRooms as $rIndex => $room) {
                 $subTypeId = $room['id_sub_type'] ?? $room['subTypeId'] ?? 0;
-                $quantity  = $room['quantite'] ?? $room['quantity'];
                 
                 $adults   = $room['nb_adultes'] ?? $room['adults'] ?? 0;
                 $children = $room['nb_enfants'] ?? $room['children'] ?? 0;
                 $babies   = $room['nb_bebes'] ?? $room['babies'] ?? 0;
 
-                $subType = SubType::find($subTypeId);
+                $subType = SubType::with('occupancies')->find($subTypeId);
                 if (!$subType) continue;
 
-                if ($adults > ($subType->cap_adultes * $quantity)) {
-                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le nombre d'adultes ({$adults}) dépasse la capacité maximale (" . ($subType->cap_adultes * $quantity) . ") pour ce type de chambre.";
+                $valid = false;
+                foreach ($subType->occupancies as $occ) {
+                    // Check if current selection matches this occupancy criteria
+                    if ($adults == $occ->adults && $children <= $occ->children_max && $babies <= $occ->babies_max) {
+                        $valid = true;
+                        break;
+                    }
                 }
-                if ($children > ($subType->cap_enfants * $quantity)) {
-                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le nombre d'enfants ({$children}) dépasse la capacité maximale (" . ($subType->cap_enfants * $quantity) . ") pour ce type de chambre.";
-                }
-                if ($babies > ($subType->cap_bebes * $quantity)) {
-                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le nombre de bébés ({$babies}) dépasse la capacité maximale (" . ($subType->cap_bebes * $quantity) . ") pour ce type de chambre.";
+
+                if (!$valid) {
+                    $failures[] = "Groupe " . ($gIndex + 1) . ": L'occupation choisie ({$adults}A, {$children}E, {$babies}B) n'est pas autorisée pour le sous-type '{$subType->nom}'.";
                 }
             }
         }
@@ -191,11 +193,11 @@ class ReservationService
                     'available' => $effectiveRemaining >= $requestedQty,
                     'remaining' => max(0, $effectiveRemaining),
                     'total' => $totalRooms,
-                    'capacities' => $subType ? [
-                        'cap_adultes' => $subType->cap_adultes,
-                        'cap_enfants' => $subType->cap_enfants,
-                        'cap_bebes'   => $subType->cap_bebes,
-                    ] : null
+                    'capacities' => $subType ? $subType->occupancies->map(fn($o) => [
+                        'adults' => $o->adults,
+                        'children_max' => $o->children_max,
+                        'babies_max' => $o->babies_max,
+                    ]) : []
                 ];
             }
             $results[] = [

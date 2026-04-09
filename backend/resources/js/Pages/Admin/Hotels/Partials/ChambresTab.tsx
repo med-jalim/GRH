@@ -118,13 +118,14 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
             <tr className="border-b border-slate-100 bg-slate-50/50">
               <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Numéro</th>
               <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Type assigné</th>
+              <th className="text-left px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Occupation</th>
               <th className="text-right px-6 py-3 text-xs text-slate-400 font-semibold uppercase tracking-wide">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {filteredChambres.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
+                <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
                   {searchQuery || filterType !== "all" 
                     ? "Aucune chambre ne correspond à vos filtres."
                     : "Aucune chambre trouvée pour cet hôtel."}
@@ -134,24 +135,43 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
               filteredChambres.map((c: any) => (
                 <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="px-6 py-4 font-bold text-slate-700">N° {c.numero}</td>
-                  <td className="px-6 py-4 text-slate-500">
-                    <div className="flex flex-col gap-1">
-                      <span 
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg border w-fit"
-                        style={{
-                          backgroundColor: (c.type?.color || "#6366f1") + "10",
-                          color: c.type?.color || "#6366f1",
-                          borderColor: (c.type?.color || "#6366f1") + "30"
-                        }}
-                      >
-                        {c.type?.nom ?? `Type #${c.id_type}`}
-                      </span>
-                      {c.sub_type && (
-                        <span className="text-[10px] font-semibold text-slate-400 ml-1">
-                         ↳ {c.sub_type.nom}
-                        </span>
-                      )}
-                    </div>
+                  <td className="px-6 py-4">
+                    <span 
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-lg border"
+                      style={{
+                        backgroundColor: (c.type?.color || "#6366f1") + "10",
+                        color: c.type?.color || "#6366f1",
+                        borderColor: (c.type?.color || "#6366f1") + "30"
+                      }}
+                    >
+                      {c.type?.nom ?? `Type #${c.id_type}`}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {c.sub_type ? (
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {c.sub_type.color && (
+                            <div 
+                              className="w-2 h-2 rounded-full border border-white shadow-sm flex-shrink-0" 
+                              style={{ backgroundColor: c.sub_type.color }} 
+                            />
+                          )}
+                          <span className="text-xs font-bold text-slate-600">
+                            {c.sub_type.nom}
+                          </span>
+                        </div>
+                        <div className="flex gap-1.5">
+                          {(c.sub_type.occupancies || []).map((occ: any, idx: number) => (
+                             <span key={idx} className="text-[9px] font-medium text-slate-400">
+                                {occ.adults}A{occ.children_max > 0 ? `+${occ.children_max}E` : ''}
+                             </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-300 italic">Non spécifié</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
