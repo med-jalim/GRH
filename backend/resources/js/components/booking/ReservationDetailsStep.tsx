@@ -109,36 +109,125 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
     }, [selectedHotel]);
 
     // Capacity Validation Logic (Real-time Local Check)
-    const hasCapacityError = useMemo(() => {
-        if (!selectedHotel || !formData.groups) return false;
+    // const hasCapacityError = useMemo(() => {
+    //     if (!selectedHotel || !formData.groups) return false;
         
-        return formData.groups.some(group => 
-            group.rooms.some(room => {
-                const chambre = selectedHotel.chambres.find(c => c.id_type === room.roomTypeId);
-                const subType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
+    //     return formData.groups.some(group => 
+    //         group.rooms.some(room => {
+    //             const chambre = selectedHotel.chambres.find(c => c.id_type === room.roomTypeId);
+    //             const subType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
                 
-                if (!subType || !subType.occupancies) return false;
+    //             if (!subType || !subType.occupancies) return false;
 
-                // Recursive partition check
-                const canPartition = (remAdults: number, remChildren: number, remBabies: number, remRooms: number): boolean => {
-                    if (remRooms === 0) return remAdults === 0 && remChildren === 0 && remBabies === 0;
+    //             // Recursive partition check
+    //             const canPartition = (remAdults: number, remChildren: number, remBabies: number, remRooms: number): boolean => {
+    //                 if (remRooms === 0) return remAdults === 0 && remChildren === 0 && remBabies === 0;
                     
-                    return subType.occupancies.some((occ: any) => {
-                        for (let c = 0; c <= occ.children_max; c++) {
-                            for (let b = 0; b <= occ.babies_max; b++) {
-                                if (remAdults >= occ.adults && remChildren >= c && remBabies >= b) {
-                                    if (canPartition(remAdults - occ.adults, remChildren - c, remBabies - b, remRooms - 1)) return true;
-                                }
-                            }
-                        }
-                        return false;
-                    });
-                };
+    //                 return subType.occupancies.some((occ: any) => {
+    //                     for (let c = 0; c <= occ.children_max; c++) {
+    //                         for (let b = 0; b <= occ.babies_max; b++) {
+    //                             if (remAdults >= occ.adults && remChildren >= c && remBabies >= b) {
+    //                                 if (canPartition(remAdults - occ.adults, remChildren - c, remBabies - b, remRooms - 1)) return true;
+    //                             }
+    //                         }
+    //                     }
+    //                     return false;
+    //                 });
+    //             };
 
-                return !canPartition(room.adults, room.children, room.babies, room.quantity);
-            })
+    //             return !canPartition(room.adults, room.children, room.babies, room.quantity);
+    //         })
+    //     );
+    // }, [formData.groups, selectedHotel]);
+
+    const hasCapacityError = useMemo(() => {
+    if (!selectedHotel || !formData.groups) return false;
+
+    return formData.groups.some(group =>
+        group.rooms.some(room => {
+
+        const chambre = selectedHotel.chambres.find(
+            c => c.id_type === room.roomTypeId
         );
+
+        const subType = (chambre?.type as any)?.sub_types?.find(
+            (st: any) => st.id === room.subTypeId
+        );
+
+        if (!subType || !subType.occupancies) return false;
+
+        // ✅ 1. Validation simple (au moins 1 personne par chambre)
+        const totalPeople = room.adults + room.children + room.babies;
+
+        if (totalPeople < room.quantity) {
+            return true; // ❌ error
+        }
+
+        // ✅ 2. Recursive partition (distribution correcte)
+        const canPartition = (
+            remAdults: number,
+            remChildren: number,
+            remBabies: number,
+            remRooms: number
+        ): boolean => {
+
+            // ✅ condition de fin
+            if (remRooms === 0) {
+            return (
+                remAdults === 0 &&
+                remChildren === 0 &&
+                remBabies === 0
+            );
+            }
+
+            return subType.occupancies.some((occ: any) => {
+
+            // ✅ adults = MAX (pas fixe)
+            for (let a = 1; a <= occ.adults; a++) {
+                for (let c = 0; c <= occ.children_max; c++) {
+                for (let b = 0; b <= occ.babies_max; b++) {
+
+                    if (
+                    remAdults >= a &&
+                    remChildren >= c &&
+                    remBabies >= b
+                    ) {
+
+                    if (
+                        canPartition(
+                        remAdults - a,
+                        remChildren - c,
+                        remBabies - b,
+                        remRooms - 1
+                        )
+                    ) {
+                        return true;
+                    }
+
+                    }
+                }
+                }
+            }
+
+            return false;
+            });
+        };
+
+        // ❌ error si impossible de distribuer
+        return !canPartition(
+            room.adults,
+            room.children,
+            room.babies,
+            room.quantity
+        );
+
+        })
+    );
+
     }, [formData.groups, selectedHotel]);
+
+    
+
 
     useEffect(() => {
         onCapacityErrorChange?.(hasCapacityError);

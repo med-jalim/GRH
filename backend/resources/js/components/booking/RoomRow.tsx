@@ -70,6 +70,8 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
     return !valid;
   }, [selectedSubType, room.adults, room.children, room.babies, room.quantity]);
 
+
+
   return (
     <div className={`flex flex-col gap-5 p-6 bg-white rounded-[2rem] border ${availability && !availability.available ? 'border-rose-200 bg-rose-50/10' : 'border-slate-100 shadow-sm'} group-room relative hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500`}>
       
