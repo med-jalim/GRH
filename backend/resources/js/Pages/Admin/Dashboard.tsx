@@ -29,9 +29,11 @@ import {
 
 interface StatData {
     booked: number;
+    confirmed: number;
     cancelled: number;
     revenue: number;
     expected_revenue: number;
+    total_revenue: number;
     pending: number;
     booked_change: number | null;
     cancelled_change: number | null;
@@ -50,9 +52,15 @@ interface TopHotel {
     name: string;
     total: number;
     percentage: number;
+    confirmed: number;
+    pending: number;
+    cancelled: number;
+    confirmed_pct: number;
+    pending_pct: number;
+    cancelled_pct: number;
 }
 
-interface StatusDist {
+interface RevenueDist {
     name: string;
     value: number;
     fill: string;
@@ -72,7 +80,7 @@ interface Props {
     stats: StatData;
     chartData: ChartData[];
     topHotels: TopHotel[];
-    statusDistribution: StatusDist[];
+    revenueDistribution: RevenueDist[];
     hotels: HotelOption[];
     filters: Filters;
 }
@@ -122,57 +130,85 @@ function StatCard({
     change,
     icon: Icon,
     colorClass,
-    borderClass,
     bgClass,
+    gradient,
 }: {
     title: string;
     value: string;
     change: number | null;
     icon: React.ElementType;
     colorClass: string;
-    borderClass: string;
     bgClass: string;
+    gradient: string;
 }) {
     const isPositive = change !== null && change >= 0;
     const noData = change === null;
 
+    // Cap extreme values for display
+    const displayChange = change === null
+        ? null
+        : Math.abs(change) > 999
+            ? (change > 0 ? 999 : -999)
+            : change;
+    const isCapped = change !== null && Math.abs(change) > 999;
+
     return (
-        <div
-            className={`bg-white p-5 rounded-3xl shadow-sm border ${borderClass} flex flex-col justify-between`}
-        >
-            <div className="flex justify-between items-start">
-                <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${bgClass}`}
-                >
-                    <Icon className={`w-5 h-5 ${colorClass}`} />
-                </div>
-                {noData ? (
-                    <span className="text-xs font-medium text-gray-400 px-2 py-1 bg-gray-50 rounded-lg">
-                        Tout le temps
-                    </span>
-                ) : (
-                    <span
-                        className={`text-sm font-semibold flex items-center gap-1 ${
+        <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-md transition-all duration-200 group">
+            {/* Accent bar */}
+            <div className={`absolute top-0 left-0 w-1 h-full ${gradient}`} />
+
+            {/* Main content */}
+            <div className="pl-4 pr-4 pt-5 pb-4 flex flex-col gap-3">
+                {/* Icon row */}
+                <div className="flex justify-between items-start">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bgClass} ring-1 ring-inset ring-black/5`}>
+                        <Icon className={`w-4 h-4 ${colorClass}`} />
+                    </div>
+                    {/* Tiny trend pill */}
+                    {!noData && (
+                        <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                             isPositive
-                                ? "text-green-600 bg-green-50"
-                                : "text-red-500 bg-red-50"
-                        } px-2 py-1 rounded-lg`}
-                    >
-                        {isPositive ? (
-                            <TrendingUp className="w-3.5 h-3.5" />
-                        ) : (
-                            <TrendingDown className="w-3.5 h-3.5" />
-                        )}
-                        {isPositive ? "+" : ""}
-                        {change}%
+                                ? "text-emerald-700 bg-emerald-50"
+                                : "text-red-600 bg-red-50"
+                        }`}>
+                            {isPositive ? "▲" : "▼"}
+                            {" "}{isCapped ? "999+": Math.abs(displayChange!)}%
+                        </span>
+                    )}
+                </div>
+
+                {/* Value */}
+                <div>
+                    <p className="text-[22px] font-black text-gray-900 tracking-tight leading-none break-all">
+                        {value}
+                    </p>
+                    <p className="text-[11px] font-semibold text-gray-400 mt-1.5 uppercase tracking-widest">
+                        {title}
+                    </p>
+                </div>
+            </div>
+
+            {/* Bottom strip */}
+            <div className={`mx-3 mb-3 rounded-xl px-3 py-2 flex items-center justify-between ${
+                noData
+                    ? "bg-gray-50"
+                    : isPositive
+                        ? "bg-emerald-50"
+                        : "bg-red-50"
+            }`}>
+                <span className={`text-[10px] font-semibold uppercase tracking-wide ${
+                    noData ? "text-gray-400" : isPositive ? "text-emerald-600" : "text-red-500"
+                }`}>
+                    {noData ? "Toutes périodes" : "vs période préc."}
+                </span>
+                {!noData && (
+                    <span className={`flex items-center gap-0.5 text-xs font-black ${
+                        isPositive ? "text-emerald-700" : "text-red-600"
+                    }`}>
+                        {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                        {isPositive ? "+" : ""}{isCapped ? `${change! > 0 ? "+" : ""}999%+` : `${displayChange}%`}
                     </span>
                 )}
-            </div>
-            <div className="mt-4">
-                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
-                    {value}
-                </h3>
-                <p className="text-sm font-medium text-gray-400 mt-1">{title}</p>
             </div>
         </div>
     );
@@ -184,7 +220,7 @@ export default function Dashboard({
     stats,
     chartData,
     topHotels,
-    statusDistribution,
+    revenueDistribution,
     hotels,
     filters,
 }: Props) {
@@ -219,10 +255,7 @@ export default function Dashboard({
         { bar: "bg-rose-400", text: "text-rose-600" },
     ];
 
-    const totalDistribution = statusDistribution.reduce(
-        (sum, s) => sum + s.value,
-        0
-    );
+    const totalRevenueBrut = stats.total_revenue ?? 0;
 
     return (
         <AdminLayout>
@@ -453,69 +486,105 @@ export default function Dashboard({
                         </div>
 
                         {/* Mini summary */}
-                        <div className="flex gap-4 mb-6">
-                            <div className="bg-green-50 px-4 py-3 rounded-xl flex-1 border border-green-100/50">
-                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-green-500 rounded-full block" />
-                                    {stats?.booked}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                    Total réservations
+                        <div className="flex gap-3 mb-6">
+                            {/* Confirmées */}
+                            <div className="bg-green-50 px-4 py-3 rounded-xl flex-1 border border-green-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 block flex-shrink-0" />
+                                    <p className="text-xl font-bold text-green-700">
+                                        {stats?.confirmed}
+                                    </p>
+                                </div>
+                                <p className="text-xs text-gray-500 font-medium">
+                                    Confirmées
                                 </p>
                             </div>
-                            <div className="bg-blue-50 px-4 py-3 rounded-xl flex-1 border border-blue-100/50">
-                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-blue-500 rounded-full block" />
-                                    {stats?.pending}
-                                </p>
-                                <p className="text-xs text-gray-400">
+                            {/* En attente */}
+                            <div className="bg-amber-50 px-4 py-3 rounded-xl flex-1 border border-amber-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 block flex-shrink-0" />
+                                    <p className="text-xl font-bold text-amber-600">
+                                        {stats?.pending}
+                                    </p>
+                                </div>
+                                <p className="text-xs text-gray-500 font-medium">
                                     En attente
                                 </p>
                             </div>
-                            <div className="bg-yellow-50 px-4 py-3 rounded-xl flex-1 border border-yellow-100/50">
-                                <p className="text-sm font-semibold text-gray-700 mb-0.5 flex items-center gap-2">
-                                    <span className="w-2 h-6 bg-yellow-400 rounded-full block" />
-                                    {stats?.cancelled}
-                                </p>
-                                <p className="text-xs text-gray-400">
+                            {/* Annulées */}
+                            <div className="bg-red-50 px-4 py-3 rounded-xl flex-1 border border-red-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-400 block flex-shrink-0" />
+                                    <p className="text-xl font-bold text-red-500">
+                                        {stats?.cancelled}
+                                    </p>
+                                </div>
+                                <p className="text-xs text-gray-500 font-medium">
                                     Annulées
                                 </p>
                             </div>
                         </div>
 
-                        {/* Progress bars */}
+
+                        {/* Stacked bars */}
                         <div className="space-y-5">
-                            {topHotels?.map((hotel, index) => {
-                                const color =
-                                    barColors[index % barColors.length];
-                                return (
-                                    <div key={hotel.name}>
-                                        <div className="flex justify-between items-end mb-2">
-                                            <span className="text-sm font-semibold text-gray-700">
-                                                {hotel.name}
+                            {topHotels?.map((hotel) => (
+                                <div key={hotel.name}>
+                                    {/* Header row */}
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm font-semibold text-gray-700 truncate max-w-[55%]">
+                                            {hotel.name}
+                                        </span>
+                                        <span className="text-xs text-gray-400">
+                                            {hotel.total} rés. ·{" "}
+                                            <span className="font-semibold text-gray-600">
+                                                {hotel.percentage}% du total
                                             </span>
-                                            <div className="text-right">
-                                                <span className="text-xs text-gray-400 mr-2">
-                                                    {hotel.total} rés.
-                                                </span>
-                                                <span
-                                                    className={`text-sm font-bold ${color.text}`}
-                                                >
-                                                    {hotel.percentage}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2.5">
-                                            <div
-                                                className={`${color.bar} h-2.5 rounded-full transition-all duration-700`}
-                                                style={{
-                                                    width: `${hotel.percentage}%`,
-                                                }}
-                                            />
-                                        </div>
+                                        </span>
                                     </div>
-                                );
-                            })}
+
+                                    {/* Stacked bar */}
+                                    <div className="w-full h-3 rounded-full overflow-hidden flex bg-gray-100">
+                                        {hotel.confirmed_pct > 0 && (
+                                            <div
+                                                className="h-full bg-green-500 transition-all duration-700"
+                                                style={{ width: `${hotel.confirmed_pct}%` }}
+                                                title={`Confirmées : ${hotel.confirmed}`}
+                                            />
+                                        )}
+                                        {hotel.pending_pct > 0 && (
+                                            <div
+                                                className="h-full bg-amber-400 transition-all duration-700"
+                                                style={{ width: `${hotel.pending_pct}%` }}
+                                                title={`En attente : ${hotel.pending}`}
+                                            />
+                                        )}
+                                        {hotel.cancelled_pct > 0 && (
+                                            <div
+                                                className="h-full bg-red-400 transition-all duration-700"
+                                                style={{ width: `${hotel.cancelled_pct}%` }}
+                                                title={`Annulées : ${hotel.cancelled}`}
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Mini legend */}
+                                    <div className="flex gap-3 mt-1.5">
+                                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                                            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                                            {hotel.confirmed} confirmées
+                                        </span>
+                                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                                            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                                            {hotel.pending} en attente
+                                        </span>
+                                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                                            <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                                            {hotel.cancelled} annulées
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
                             {(!topHotels || topHotels.length === 0) && (
                                 <div className="text-center text-sm text-gray-400 py-8">
                                     <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-200" />
@@ -535,9 +604,9 @@ export default function Dashboard({
                             value={stats.booked.toLocaleString("fr-MA")}
                             change={stats.booked_change}
                             icon={CalendarDays}
-                            colorClass="text-green-600"
-                            borderClass="border-green-100"
-                            bgClass="bg-green-50"
+                            colorClass="text-emerald-600"
+                            bgClass="bg-emerald-50"
+                            gradient="bg-gradient-to-b from-emerald-400 to-emerald-600"
                         />
                         <StatCard
                             title="Annulées"
@@ -549,8 +618,8 @@ export default function Dashboard({
                             }
                             icon={Users}
                             colorClass="text-amber-500"
-                            borderClass="border-amber-100"
                             bgClass="bg-amber-50"
+                            gradient="bg-gradient-to-b from-amber-300 to-amber-500"
                         />
                         <StatCard
                             title="Revenu Perçu"
@@ -558,8 +627,8 @@ export default function Dashboard({
                             change={stats.revenue_change}
                             icon={Building2}
                             colorClass="text-blue-500"
-                            borderClass="border-blue-100"
                             bgClass="bg-blue-50"
+                            gradient="bg-gradient-to-b from-blue-400 to-blue-600"
                         />
                         <StatCard
                             title="Reste à Percevoir"
@@ -567,24 +636,29 @@ export default function Dashboard({
                             change={stats.expected_revenue_change}
                             icon={TrendingUp}
                             colorClass="text-purple-500"
-                            borderClass="border-purple-100"
                             bgClass="bg-purple-50"
+                            gradient="bg-gradient-to-b from-purple-400 to-purple-600"
                         />
                     </div>
 
-                    {/* Pie Chart — Distribution des statuts */}
+                    {/* Donut — Distribution Financière */}
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-[390px]">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-bold text-gray-900">
-                                Distribution des Statuts
-                            </h2>
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-900">
+                                    Répartition Financière
+                                </h2>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    Revenus des réservations confirmées
+                                </p>
+                            </div>
                         </div>
 
                         <div className="flex-1 relative flex items-center justify-center">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
-                                        data={statusDistribution || []}
+                                        data={revenueDistribution || []}
                                         cx="50%"
                                         cy="60%"
                                         startAngle={180}
@@ -595,7 +669,7 @@ export default function Dashboard({
                                         dataKey="value"
                                         stroke="none"
                                     >
-                                        {statusDistribution?.map(
+                                        {revenueDistribution?.map(
                                             (entry, index) => (
                                                 <Cell
                                                     key={`cell-${index}`}
@@ -607,54 +681,48 @@ export default function Dashboard({
                                 </PieChart>
                             </ResponsiveContainer>
 
-                            {/* Center label */}
+                            {/* Center — Total brut */}
                             <div className="absolute top-[58%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-                                <p className="text-xs font-semibold text-gray-400 mb-1">
-                                    Total
+                                <p className="text-[10px] font-semibold text-gray-400 mb-1 uppercase tracking-wider">
+                                    Total Attendu
                                 </p>
-                                <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                                    {totalDistribution.toLocaleString("fr-MA")}
+                                <p className="text-2xl font-black text-gray-900 tracking-tight leading-none">
+                                    {totalRevenueBrut.toLocaleString("fr-MA")}
                                 </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                    réservations
+                                <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                                    MAD
                                 </p>
                             </div>
                         </div>
 
-                        {/* Legend */}
+                        {/* Legend with MAD amounts */}
                         <div className="flex flex-col gap-2 mt-2 mb-4">
-                            {statusDistribution?.map((stat) => {
+                            {revenueDistribution?.map((seg) => {
                                 const pct =
-                                    totalDistribution > 0
+                                    totalRevenueBrut > 0
                                         ? Math.round(
-                                              (stat.value /
-                                                  totalDistribution) *
-                                                  100
+                                              (seg.value / totalRevenueBrut) * 100
                                           )
                                         : 0;
                                 return (
                                     <div
-                                        key={stat.name}
+                                        key={seg.name}
                                         className="flex items-center justify-between"
                                     >
                                         <div className="flex items-center gap-2">
                                             <span
                                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                                style={{
-                                                    backgroundColor: stat.fill,
-                                                }}
+                                                style={{ backgroundColor: seg.fill }}
                                             />
                                             <span className="text-xs font-medium text-gray-500">
-                                                {stat.name}
+                                                {seg.name}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold text-gray-700">
-                                                {stat.value}
+                                                {seg.value.toLocaleString("fr-MA")} MAD
                                             </span>
-                                            <span className="text-xs text-gray-400">
-                                                ({pct}%)
-                                            </span>
+                                            <span className="text-xs text-gray-400">({pct}%)</span>
                                         </div>
                                     </div>
                                 );
@@ -669,7 +737,7 @@ export default function Dashboard({
                                     : "—"}
                             </span>
                             <p className="text-xs font-medium text-gray-600">
-                                Revenu perçu :{" "}
+                                Encaissé :{" "}
                                 <span className="text-gray-900 font-bold">
                                     {stats.revenue.toLocaleString("fr-MA")} MAD
                                 </span>{" "}

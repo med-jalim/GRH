@@ -141,22 +141,48 @@ class DashboardController extends Controller
         // ── Meilleurs Hôtels ─────────────────────────────────────────────────
         $topHotels = $this->buildTopHotels($start, $end, $hotelId);
 
-        // ── Distribution des statuts (Pie Chart) ─────────────────────────────
-        $statusDistribution = [
-            ['name' => 'Confirmée',  'value' => (clone $curBase)->whereIn('statut', $confirmedStatuts)->count(), 'fill' => '#4ade80'],
-            ['name' => 'En attente', 'value' => $curPending,   'fill' => '#fbbf24'],
-            ['name' => 'Annulée',    'value' => $curCancelled, 'fill' => '#f87171'],
+        // ── Distribution des Revenus (Donut financier) ───────────────────────
+        // Réservations confirmées par l'admin = source de vérité financière
+        $confirmedBase = (clone $curBase)->whereIn('statut', $confirmedStatuts);
+
+        // 1. Encaissé intégralement (confirme / valide, paid >= total)
+        $paidFull = (clone $curBase)
+            ->whereIn('statut', ['confirme', 'valide'])
+            ->whereRaw('paid_amount >= total_amount AND total_amount > 0')
+            ->sum('paid_amount');
+
+        // 2. Partiellement encaissé (partiellement_paye)
+        $paidPartial = (clone $curBase)
+            ->where('statut', 'partiellement_paye')
+            ->sum('paid_amount');
+
+        // 3. Encore dû (total_amount - paid_amount de toutes les réservations confirmées)
+        $stillDue = (float) ((clone $confirmedBase)
+            ->selectRaw('SUM(total_amount - paid_amount) as due')
+            ->value('due') ?? 0);
+
+        // Total attendu = somme de tous les total_amount des réservations confirmées
+        $totalRevenueBrut = (float) ((clone $confirmedBase)->sum('total_amount'));
+
+        $revenueDistribution = [
+            ['name' => 'Encaissé',         'value' => (float) $paidFull,    'fill' => '#4ade80'],
+            ['name' => 'Partiel encaissé', 'value' => (float) $paidPartial, 'fill' => '#60a5fa'],
+            ['name' => 'Encore dû',        'value' => $stillDue,            'fill' => '#f87171'],
         ];
 
         // ── Hotels list pour le filtre ────────────────────────────────────────
         $hotels = Hotel::select('id', 'name')->orderBy('name')->get();
 
+        $curConfirmed = (clone $curBase)->whereIn('statut', $confirmedStatuts)->count();
+
         return Inertia::render('Admin/Dashboard', [
             'stats' => [
                 'booked'           => $curBooked,
+                'confirmed'        => $curConfirmed,
                 'cancelled'        => $curCancelled,
                 'revenue'          => (float) $curRevenuePaid,
                 'expected_revenue' => (float) $curRevenueExpected,
+                'total_revenue'    => $totalRevenueBrut,
                 'pending'          => $curPending,
                 // Comparaisons
                 'booked_change'           => $this->pctChange($curBooked, $prevBooked),
@@ -165,11 +191,11 @@ class DashboardController extends Controller
                 'expected_revenue_change' => $this->pctChange($curRevenueExpected, $prevRevenueExpected),
                 'pending_change'          => $this->pctChange($curPending, $prevPending),
             ],
-            'chartData'          => $chartData,
-            'topHotels'          => $topHotels,
-            'statusDistribution' => $statusDistribution,
-            'hotels'             => $hotels,
-            'filters'            => [
+            'chartData'           => $chartData,
+            'topHotels'           => $topHotels,
+            'revenueDistribution' => $revenueDistribution,
+            'hotels'              => $hotels,
+            'filters'             => [
                 'period'   => $period,
                 'hotel_id' => $hotelId,
             ],
@@ -313,17 +339,33 @@ class DashboardController extends Controller
         $totalInPeriod = (clone $query)->count();
 
         return (clone $query)
-            ->select('id_hotel', DB::raw('COUNT(id) as total_reservations'))
+            ->select(
+                'id_hotel',
+                DB::raw('COUNT(id) as total_reservations'),
+                DB::raw("SUM(CASE WHEN statut IN ('confirme', 'valide', 'partiellement_paye') THEN 1 ELSE 0 END) as confirmed"),
+                DB::raw("SUM(CASE WHEN statut IN ('en_attente', 'pre_reserve') THEN 1 ELSE 0 END) as pending"),
+                DB::raw("SUM(CASE WHEN statut = 'annule' THEN 1 ELSE 0 END) as cancelled")
+            )
             ->with('hotel:id,name')
             ->groupBy('id_hotel')
             ->orderByDesc('total_reservations')
             ->limit(5)
             ->get()
             ->map(function ($res) use ($totalInPeriod) {
+                $total     = (int) $res->total_reservations;
+                $confirmed = (int) $res->confirmed;
+                $pending   = (int) $res->pending;
+                $cancelled = (int) $res->cancelled;
                 return [
-                    'name'       => $res->hotel ? $res->hotel->name : 'Hôtel inconnu',
-                    'total'      => $res->total_reservations,
-                    'percentage' => $totalInPeriod > 0 ? round(($res->total_reservations / $totalInPeriod) * 100) : 0,
+                    'name'           => $res->hotel ? $res->hotel->name : 'Hôtel inconnu',
+                    'total'          => $total,
+                    'percentage'     => $totalInPeriod > 0 ? round(($total / $totalInPeriod) * 100) : 0,
+                    'confirmed'      => $confirmed,
+                    'pending'        => $pending,
+                    'cancelled'      => $cancelled,
+                    'confirmed_pct'  => $total > 0 ? round(($confirmed / $total) * 100) : 0,
+                    'pending_pct'    => $total > 0 ? round(($pending   / $total) * 100) : 0,
+                    'cancelled_pct'  => $total > 0 ? round(($cancelled / $total) * 100) : 0,
                 ];
             })
             ->toArray();
