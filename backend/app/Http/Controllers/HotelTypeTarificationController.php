@@ -11,56 +11,34 @@ use Illuminate\Support\Facades\DB;
 class HotelTypeTarificationController extends Controller
 {
     /**
-     * Enregistrer ou mettre à jour la configuration complète de tarification pour un hôtel.
+     * Enregistrer ou mettre à jour les types actifs pour un hôtel.
      *
      * Payload attendu :
      * {
      *   "id_hotel": 1,
-     *   "essentiel_type_id": 3,          // type essentiel (référence)
      *   "types": [
-     *     { "id_type": 3, "pourcentage": 100 },
-     *     { "id_type": 4, "pourcentage": 200 },
-     *     { "id_type": 5, "pourcentage": 150 }
+     *     { "id_type": 3 },
+     *     { "id_type": 4 }
      *   ]
      * }
      */
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'id_hotel'          => 'required|integer|exists:hotels,id',
-            'essentiel_type_id' => 'required|integer|exists:types,id',
-            'types'             => 'required|array|min:1',
-            'types.*.id_type'   => 'required|integer|exists:types,id',
-            'types.*.pourcentage' => 'required|numeric|min:1|max:10000',
-            'types.*.cap_adultes' => 'required|integer|min:0',
-            'types.*.cap_enfants' => 'required|integer|min:0',
-            'types.*.cap_bebes'   => 'required|integer|min:0',
+            'id_hotel'        => 'required|integer|exists:hotels,id',
+            'types'           => 'required|array|min:1',
+            'types.*.id_type' => 'required|integer|exists:types,id',
         ]);
 
         DB::transaction(function () use ($validated) {
-            $hotelId         = $validated['id_hotel'];
-            $essentielTypeId = $validated['essentiel_type_id'];
+            $hotelId = $validated['id_hotel'];
 
             foreach ($validated['types'] as $typeConfig) {
-                HotelTypeTarification::updateOrCreate(
-                    [
-                        'id_hotel' => $hotelId,
-                        'id_type'  => $typeConfig['id_type'],
-                    ],
-                    [
-                        'is_essentiel' => ($typeConfig['id_type'] == $essentielTypeId),
-                        'pourcentage'  => $typeConfig['pourcentage'],
-                        'cap_adultes'  => $typeConfig['cap_adultes'],
-                        'cap_enfants'  => $typeConfig['cap_enfants'],
-                        'cap_bebes'    => $typeConfig['cap_bebes'],
-                    ]
-                );
+                HotelTypeTarification::firstOrCreate([
+                    'id_hotel' => $hotelId,
+                    'id_type'  => $typeConfig['id_type'],
+                ]);
             }
-
-            // S'assurer qu'il n'y a qu'un seul essentiel pour cet hôtel
-            HotelTypeTarification::where('id_hotel', $hotelId)
-                ->where('id_type', '!=', $essentielTypeId)
-                ->update(['is_essentiel' => false]);
         });
 
         return redirect()->back()->with('success', 'Configuration de tarification enregistrée avec succès.');

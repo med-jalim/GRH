@@ -12,11 +12,6 @@ class HotelTypeTarification extends Model
     protected $fillable = [
         'id_hotel',
         'id_type',
-        'is_essentiel',
-    ];
-
-    protected $casts = [
-        'is_essentiel' => 'boolean',
     ];
 
     public function hotel(): BelongsTo

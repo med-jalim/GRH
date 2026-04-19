@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   Layers,
   BedDouble,
-  Tag,
   Calendar as CalendarIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -20,7 +19,6 @@ import { ApercuTab } from "./Partials/ApercuTab";
 import { TypesTab } from "./Partials/TypesTab";
 import { ChambresTab } from "./Partials/ChambresTab";
 import { TarifsTab } from "./Partials/TarifsTab";
-import { MultiplicateursTab } from "./Partials/MultiplicateursTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -85,20 +83,9 @@ interface Hotel {
   reservations: Reservation[];
 }
 
-interface TarificationLine {
-  id_type: number;
-  type_nom: string | null;
-  is_essentiel: boolean;
-  pourcentage: number;
-  cap_adultes: number;
-  cap_enfants: number;
-  cap_bebes: number;
-}
-
 interface Props {
   hotel: Hotel;
   types: Type[];
-  tarification: TarificationLine[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -246,12 +233,12 @@ function EditHotelModal({
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export default function HotelShow({ hotel, types, tarification }: Props) {
+export default function HotelShow({ hotel, types }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
   // Onglets State
-  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"calendrier"|"multiplicateurs">("apercu");
+  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"calendrier">("apercu");
 
   // Group rooms by type for Apercu display
   const chambresByType = hotel.chambres.reduce<Record<string, Chambre[]>>((acc, c) => {
@@ -271,7 +258,6 @@ export default function HotelShow({ hotel, types, tarification }: Props) {
     { id: "types", label: "Types de Chambres", icon: Layers },
     { id: "chambres", label: "Chambres", icon: BedDouble },
     { id: "calendrier", label: "Tarifs", icon: CalendarIcon },
-    { id: "multiplicateurs", label: "Grille Tarification", icon: Tag },
   ] as const;
 
   return (
@@ -357,9 +343,6 @@ export default function HotelShow({ hotel, types, tarification }: Props) {
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
         {activeTab === "calendrier" && (
           <TarifsTab hotel={hotel} types={types} />
-        )}
-        {activeTab === "multiplicateurs" && (
-          <MultiplicateursTab hotelId={hotel.id} tarification={tarification} types={types} />
         )}
       </div>
 

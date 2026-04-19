@@ -8,7 +8,6 @@ import {
     X,
     Calendar as CalendarIcon,
     Filter,
-    Percent,
     Info,
     Star,
     TrendingUp,
@@ -17,18 +16,6 @@ import {
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { PricingCalendar } from "@/components/Calendar/PricingCalendar";
-
-// ── Types ──────────────────────────────────────────────────────────────────
-
-interface TarificationLine {
-    id_type: number;
-    type_nom: string | null;
-    is_essentiel: boolean;
-    pourcentage: number;
-    cap_adultes: number;
-    cap_enfants: number;
-    cap_bebes: number;
-}
 
 interface TarifsTabProps {
     hotel: any;

@@ -344,11 +344,6 @@ export default function Dashboard({
                         ))}
                     </Dropdown>
 
-                    {/* Sort button (visual) */}
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm">
-                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                        Trier
-                    </button>
 
                     {/* Active filter badge */}
                     {(filters.hotel_id || filters.period !== "this_month") && (
