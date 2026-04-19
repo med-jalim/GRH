@@ -23,9 +23,6 @@ interface Props {
 export default function Edit({ template }: Props) {
     const editorRef = useRef<any>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [showVariables, setShowVariables] = useState(false);
-    const [copiedVar, setCopiedVar] = useState<string | null>(null);
-
     const { data, setData } = useForm({
         subject: template.subject,
     });
@@ -77,14 +74,6 @@ export default function Edit({ template }: Props) {
         reservation_status_updated: [
             { var: '{{STATUT_LABEL}}', desc: 'Libellé humain du nouveau statut (ex: Confirmée)' },
         ],
-    };
-
-    const templateVars = AVAILABLE_VARIABLES[template.slug] || [];
-
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopiedVar(text);
-        setTimeout(() => setCopiedVar(null), 2000);
     };
 
     useEffect(() => {
@@ -217,7 +206,7 @@ export default function Edit({ template }: Props) {
                         <ArrowLeft size={18} />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight leading-tight">{template.name}</h1>
+                        <h1 className="text-2xl text-slate-700 font-bold  tracking-tight leading-tight">{template.name}</h1>
                         <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
                             Éditeur Visuel <span className="w-1 h-1 bg-slate-600 rounded-full"></span> {template.slug}
                         </p>
@@ -236,13 +225,13 @@ export default function Edit({ template }: Props) {
                         <span className="absolute -top-2 left-3 px-1.5 py-0.5 bg-slate-800 text-[9px] font-bold text-slate-500 uppercase tracking-widest border border-slate-700 rounded">Objet</span>
                     </div>
                     <div className="flex items-center gap-2 border-l border-slate-700 pl-3">
-                        <button
+                        {/* <button
                             onClick={() => setShowVariables(true)}
                             className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-slate-200 text-sm font-bold rounded-xl hover:bg-slate-600 transition-all"
                         >
                             <Braces size={16} />
                             <span className="hidden sm:inline">Variables</span>
-                        </button>
+                        </button> */}
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
@@ -267,70 +256,6 @@ export default function Edit({ template }: Props) {
                     <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
                         Glissez les blocs (droite) sur la zone de travail. Utilisez le bouton <span className="text-white font-bold">Variables</span> pour voir les données dynamiques disponibles.
                     </p>
-                </div>
-
-                {/* Variables Slide-over Panel */}
-                <div className={`absolute top-0 right-0 h-full w-80 bg-slate-900 border-l border-slate-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${showVariables ? 'translate-x-0' : 'translate-x-full'}`}>
-                    <div className="flex items-center justify-between p-4 border-b border-slate-800">
-                        <div className="flex items-center gap-2 text-white font-bold">
-                            <Braces size={18} className="text-indigo-400" />
-                            Variables Disponibles
-                        </div>
-                        <button 
-                            onClick={() => setShowVariables(false)}
-                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-                        >
-                            <X size={18} />
-                        </button>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                        {/* Common Variables */}
-                        <div>
-                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Variables Communes</h3>
-                            <div className="space-y-2">
-                                {AVAILABLE_VARIABLES.common.map((v) => (
-                                    <div key={v.var} className="p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-indigo-500/50 transition-colors group">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <code className="text-xs font-bold text-indigo-400">{v.var}</code>
-                                            <button 
-                                                onClick={() => copyToClipboard(v.var)}
-                                                className="text-slate-500 hover:text-indigo-400 p-1"
-                                                title="Copier"
-                                            >
-                                                {copiedVar === v.var ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                            </button>
-                                        </div>
-                                        <p className="text-[11px] text-slate-400 leading-snug">{v.desc}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Specific Variables */}
-                        {templateVars.length > 0 && (
-                            <div>
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Spécifiques ({template.slug})</h3>
-                                <div className="space-y-2">
-                                    {templateVars.map((v) => (
-                                        <div key={v.var} className="p-3 bg-indigo-900/20 border border-indigo-900/30 rounded-xl hover:border-indigo-500/50 transition-colors group">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <code className="text-xs font-bold text-indigo-300">{v.var}</code>
-                                                <button 
-                                                    onClick={() => copyToClipboard(v.var)}
-                                                    className="text-indigo-500 hover:text-indigo-300 p-1"
-                                                    title="Copier"
-                                                >
-                                                    {copiedVar === v.var ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                                </button>
-                                            </div>
-                                            <p className="text-[11px] text-indigo-100/60 leading-snug font-medium">{v.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
 

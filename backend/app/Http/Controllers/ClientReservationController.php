@@ -105,6 +105,7 @@ class ClientReservationController extends Controller
         $reservation = Reservation::where('token', $token)->firstOrFail();
 
         $validated = $request->validate([
+            'type_reservant'      => 'sometimes|required|in:agence,groupe',
             'nom_contact'         => 'required|string|max:255',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
@@ -152,7 +153,8 @@ class ClientReservationController extends Controller
         }
         $validated['nb_personnes'] = $totalPersonnes;
 
-        if ($reservation->type_reservant === 'agence') {
+        $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
+        if ($typeReservant === 'agence') {
             $validated['prix_avant_remise'] = $prixTotal;
             $validated['remise_pourcentage'] = 4.0;
             $validated['prix_total'] = $prixTotal * (1 - (4.0 / 100));

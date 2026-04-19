@@ -149,7 +149,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             }))
         };
 
-        router.put(`/reservation/${reservation.token}/update`, payload, {
+        router.post(`/reservation/${reservation.token}/update`, payload, {
             onSuccess: () => {
                 setSubmitting(false);
                 setIsEditing(false);
@@ -169,6 +169,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                 }
                 window.scrollTo({ top: 0, behavior: "smooth" });
             },
+            onFinish: () => setSubmitting(false),
         });
     };
 
