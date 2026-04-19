@@ -62,7 +62,6 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                     quantity: i.quantite,
                     adults: i.nb_adultes ?? 2,
                     children: i.nb_enfants ?? 0,
-                    babies: i.nb_bebes ?? 0,
                 })) || [],
             })) || [],
             specialRequests: reservation.remarques_speciales || "",
@@ -130,7 +129,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             groups: data.groups.map(g => ({
                 date_arrivee: g.checkIn,
                 date_depart: g.checkOut,
-                nb_personnes: g.occupants,
+                nb_personnes: g.rooms.reduce((sum, room) => sum + room.adults + room.children, 0),
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
                     const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
@@ -141,7 +140,6 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                         prix_unitaire: prix,
                         nb_adultes: r.adults,
                         nb_enfants: r.children,
-                        nb_bebes: r.babies,
                     };
                 })
             }))
@@ -402,7 +400,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                                 )}
                                                                             </p>
                                                                             <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                                                                                {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`} {i.nb_bebes > 0 && `· ${i.nb_bebes} Bébés`}
+                                                                                {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
                                                                             </p>
                                                                             <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
                                                                         </td>

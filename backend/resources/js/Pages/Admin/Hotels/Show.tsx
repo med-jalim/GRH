@@ -24,18 +24,14 @@ import { MultiplicateursTab } from "./Partials/MultiplicateursTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface Occupancy {
-  adults: number;
-  children_max: number;
-  babies_max: number;
-}
-
 interface SubType {
   id: number;
   id_hotel: number;
   id_type: number;
   nom: string;
-  occupancies: Occupancy[];
+  max_adults: number;
+  max_children: number;
+  capacity_total: number;
 }
 
 interface Type {

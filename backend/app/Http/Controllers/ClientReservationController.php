@@ -122,8 +122,12 @@ class ClientReservationController extends Controller
             'groups.*.rooms.*.prix_unitaire' => 'required|numeric|min:0',
             'groups.*.rooms.*.nb_adultes'    => 'required|integer|min:0',
             'groups.*.rooms.*.nb_enfants'    => 'required|integer|min:0',
-            'groups.*.rooms.*.nb_bebes'      => 'required|integer|min:0',
         ]);
+
+        $occupancyFailures = $this->reservationService->validateOccupancyCount($validated['groups']);
+        if (!empty($occupancyFailures)) {
+            return redirect()->back()->withErrors(['availability' => $occupancyFailures]);
+        }
 
         // Availability check
         $failures = $this->reservationService->checkAvailability($reservation->id_hotel, $validated['groups'], $reservation->id);
@@ -138,7 +142,10 @@ class ClientReservationController extends Controller
         $totalPersonnes = 0;
         foreach ($groupsData as $g) {
             $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
-            $totalPersonnes += $g['nb_personnes'];
+            $groupOccupants = collect($g['rooms'])->sum(function ($room) {
+                return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
+            });
+            $totalPersonnes += $groupOccupants;
             foreach ($g['rooms'] as $r) {
                 $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
             }
@@ -158,11 +165,15 @@ class ClientReservationController extends Controller
         }
 
         foreach ($groupsData as $groupData) {
+            $groupOccupants = collect($groupData['rooms'])->sum(function ($room) {
+                return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
+            });
+
             $group = ReservationGroup::create([
                 'id_reservation' => $reservation->id,
                 'date_arrivee'   => $groupData['date_arrivee'],
                 'date_depart'    => $groupData['date_depart'],
-                'nb_personnes'   => $groupData['nb_personnes'],
+                'nb_personnes'   => $groupOccupants,
             ]);
 
             foreach ($groupData['rooms'] as $roomData) {
@@ -174,7 +185,6 @@ class ClientReservationController extends Controller
                     'prix_unitaire' => $roomData['prix_unitaire'],
                     'nb_adultes'    => $roomData['nb_adultes'],
                     'nb_enfants'    => $roomData['nb_enfants'],
-                    'nb_bebes'      => $roomData['nb_bebes'],
                 ]);
             }
         }

@@ -103,7 +103,7 @@ class HotelController extends Controller
         }
 
         $types = Type::with(['subTypes' => function($q) use ($id) {
-            $q->where('id_hotel', $id)->with('occupancies');
+            $q->where('id_hotel', $id);
         }])->orderBy('nom')->get();
 
         return Inertia::render('Admin/Hotels/Show', [

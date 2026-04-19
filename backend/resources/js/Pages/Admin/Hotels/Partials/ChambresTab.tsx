@@ -161,13 +161,9 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
                             {c.sub_type.nom}
                           </span>
                         </div>
-                        <div className="flex gap-1.5">
-                          {(c.sub_type.occupancies || []).map((occ: any, idx: number) => (
-                             <span key={idx} className="text-[9px] font-medium text-slate-400">
-                                {occ.adults}A{occ.children_max > 0 ? `+${occ.children_max}E` : ''}
-                             </span>
-                          ))}
-                        </div>
+                        <span className="text-[9px] font-medium text-slate-400">
+                          {c.sub_type.max_adults ?? 0}A max · {c.sub_type.max_children ?? 0}E max · {c.sub_type.capacity_total ?? 0} total
+                        </span>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-300 italic">Non spécifié</span>

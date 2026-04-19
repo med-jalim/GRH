@@ -18,7 +18,6 @@ class ItemReservation extends Model
         'prix_unitaire',
         'nb_adultes',
         'nb_enfants',
-        'nb_bebes'
     ];
 
     protected $casts = [

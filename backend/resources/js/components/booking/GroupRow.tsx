@@ -48,7 +48,7 @@ export function GroupRow({
   }, 0);
 
   const totalOccupants = group.rooms.reduce((acc, room) => {
-    return acc + (room.adults + room.children + room.babies);
+    return acc + (room.adults + room.children);
   }, 0);
 
   return (

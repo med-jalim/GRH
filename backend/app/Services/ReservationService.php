@@ -20,26 +20,32 @@ class ReservationService
             $groupRooms = $group['rooms'] ?? [];
             foreach ($groupRooms as $rIndex => $room) {
                 $subTypeId = $room['id_sub_type'] ?? $room['subTypeId'] ?? 0;
+                $quantity = (int) ($room['quantite'] ?? $room['quantity'] ?? 1);
                 
-                $adults   = $room['nb_adultes'] ?? $room['adults'] ?? 0;
-                $children = $room['nb_enfants'] ?? $room['children'] ?? 0;
-                $babies   = $room['nb_bebes'] ?? $room['babies'] ?? 0;
-
-                $subType = SubType::with('occupancies')->find($subTypeId);
+                $adults   = (int) ($room['nb_adultes'] ?? $room['adults'] ?? 0);
+                $children = (int) ($room['nb_enfants'] ?? $room['children'] ?? 0);
+                $subType = SubType::find($subTypeId);
                 if (!$subType) continue;
 
-                $valid = false;
-                foreach ($subType->occupancies as $occ) {
-                    // Check if current selection matches this occupancy criteria
-                    if ($adults >= 1 && $adults <= $occ->adults && $children <= $occ->children_max && $babies <= $occ->babies_max) {
-                        $valid = true;
-                        break;
-                    }
+                $maxAdultsAllowed = max(0, (int) $subType->max_adults) * max(1, $quantity);
+                $maxChildrenAllowed = max(0, (int) $subType->max_children) * max(1, $quantity);
+                $maxTotalAllowed = max(0, (int) $subType->capacity_total) * max(1, $quantity);
+
+                if ($adults > $maxAdultsAllowed) {
+                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le nombre d'adultes dépasse la limite autorisée pour le sous-type '{$subType->nom}'.";
+                    continue;
                 }
 
-                if (!$valid) {
-                    $failures[] = "Groupe " . ($gIndex + 1) . ": L'occupation choisie ({$adults}A, {$children}E, {$babies}B) n'est pas autorisée pour le sous-type '{$subType->nom}'.";
+                if ($children > $maxChildrenAllowed) {
+                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le nombre d'enfants dépasse la limite autorisée pour le sous-type '{$subType->nom}'.";
+                    continue;
                 }
+
+                if (($adults + $children) > $maxTotalAllowed) {
+                    $failures[] = "Groupe " . ($gIndex + 1) . ": Le total adultes + enfants dépasse la capacité autorisée pour le sous-type '{$subType->nom}'.";
+                    continue;
+                }
+
             }
         }
 
@@ -187,11 +193,11 @@ class ReservationService
                     'available' => $effectiveRemaining >= $requestedQty,
                     'remaining' => max(0, $effectiveRemaining),
                     'total' => $totalRooms,
-                    'capacities' => $subType ? $subType->occupancies->map(fn($o) => [
-                        'adults' => $o->adults,
-                        'children_max' => $o->children_max,
-                        'babies_max' => $o->babies_max,
-                    ]) : []
+                    'capacities' => $subType ? [
+                        'max_adults' => (int) $subType->max_adults,
+                        'max_children' => (int) $subType->max_children,
+                        'capacity_total' => (int) $subType->capacity_total,
+                    ] : null
                 ];
             }
             $results[] = [

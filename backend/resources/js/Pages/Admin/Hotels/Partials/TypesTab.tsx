@@ -226,15 +226,13 @@ export function TypesTab({ types, hotel }: { types: any[], hotel: any }) {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                           {(st.occupancies || []).map((occ: any, idx: number) => (
-                              <div key={idx} className="flex items-center gap-2 px-2.5 py-1.5 bg-white rounded-lg border border-slate-100 text-[11px] font-bold text-slate-600 shadow-sm">
-                                <span>{occ.adults}A</span>
-                                {occ.children_max > 0 && <span className="text-slate-300">|</span>}
-                                {occ.children_max > 0 && <span>{occ.children_max}E</span>}
-                                {occ.babies_max > 0 && <span className="text-slate-300">|</span>}
-                                {occ.babies_max > 0 && <span>{occ.babies_max}B</span>}
-                              </div>
-                           ))}
+                          <div className="w-full text-[11px] font-bold text-slate-500 flex items-center gap-2">
+                            <span>{st.max_adults ?? 0}A max</span>
+                            <span className="text-slate-300">|</span>
+                            <span>{st.max_children ?? 0}E max</span>
+                            <span className="text-slate-300">|</span>
+                            <span>{st.capacity_total ?? 0} Total</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -315,24 +313,10 @@ function SubTypeModal({ editingSubType, typeId, hotelId, onClose }: any) {
         id_hotel: hotelId,
         nom: editingSubType?.nom ?? "",
         color: editingSubType?.color ?? "#f59e0b", // default to amber
-        occupancies: editingSubType?.occupancies ?? [
-            { adults: 2, children_max: 0, babies_max: 0 }
-        ],
+        max_adults: editingSubType?.max_adults ?? 2,
+        max_children: editingSubType?.max_children ?? 0,
+        capacity_total: editingSubType?.capacity_total ?? 2,
     });
-
-    function addOccupancy() {
-      setData("occupancies", [...data.occupancies, { adults: 2, children_max: 0, babies_max: 0 }]);
-    }
-
-    function removeOccupancy(index: number) {
-      setData("occupancies", data.occupancies.filter((_: any, i: number) => i !== index));
-    }
-
-    function updateOccupancy(index: number, field: string, value: number) {
-      const newOccs = [...data.occupancies];
-      newOccs[index] = { ...newOccs[index], [field]: value };
-      setData("occupancies", newOccs);
-    }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -372,37 +356,40 @@ function SubTypeModal({ editingSubType, typeId, hotelId, onClose }: any) {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3">
-                 <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Critères d'occupation</label>
-                    <button type="button" onClick={addOccupancy} className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1">
-                       <Plus className="w-3.5 h-3.5" /> Ajouter un critère
-                    </button>
-                 </div>
-
-                 <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1">
-                    {data.occupancies.map((occ: any, idx: number) => (
-                       <div key={idx} className="flex items-end gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 relative group">
-                          <div className="flex-1">
-                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Adultes</label>
-                             <input type="number" value={occ.adults} onChange={(e) => updateOccupancy(idx, "adults", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
-                          </div>
-                          <div className="flex-1">
-                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Enfants Max</label>
-                             <input type="number" value={occ.children_max} onChange={(e) => updateOccupancy(idx, "children_max", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
-                          </div>
-                          <div className="flex-1">
-                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest text-center">Bébés Max</label>
-                             <input type="number" value={occ.babies_max} onChange={(e) => updateOccupancy(idx, "babies_max", parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none" min={0} />
-                          </div>
-                          {data.occupancies.length > 1 && (
-                             <button type="button" onClick={() => removeOccupancy(idx)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                             </button>
-                          )}
-                       </div>
-                    ))}
-                 </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Max Adultes</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={data.max_adults}
+                    onChange={(e) => setData("max_adults", Math.max(0, Number(e.target.value)))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none"
+                  />
+                  {errors.max_adults && <p className="text-red-500 text-xs mt-1">{errors.max_adults}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Max Enfants</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={data.max_children}
+                    onChange={(e) => setData("max_children", Math.max(0, Number(e.target.value)))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none"
+                  />
+                  {errors.max_children && <p className="text-red-500 text-xs mt-1">{errors.max_children}</p>}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Capacité Totale</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={data.capacity_total}
+                    onChange={(e) => setData("capacity_total", Math.max(0, Number(e.target.value)))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center focus:ring-2 focus:ring-amber-400/40 outline-none"
+                  />
+                  {errors.capacity_total && <p className="text-red-500 text-xs mt-1">{errors.capacity_total}</p>}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-2">

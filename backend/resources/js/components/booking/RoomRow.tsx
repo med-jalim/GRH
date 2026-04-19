@@ -1,4 +1,4 @@
-import type { RoomSelection, RoomType, Occupancy } from '@/types/booking';
+import type { RoomSelection, RoomType } from '@/types/booking';
 import { formatPrice } from '@/data/mockData';
 import { Input } from '@/components/ui/input';
 import { BedDouble } from 'lucide-react';
@@ -24,7 +24,6 @@ interface Props {
     available: boolean;
     remaining: number;
     total: number;
-    occupancies?: Occupancy[];
   } | null;
 }
 
@@ -40,35 +39,45 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
   const selectedSubType = selectedOption?.type.sub_types?.find((st: any) => st.id === room.subTypeId);
   const price = selectedOption?.dynamicPrice || 0;
 
-  // Validation logic for multiple criteria
-  const occupancyErrors = useMemo(() => {
-    if (!selectedSubType || !selectedSubType.occupancies) return null;
-    
-    // Check if the combination of (adults, children, babies) can be distributed
-    // across (quantity) rooms such that each room matches at least one criteria.
-    // For small quantities, we can use a simple recursive check.
-    const canPartition = (remAdults: number, remChildren: number, remBabies: number, remRooms: number): boolean => {
-      if (remRooms === 0) return remAdults === 0 && remChildren === 0 && remBabies === 0;
-      
-      return selectedSubType.occupancies.some((occ: any) => {
-        // Find if this occ can fit in at least one room
-        // Since we have max limits, we test all valid combinations
-        for (let a = 1; a <= occ.adults; a++) {
-          for (let c = 0; c <= occ.children_max; c++) {
-            for (let b = 0; b <= occ.babies_max; b++) {
-               if (remAdults >= a && remChildren >= c && remBabies >= b) {
-                  if (canPartition(remAdults - a, remChildren - c, remBabies - b, remRooms - 1)) return true;
-               }
-            }
-          }
-        }
-        return false;
-      });
-    };
+  const capacityValidation = useMemo(() => {
+    if (!selectedSubType) {
+      return {
+        hasError: false,
+        adultLimitExceeded: false,
+        childrenLimitExceeded: false,
+        totalLimitExceeded: false,
+        message: '',
+      };
+    }
 
-    const valid = canPartition(room.adults, room.children, room.babies, room.quantity);
-    return !valid;
-  }, [selectedSubType, room.adults, room.children, room.babies, room.quantity]);
+    const quantity = Math.max(1, room.quantity || 1);
+    const maxAdults = (selectedSubType.max_adults ?? 0) * quantity;
+    const maxChildren = (selectedSubType.max_children ?? 0) * quantity;
+    const maxTotal = (selectedSubType.capacity_total ?? 0) * quantity;
+
+    const adultLimitExceeded = room.adults > maxAdults;
+    const childrenLimitExceeded = room.children > maxChildren;
+    const totalLimitExceeded = (room.adults + room.children) > maxTotal;
+
+    let message = '';
+    if (adultLimitExceeded) {
+      message = `Adultes dépassés: ${room.adults}/${maxAdults}`;
+    } else if (childrenLimitExceeded) {
+      message = `Enfants dépassés: ${room.children}/${maxChildren}`;
+    } else if (totalLimitExceeded) {
+      message = `Total adultes + enfants dépassé: ${room.adults + room.children}/${maxTotal}`;
+    }
+
+    return {
+      hasError: adultLimitExceeded || childrenLimitExceeded || totalLimitExceeded,
+      adultLimitExceeded,
+      childrenLimitExceeded,
+      totalLimitExceeded,
+      message,
+    };
+  }, [selectedSubType, room.adults, room.children, room.quantity]);
+
+  const hasOccupancyError = capacityValidation.hasError;
 
 
 
@@ -171,12 +180,12 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
       </div>
 
       {/* 3. Footer: Capacities */}
-      <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50/60 rounded-[1.5rem] border border-slate-100">
+      <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50/60 rounded-[1.5rem] border border-slate-100">
          {/* Adultes */}
          <div className="space-y-1.5">
             <div className="flex justify-between items-end mb-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre d'adultes">Adultes</label>
-                {selectedSubType && occupancyErrors && (
+                {selectedSubType && (capacityValidation.adultLimitExceeded || capacityValidation.totalLimitExceeded) && (
                     <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
                 )}
             </div>
@@ -187,7 +196,7 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
                    value={room.adults}
                    onChange={e => onChange(room.uid, 'adults', Math.max(0, Number(e.target.value)))}
                    className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-emerald-800 transition-all focus:ring-4 ${
-                       selectedSubType && occupancyErrors
+                       selectedSubType && hasOccupancyError
                        ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
                        : 'border-slate-200 focus:ring-emerald-500/10 focus:border-emerald-500'
                    }`}
@@ -199,7 +208,7 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
          <div className="space-y-1.5">
             <div className="flex justify-between items-end mb-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre d'enfants">Enfants</label>
-                {selectedSubType && occupancyErrors && (
+                {selectedSubType && (capacityValidation.childrenLimitExceeded || capacityValidation.totalLimitExceeded) && (
                     <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
                 )}
             </div>
@@ -210,7 +219,7 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
                    value={room.children}
                    onChange={e => onChange(room.uid, 'children', Math.max(0, Number(e.target.value)))}
                    className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-blue-600 transition-all focus:ring-4 ${
-                       selectedSubType && occupancyErrors
+                       selectedSubType && hasOccupancyError
                        ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
                        : 'border-slate-200 focus:ring-blue-500/10 focus:border-blue-500'
                    }`}
@@ -218,29 +227,12 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
             </div>
          </div>
 
-         {/* Bébés */}
-         <div className="space-y-1.5">
-            <div className="flex justify-between items-end mb-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block" title="Nombre de bébés">Bébés</label>
-                {selectedSubType && occupancyErrors && (
-                    <span className="text-[8px] font-black text-rose-500 uppercase animate-pulse">Invalide !</span>
-                )}
-            </div>
-            <div className="relative">
-                <Input
-                   type="number"
-                   min="0"
-                   value={room.babies}
-                   onChange={e => onChange(room.uid, 'babies', Math.max(0, Number(e.target.value)))}
-                   className={`h-11 bg-white rounded-xl border font-bold text-xs text-center text-amber-600 transition-all focus:ring-4 ${
-                       selectedSubType && occupancyErrors
-                       ? 'border-rose-500 bg-rose-50/30 focus:ring-rose-500/10 focus:border-rose-500'
-                       : 'border-slate-200 focus:ring-amber-500/10 focus:border-amber-500'
-                   }`}
-                />
-            </div>
-         </div>
       </div>
+      {selectedSubType && capacityValidation.hasError && (
+        <p className="text-[11px] font-bold text-rose-600 -mt-1">
+          {capacityValidation.message}
+        </p>
+      )}
     </div>
   );
 }

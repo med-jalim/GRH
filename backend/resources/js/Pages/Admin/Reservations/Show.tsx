@@ -57,7 +57,6 @@ interface ItemReservation {
   prix_unitaire: number;
   nb_adultes: number;
   nb_enfants: number;
-  nb_bebes: number;
   type: Type | null;
   sub_type?: SubType | null;
 }
@@ -662,7 +661,7 @@ export default function ReservationShow({ reservation }: Props) {
                                             <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Prix unitaire: {formatPrice(item.prix_unitaire)}</span>
                                             <span className="h-1 w-1 bg-slate-300 rounded-full" />
                                             <span className="text-[10px] text-emerald-600 font-black uppercase tracking-wider">
-                                              {item.nb_adultes}A {item.nb_enfants > 0 && `· ${item.nb_enfants}E`} {item.nb_bebes > 0 && `· ${item.nb_bebes}B`}
+                                              {item.nb_adultes}A {item.nb_enfants > 0 && `· ${item.nb_enfants}E`}
                                             </span>
                                           </div>
                                         </div>

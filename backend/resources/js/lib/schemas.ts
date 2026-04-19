@@ -23,7 +23,6 @@ export const bookingSchema = z.object({
       quantity:   z.number().min(1, 'La quantité doit être au moins 1'),
       adults:     z.number().min(0),
       children:   z.number().min(0),
-      babies:     z.number().min(0),
     })).min(1, 'Veuillez ajouter au moins une chambre'),
   })).min(1, 'Veuillez ajouter au moins un groupe'),
 

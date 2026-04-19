@@ -13,16 +13,20 @@ class SubType extends Model
         'id_type',
         'nom',
         'color',
+        'max_adults',
+        'max_children',
+        'capacity_total',
+    ];
+
+    protected $casts = [
+        'max_adults' => 'integer',
+        'max_children' => 'integer',
+        'capacity_total' => 'integer',
     ];
 
     public function hotel(): BelongsTo
     {
         return $this->belongsTo(Hotel::class, 'id_hotel');
-    }
-
-    public function occupancies(): HasMany
-    {
-        return $this->hasMany(SubTypeOccupancy::class, 'id_sub_type');
     }
 
     public function type(): BelongsTo

@@ -1,15 +1,11 @@
-export interface Occupancy {
-  adults: number;
-  children_max: number;
-  babies_max: number;
-}
-
 export interface SubType {
   id: number;
   id_type: number;
   id_hotel: number;
   nom: string;
-  occupancies: Occupancy[];
+  max_adults: number;
+  max_children: number;
+  capacity_total: number;
   color?: string;
 }
 
@@ -57,7 +53,6 @@ export interface RoomSelection {
   quantity: number;
   adults: number;
   children: number;
-  babies: number;
 }
 
 export interface GroupSelection {

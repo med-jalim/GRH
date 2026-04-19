@@ -27,8 +27,6 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
-  console.log(formData) ;
-
   const totalOccupants = formData.groups?.reduce((acc, g) => acc + (Number(g.occupants) || 0), 0) || 0;
 
   return (
@@ -116,7 +114,7 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                                             {room.quantity} unité(s) · {formatPrice(price)}/nuit
                                         </p>
                                         <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
-                                            {room.adults}A {room.children > 0 && `· ${room.children}E`} {room.babies > 0 && `· ${room.babies}B`} per chambre
+                                            {room.adults}A {room.children > 0 && `· ${room.children}E`} par chambre
                                         </p>
                                     </div>
                                 </div>
