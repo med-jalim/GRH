@@ -225,13 +225,6 @@ export default function Edit({ template }: Props) {
                         <span className="absolute -top-2 left-3 px-1.5 py-0.5 bg-slate-800 text-[9px] font-bold text-slate-500 uppercase tracking-widest border border-slate-700 rounded">Objet</span>
                     </div>
                     <div className="flex items-center gap-2 border-l border-slate-700 pl-3">
-                        {/* <button
-                            onClick={() => setShowVariables(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-slate-200 text-sm font-bold rounded-xl hover:bg-slate-600 transition-all"
-                        >
-                            <Braces size={16} />
-                            <span className="hidden sm:inline">Variables</span>
-                        </button> */}
                         <button
                             onClick={handleSave}
                             disabled={isSaving}
@@ -245,18 +238,8 @@ export default function Edit({ template }: Props) {
             </div>
 
             {/* Editor Canvas Container */}
-            <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-[0_4px_30px_-4px_rgba(0,0,0,0.5)] overflow-hidden relative group">
+            <div className="bg-slate-900 rounded-2xl  shadow-[0_4px_30px_-4px_rgba(0,0,0,0.5)] overflow-hidden relative group">
                 <div id="editor" className="h-[700px] w-full"></div>
-                
-                {/* Float Hint */}
-                <div className="absolute bottom-6 left-6 bg-slate-800/90 backdrop-blur-md border border-slate-700 rounded-2xl p-4 shadow-xl z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 max-w-xs">
-                    <div className="flex items-center gap-2 mb-2 text-indigo-400 font-bold text-[10px] uppercase tracking-widest">
-                        <Info size={12} /> Conseil d'utilisation
-                    </div>
-                    <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
-                        Glissez les blocs (droite) sur la zone de travail. Utilisez le bouton <span className="text-white font-bold">Variables</span> pour voir les données dynamiques disponibles.
-                    </p>
-                </div>
             </div>
 
             <style dangerouslySetInnerHTML={{ __html: `
