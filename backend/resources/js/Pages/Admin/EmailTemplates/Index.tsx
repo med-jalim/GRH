@@ -31,19 +31,6 @@ export default function Index({ templates }: Props) {
                 </div>
             </div>
 
-            {/* Help / Info Bar */}
-            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-8 flex items-start gap-4">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm text-indigo-500">
-                    <Info size={20} />
-                </div>
-                <div>
-                    <h4 className="text-sm font-bold text-indigo-900 tracking-tight uppercase">Variables Dynamiques</h4>
-                    <p className="text-xs text-indigo-700/80 mt-1 leading-relaxed">
-                        Utilisez des balises comme <code className="bg-white/50 px-1 rounded font-bold text-indigo-800">{"{{NOM_CLIENT}}"}</code> ou <code className="bg-white/50 px-1 rounded font-bold text-indigo-800">{"{{TABLEAU_DEVIS}}"}</code> dans l'éditeur pour personnaliser vos envois.
-                    </p>
-                </div>
-            </div>
-
             {/* Grid of Templates */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {templates.map((template) => {

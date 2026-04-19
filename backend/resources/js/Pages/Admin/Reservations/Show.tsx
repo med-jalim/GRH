@@ -704,8 +704,8 @@ export default function ReservationShow({ reservation }: Props) {
                       {/* Breakdown Lines */}
                       <div className="space-y-4">
                         <div className="flex justify-between items-center text-slate-400">
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sous-total (Hébergement)</span>
-                          <span className="text-sm font-bold text-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - reservation.taxe_sejour_total))}</span>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sous-total Chambres</span>
+                          <span className="text-sm font-bold text-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</span>
                         </div>
 
                         {reservation.type_reservant === 'agence' && reservation.remise_pourcentage && (

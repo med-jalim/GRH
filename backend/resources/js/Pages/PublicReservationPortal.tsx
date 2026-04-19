@@ -10,7 +10,7 @@ import { StepIndicator } from "@/components/booking/StepIndicator";
 import { AgencyInfoStep } from "@/components/booking/AgencyInfoStep";
 import { ReservationDetailsStep } from "@/components/booking/ReservationDetailsStep";
 import { SummaryStep } from "@/components/booking/SummaryStep";
-import { CheckCircle, XCircle, FileUp, CreditCard, ExternalLink, Calendar, Users, Building2, BedDouble, Upload, Clock, Ban, Loader2, Edit2 } from "lucide-react";
+import { CheckCircle, XCircle, FileUp, CreditCard, ExternalLink, Calendar, Users, Building2, BedDouble, Upload, Clock, Ban, Loader2, Edit2, AlertTriangle, RefreshCw, Check } from "lucide-react";
 
 interface Props {
     reservation: any;
@@ -40,6 +40,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const [paymentFile, setPaymentFile] = useState<File | null>(null);
     const [paymentAmount, setPaymentAmount] = useState<string>("");
     const [isUploading, setIsUploading] = useState(false);
+    const [actionConfirmType, setActionConfirmType] = useState<'confirm' | 'cancel' | null>(null);
 
     const methods = useForm<BookingSchemaType>({
         resolver: zodResolver(bookingSchema),
@@ -210,16 +211,19 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     };
 
     const handleAction = (action: 'confirm' | 'cancel') => {
-        const message = action === 'confirm'
-            ? "Voulez-vous valider et confirmer votre réservation ?"
-            : "Êtes-vous sûr de vouloir annuler cette réservation ?";
+        setActionConfirmType(action);
+    };
 
-        if (confirm(message)) {
-            setIsActioning(action);
-            router.post(`/reservation/${reservation.token}/${action}`, {}, {
-                onFinish: () => setIsActioning(null)
-            });
-        }
+    const confirmFinalAction = () => {
+        if (!actionConfirmType) return;
+        
+        setIsActioning(actionConfirmType);
+        router.post(`/reservation/${reservation.token}/${actionConfirmType}`, {}, {
+            onFinish: () => {
+                setIsActioning(null);
+                setActionConfirmType(null);
+            }
+        });
     };
 
     const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
@@ -246,6 +250,15 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
     return (
         <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-900">
+            {/* Confirmation Modal */}
+            {actionConfirmType && (
+                <ActionConfirmModal 
+                    type={actionConfirmType} 
+                    onClose={() => setActionConfirmType(null)} 
+                    onConfirm={confirmFinalAction} 
+                    processing={!!isActioning}
+                />
+            )}
             {/* STICKY HEADER - ADMIN STYLE */}
             <header className="sticky top-0 z-50 bg-white border-b border-slate-200/60 backdrop-blur-md bg-white/80 py-4 px-6 mb-8">
                 <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -425,6 +438,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                             <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
                                                                                 {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
                                                                             </p>
+                                                                            <p className="text-[10px] text-slate-400 font-medium">{formatPrice(i.prix_unitaire)}/nuit</p>
                                                                             <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
                                                                         </td>
                                                                         <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
@@ -434,7 +448,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             })}
                                                         </tbody>
                                                         <tfoot className="bg-slate-50">
-                                                            {reservation.type_reservant === 'agence' && reservation.prix_avant_remise && (
+                                                            {reservation.type_reservant === 'agence' && reservation.prix_avant_remise ? (
                                                                 <>
                                                                     <tr>
                                                                         <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
@@ -445,6 +459,11 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                                         <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise * 0.04)}</td>
                                                                     </tr>
                                                                 </>
+                                                            ):(
+                                                                <tr>
+                                                                    <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
+                                                                    <td className="px-6 py-4 text-right font-bold text-slate-400 border-b border-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</td>
+                                                                </tr>
                                                             )}
                                                             {reservation.taxe_sejour_total > 0 && (
                                                                 <tr>
@@ -712,6 +731,94 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                     © 2026 GRH Hôtels · Expérience Client Premium
                 </p>
             </footer>
+        </div>
+    );
+}
+
+// ── Action Confirmation Modal ──────────────────────────────────────────────
+
+function ActionConfirmModal({ 
+    type, 
+    onClose, 
+    onConfirm, 
+    processing 
+}: { 
+    type: 'confirm' | 'cancel'; 
+    onClose: () => void; 
+    onConfirm: () => void;
+    processing: boolean;
+}) {
+    const isConfirm = type === 'confirm';
+    
+    return (
+        <div role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
+                {/* Header */}
+                <div className="px-8 py-6 flex items-center justify-between border-b border-slate-50">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${isConfirm ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                            {isConfirm ? <CheckCircle className="w-6 h-6 text-emerald-600" /> : <Ban className="w-6 h-6 text-rose-600" />}
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                                {isConfirm ? 'Confirmation' : 'Annulation'}
+                            </h3>
+                            <p className="text-sm text-slate-500 font-medium">
+                                Action requise
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2.5 hover:bg-slate-100 rounded-full transition-all text-slate-400 hover:text-slate-600 focus:outline-none"
+                    >
+                        <XCircle className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-8 text-center">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner relative ${isConfirm ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                        {isConfirm ? (
+                            <Check className="w-10 h-10 text-emerald-500 relative z-10" />
+                        ) : (
+                            <AlertTriangle className="w-10 h-10 text-rose-500 relative z-10" />
+                        )}
+                        <div className={`absolute inset-0 rounded-full animate-ping opacity-25 ${isConfirm ? 'bg-emerald-200/30' : 'bg-rose-200/30'}`} />
+                    </div>
+                    
+                    <h4 className="text-lg font-bold text-slate-900 mb-2">
+                        {isConfirm ? 'Confirmer mon séjour ?' : 'Souhaitez-vous annuler ?'}
+                    </h4>
+                    
+                    <p className="text-slate-600 text-sm font-medium leading-relaxed px-4">
+                        {isConfirm 
+                            ? "En confirmant, vous validez les informations de votre séjour et acceptez que votre dossier soit traité pour finalisation."
+                            : "Attention, l'annulation de votre réservation est définitive et libérera immédiatement vos chambres."
+                        }
+                    </p>
+                </div>
+
+                {/* Footer */}
+                <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                    >
+                        Annuler
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={processing}
+                        className={`flex-[1.5] px-6 py-3 rounded-2xl text-sm font-bold text-white shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isConfirm ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                        }`}
+                    >
+                        {processing ? <RefreshCw className="w-4 h-4 animate-spin" /> : (isConfirm ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />)}
+                        {isConfirm ? "Oui, je confirme" : "Oui, annuler"}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
