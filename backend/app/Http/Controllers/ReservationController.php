@@ -7,6 +7,7 @@ use App\Mail\ReservationCancelled;
 use App\Mail\ReservationConfirmed;
 use App\Mail\ReservationStatusUpdated;
 use App\Mail\ReservationValidationRequest;
+use App\Models\Hotel;
 use App\Models\ItemReservation;
 use App\Models\Reservation;
 use App\Models\User;
@@ -143,27 +144,41 @@ class ReservationController extends Controller
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
 
         $groupsData = $validated['groups'];
-        $prixTotal = 0;
+        $chambreSousTotal = 0;
+        $taxeSejourTotal = 0;
         $totalPersonnes = 0;
+
+        $hotel = Hotel::find($validated['id_hotel']);
+        $taxeParAdulte = $hotel->taxe_sejour ?? 0;
 
         foreach ($groupsData as $g) {
             $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
-            $groupOccupants = collect($g['rooms'])->sum(function ($room) {
+            $groupPersonnes = collect($g['rooms'])->sum(function ($room) {
                 return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
             });
-            $totalPersonnes += $groupOccupants;
+            $totalPersonnes += $groupPersonnes;
+
             foreach ($g['rooms'] as $r) {
-                $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+                // Room Price
+                $chambreSousTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+                
+                // Tax Calculation (Daily per adult)
+                $taxeSejourTotal += ($r['nb_adultes'] * $r['quantite'] * $nights * $taxeParAdulte);
             }
         }
 
-        $validated['prix_total'] = $prixTotal;
         $validated['nb_personnes'] = $totalPersonnes;
+        $validated['taxe_sejour_total'] = $taxeSejourTotal;
 
         if (($validated['type_reservant'] ?? 'groupe') === 'agence') {
-            $validated['prix_avant_remise'] = $prixTotal;
+            $validated['prix_avant_remise'] = $chambreSousTotal;
             $validated['remise_pourcentage'] = 4.0;
-            $validated['prix_total'] = $prixTotal * (1 - (4.0 / 100));
+            // Discount applies ONLY to the room subtotal
+            $validated['prix_total'] = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
+        } else {
+            $validated['prix_total'] = $chambreSousTotal + $taxeSejourTotal;
+            $validated['prix_avant_remise'] = null;
+            $validated['remise_pourcentage'] = null;
         }
 
         unset($validated['groups']);
@@ -297,30 +312,38 @@ class ReservationController extends Controller
         $reservation->update($validated);
 
         // Recalculate total if general info changed (hotel, etc.)
-        // In this implementation, the admin update doesn't yet handle direct group/item editing.
-        // We recalculate based on existing groups.
-        $prixTotal = 0;
+        $chambreSousTotal = 0;
+        $taxeSejourTotal = 0;
         $totalPersonnes = 0;
+
+        $hotel = $reservation->hotel;
+        $taxeParAdulte = $hotel->taxe_sejour ?? 0;
+
         foreach ($reservation->groups as $group) {
             $nights = $this->reservationService->calculateNights($group->date_arrivee, $group->date_depart);
             $totalPersonnes += $group->items->sum(function ($item) {
                 return ((int) ($item->nb_adultes ?? 0)) + ((int) ($item->nb_enfants ?? 0));
             });
             foreach ($group->items as $item) {
-                $prixTotal += ($item->quantite * $item->prix_unitaire * $nights);
+                // Room Price
+                $chambreSousTotal += ($item->quantite * $item->prix_unitaire * $nights);
+                
+                // Tax Calculation
+                $taxeSejourTotal += ($item->nb_adultes * $item->quantite * $nights * $taxeParAdulte);
             }
         }
 
         $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
+        $reservation->taxe_sejour_total = $taxeSejourTotal;
         
         if ($typeReservant === 'agence') {
-            $reservation->prix_avant_remise = $prixTotal;
+            $reservation->prix_avant_remise = $chambreSousTotal;
             $reservation->remise_pourcentage = 4.0;
-            $reservation->prix_total = $prixTotal * (1 - (4.0 / 100));
+            $reservation->prix_total = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
         } else {
             $reservation->prix_avant_remise = null;
             $reservation->remise_pourcentage = null;
-            $reservation->prix_total = $prixTotal;
+            $reservation->prix_total = $chambreSousTotal + $taxeSejourTotal;
         }
 
         $reservation->nb_personnes = $totalPersonnes;

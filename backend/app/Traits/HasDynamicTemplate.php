@@ -78,6 +78,7 @@ trait HasDynamicTemplate
             'PAYMENT_LINK' => $reservation->payment_link ?? url('reservation/' . $reservation->token),
             
             // Tables
+            'TAXE_SEJOUR' => number_format($reservation->taxe_sejour_total ?? 0, 2, ',', ' ') . ' MAD',
             'TABLEAU_DEVIS' => $this->generateQuoteTable($reservation),
             'TABLEAU_DEVIS_SIMPLIFIE' => $this->generateSimplifiedQuoteTable($reservation),
         ];
@@ -114,25 +115,48 @@ trait HasDynamicTemplate
         // Sécurité : Si le prix avant remise est manquant (anciennes réservations), on le recalcule pour l'affichage
         $prixTotal = $reservation->prix_total;
         $prixAvant = $reservation->prix_avant_remise;
+        $taxeTotal = $reservation->taxe_sejour_total ?? 0;
         $remiseP = $reservation->remise_pourcentage ?? 4.0;
 
+        // If it's an agency but we don't have the room subtotal, we try to derive it
+        // Note: For old records, tax might be 0, so deriving is easier.
         if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
-            $prixAvant = $prixTotal / (1 - ($remiseP / 100));
+            $roomPart = $prixTotal - $taxeTotal;
+            $prixAvant = $roomPart / (1 - ($remiseP / 100));
         }
 
         if ($reservation->type_reservant === 'agence' && $prixAvant) {
             $html .= "<tr>";
-            $html .= "<td style='padding: 20px 12px 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Valeur Initiale</td>";
+            $html .= "<td style='padding: 20px 12px 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Total Hébergement (HT)</td>";
             $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #94a3b8; border-top: 2px solid #f1f5f9; text-align: right; text-decoration: line-through;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             $html .= "<tr>";
             $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise Agence ({$remiseP}%)</td>";
-            $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($prixAvant - $prixTotal, 0, ',', ' ') . " MAD</td>";
+            $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($prixAvant * ($remiseP / 100), 0, ',', ' ') . " MAD</td>";
+            $html .= "</tr>";
+            
+            // Ligne du total chambre après remise
+            $html .= "<tr>";
+            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #1e293b; font-size: 11px;'>Total Prix Chambre</td>";
+            $html .= "<td style='padding: 10px 12px; font-weight: bold; font-size: 14px; color: #1e293b; text-align: right;'>" . number_format($prixTotal - $taxeTotal, 0, ',', ' ') . " MAD</td>";
+            $html .= "</tr>";
+        } else {
+             // Pour les groupes/particuliers (HT)
+            $html .= "<tr>";
+            $html .= "<td style='padding: 20px 12px 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Total Prix Chambre</td>";
+            $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #1e293b; border-top: 2px solid #f1f5f9; text-align: right;'>" . number_format($prixTotal - $taxeTotal, 0, ',', ' ') . " MAD</td>";
+            $html .= "</tr>";
+        }
+
+        if ($taxeTotal > 0) {
+            $html .= "<tr>";
+            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Total Taxes de Séjour</td>";
+            $html .= "<td style='padding: 10px 12px; font-weight: bold; font-size: 14px; color: #64748b; text-align: right;'>+ " . number_format($taxeTotal, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
         }
 
         $html .= "<tr>";
-        $html .= "<td style='padding: 20px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>TOTAL GÉNÉRAL </td>";
+        $html .= "<td style='padding: 20px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #1e293b; font-size: 11px;'>TOTAL NET À PAYER (TTC)</td>";
         $html .= "<td style='padding: 20px 12px; font-weight: 900; font-size: 18px; color: #54b172; border-top: 2px solid #f1f5f9; text-align: right;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</td>";
         $html .= "</tr>";
         $html .= '</tfoot></table>';
@@ -157,20 +181,31 @@ trait HasDynamicTemplate
         // Sécurité : Si le prix avant remise est manquant, on le recalcule
         $prixTotal = $reservation->prix_total;
         $prixAvant = $reservation->prix_avant_remise;
+        $taxeTotal = $reservation->taxe_sejour_total ?? 0;
         $remiseP = $reservation->remise_pourcentage ?? 4.0;
 
         if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
-            $prixAvant = $prixTotal / (1 - ($remiseP / 100));
+            $roomPart = $prixTotal - $taxeTotal;
+            $prixAvant = $roomPart / (1 - ($remiseP / 100));
         }
 
         if ($reservation->type_reservant === 'agence' && $prixAvant) {
             $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right;'>";
             $html .= "<div style='font-weight: bold; color: #94a3b8; font-size: 13px; text-decoration: line-through; margin-bottom: 2px;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</div>";
-            $html .= "<div style='font-weight: 900; color: #059669; font-size: 12px; margin-bottom: 4px;'>- " . number_format($prixAvant - $prixTotal, 0, ',', ' ') . " MAD (-{$remiseP}%)</div>";
+            $html .= "<div style='font-weight: 900; color: #059669; font-size: 12px; margin-bottom: 4px;'>- " . number_format($prixAvant * ($remiseP / 100), 0, ',', ' ') . " MAD (-{$remiseP}%)</div>";
+            if ($taxeTotal > 0) {
+                $html .= "<div style='font-weight: bold; color: #64748b; font-size: 11px; margin-bottom: 4px;'>+ " . number_format($taxeTotal, 0, ',', ' ') . " MAD (Taxes)</div>";
+            }
             $html .= "<div style='font-weight: 900; color: #54b172; font-size: 16px; margin-top: 6px; border-top: 1px dashed #e2e8f0; padding-top: 6px;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</div>";
             $html .= "</td></tr>";
         } else {
-            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 900; color: #54b172; font-size: 16px;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</td></tr>";
+            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right;'>";
+            if ($taxeTotal > 0) {
+                $html .= "<div style='font-weight: bold; color: #64748b; font-size: 11px; margin-bottom: 4px;'>Chambres: " . number_format($prixTotal - $taxeTotal, 0, ',', ' ') . " MAD</div>";
+                $html .= "<div style='font-weight: bold; color: #64748b; font-size: 11px; margin-bottom: 4px;'>Taxes: " . number_format($taxeTotal, 0, ',', ' ') . " MAD</div>";
+            }
+            $html .= "<div style='font-weight: 900; color: #54b172; font-size: 16px;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</div>";
+            $html .= "</td></tr>";
         }
 
         $html .= '</tbody></table>';

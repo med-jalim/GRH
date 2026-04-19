@@ -80,10 +80,10 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
 
     const basePrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
-
+        
         return formData.groups.reduce((sum: number, g: any) => {
             if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
-
+            
             const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
             const nights = Math.max(1, Math.round(diff / 86_400_000));
             const checkInDate = new Date(g.checkIn);
@@ -97,7 +97,25 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         }, 0);
     }, [formData.groups, selectedHotel]);
 
-    const totalPrice = formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice;
+    const stayTaxTotal = useMemo(() => {
+        if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
+        const taxeParAdulte = selectedHotel.taxe_sejour || 0;
+
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
+
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+
+            const groupTax = g.rooms.reduce((rSum: number, r: any) => {
+                return rSum + (r.adults * r.quantity * nights * taxeParAdulte);
+            }, 0);
+
+            return sum + groupTax;
+        }, 0);
+    }, [formData.groups, selectedHotel]);
+
+    const totalPrice = formData.bookingType === 'agence' ? (basePrice * 0.96) + stayTaxTotal : basePrice + stayTaxTotal;
 
     const handleNext = async () => {
         let fieldsToValidate: any[] = [];
@@ -419,17 +437,23 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             {reservation.type_reservant === 'agence' && reservation.prix_avant_remise && (
                                                                 <>
                                                                     <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Valeur Initiale</td>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
                                                                         <td className="px-6 py-4 text-right font-bold text-slate-400 line-through border-b border-white">{formatPrice(reservation.prix_avant_remise)}</td>
                                                                     </tr>
                                                                     <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise Agence ({reservation.remise_pourcentage}%)</td>
-                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise - reservation.prix_total)}</td>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise Agence (4%)</td>
+                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise * 0.04)}</td>
                                                                     </tr>
                                                                 </>
                                                             )}
+                                                            {reservation.taxe_sejour_total > 0 && (
+                                                                <tr>
+                                                                    <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-500 uppercase tracking-widest border-b border-white">Taxes de séjour</td>
+                                                                    <td className="px-6 py-4 text-right font-bold text-slate-600 border-b border-white">+{formatPrice(reservation.taxe_sejour_total)}</td>
+                                                                </tr>
+                                                            )}
                                                             <tr>
-                                                                <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Estimé</td>
+                                                                <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Net à payer</td>
                                                                 <td className="px-6 py-4 text-right font-black text-lg text-[#54b172]">{formatPrice(reservation.prix_total)}</td>
                                                             </tr>
                                                         </tfoot>
@@ -532,24 +556,33 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         {reservation.type_reservant === 'agence' && reservation.prix_avant_remise ? (
                                             <>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-500 font-medium">Valeur Totale</span>
+                                                    <span className="text-slate-500 font-medium">Prix Chambres</span>
                                                     <span className="font-bold text-slate-400 line-through">{formatPrice(reservation.prix_avant_remise)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-emerald-600 font-bold">Remise Agence</span>
-                                                    <span className="font-black text-emerald-600">-{formatPrice(reservation.prix_avant_remise - reservation.prix_total)}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
-                                                    <span className="text-slate-500 font-medium">Total Net</span>
-                                                    <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                                    <span className="text-emerald-600 font-bold">Remise Agence (4%)</span>
+                                                    <span className="font-black text-emerald-600">-{formatPrice(reservation.prix_avant_remise * 0.04)}</span>
                                                 </div>
                                             </>
                                         ) : (
                                             <div className="flex justify-between items-center text-sm">
-                                                <span className="text-slate-500 font-medium">Total Séjour</span>
-                                                <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                                <span className="text-slate-500 font-medium">Prix Chambres</span>
+                                                <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total - (reservation.taxe_sejour_total || 0))}</span>
                                             </div>
                                         )}
+                                        
+                                        {reservation.taxe_sejour_total > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-500 font-medium">Taxes de séjour</span>
+                                                <span className="font-bold text-slate-700">+{formatPrice(reservation.taxe_sejour_total)}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100 italic">
+                                            <span className="text-slate-600 font-bold">Total Net à payer</span>
+                                            <span className="font-black text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                        </div>
+
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500 font-medium">Déjà versé</span>
                                             <span className="font-bold text-emerald-600">-{formatPrice(totalValidPaid)}</span>
@@ -607,7 +640,14 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                 onCapacityErrorChange={(hasError) => setIsCapacityValid(!hasError)}
                                             />
                                         )}
-                                        {step === 3 && <SummaryStep hotel={selectedHotel} basePrice={basePrice} totalPrice={totalPrice} />}
+                                        {step === 3 && (
+                                            <SummaryStep 
+                                                hotel={selectedHotel} 
+                                                basePrice={basePrice} 
+                                                stayTaxTotal={stayTaxTotal}
+                                                totalPrice={totalPrice} 
+                                            />
+                                        )}
                                     </form>
                                 </FormProvider>
                             </div>

@@ -10,6 +10,7 @@ import { computeDynamicPrice } from '@/lib/utils';
 interface Props {
   hotel:      Hotel | null;
   basePrice:  number;
+  stayTaxTotal: number;
   totalPrice: number;
 }
 
@@ -24,7 +25,7 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-export function SummaryStep({ hotel, basePrice, totalPrice }: Props) {
+export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
@@ -133,26 +134,39 @@ export function SummaryStep({ hotel, basePrice, totalPrice }: Props) {
         <div className="bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/20 rounded-full -mr-16 -mt-16 blur-3xl" />
           <div className="relative z-10">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-2">Total de la Demande</h3>
-                    <p className="text-xs text-slate-400">Taxes de séjour incluses dans l'estimation</p>
-                    
-                    {formData.bookingType === 'agence' && (
-                        <div className="mt-3 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
-                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise Agence (4%)</span>
-                            <span className="text-sm font-black text-emerald-300">- {formatPrice(basePrice - totalPrice)}</span>
+            <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-end border-b border-white/10 pb-4">
+                    <div>
+                        <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-2">Détail des Tarifs</h3>
+                        <div className="space-y-1">
+                            <p className="text-xs text-slate-400 flex justify-between gap-8">
+                                <span>Sous-total Hébergement :</span>
+                                <span className={formData.bookingType === 'agence' ? 'line-through opacity-50' : 'font-bold text-white'}>{formatPrice(basePrice)}</span>
+                            </p>
+                            {formData.bookingType === 'agence' && (
+                                <p className="text-xs text-emerald-400 flex justify-between gap-8 font-bold">
+                                    <span>Remise Agence (4%) :</span>
+                                    <span>- {formatPrice(basePrice * 0.04)}</span>
+                                </p>
+                            )}
+                            {stayTaxTotal > 0 && (
+                                <p className="text-xs text-amber-400 flex justify-between gap-8 font-bold">
+                                    <span>Taxes de séjour :</span>
+                                    <span>+ {formatPrice(stayTaxTotal)}</span>
+                                </p>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
-                <div className="text-right">
-                    {formData.bookingType === 'agence' && (
-                        <p className="text-lg font-bold text-slate-500 line-through opacity-70 mb-1">
-                            {formatPrice(basePrice)}
-                        </p>
-                    )}
-                    <p className="text-4xl font-black tracking-tighter text-white leading-none">{formatPrice(totalPrice)}</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">{formData.groups?.reduce((acc, g) => acc + g.rooms.reduce((ra, r) => ra + r.quantity, 0), 0)} unité(s) au total</p>
+
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Total Net à payer</h3>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">TVA & Taxes incluses</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-4xl font-black tracking-tighter text-white leading-none">{formatPrice(totalPrice)}</p>
+                    </div>
                 </div>
             </div>
           </div>

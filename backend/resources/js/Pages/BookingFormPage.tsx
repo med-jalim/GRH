@@ -83,7 +83,24 @@ export default function BookingFormPage({ hotels }: Props) {
         }, 0);
     }, [formData.groups, selectedHotel]);
 
-    const totalPrice = formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice;
+    const stayTaxTotal = useMemo(() => {
+        if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
+        const taxeParAdulte = selectedHotel.taxe_sejour ?? 0;
+
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return sum;
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+
+            const groupTax = g.rooms.reduce((rSum: number, r: any) => {
+                return rSum + (r.adults * r.quantity * nights * taxeParAdulte);
+            }, 0);
+
+            return sum + groupTax;
+        }, 0);
+    }, [formData.groups, selectedHotel]);
+
+    const totalPrice = (formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice) + stayTaxTotal;
 
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
@@ -185,6 +202,7 @@ export default function BookingFormPage({ hotels }: Props) {
                 formData={successData.data}
                 hotel={selectedHotel}
                 basePrice={basePrice}
+                stayTaxTotal={stayTaxTotal}
                 totalPrice={totalPrice}
             />
         );
@@ -233,6 +251,7 @@ export default function BookingFormPage({ hotels }: Props) {
                                         <SummaryStep
                                             hotel={selectedHotel}
                                             basePrice={basePrice}
+                                            stayTaxTotal={stayTaxTotal}
                                             totalPrice={totalPrice}
                                         />
                                     )}

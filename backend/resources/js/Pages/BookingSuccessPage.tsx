@@ -12,12 +12,12 @@ import {
   BedDouble,
   PlusCircle,
 } from "lucide-react";
-
 interface Props {
   reference: string;
   formData: BookingFormData;
   hotel: Hotel | null;
   basePrice: number;
+  stayTaxTotal: number;
   totalPrice: number;
 }
 
@@ -26,6 +26,7 @@ export function BookingSuccessPage({
   formData,
   hotel,
   basePrice,
+  stayTaxTotal,
   totalPrice,
 }: Props) {
   const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
@@ -170,21 +171,30 @@ export function BookingSuccessPage({
                     )}
 
                     <div className="flex justify-between items-end">
-                        <div>
-                            <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Estimation Totale (HT)</p>
-                            <p className="text-xs text-white/60 font-medium whitespace-nowrap">Récapitulatif de tous les groupes</p>
+                        <div className="space-y-3">
+                            <div>
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Estimation Totale</p>
+                                <p className="text-xs text-white/60 font-medium whitespace-nowrap">Incluant taxes et remises</p>
+                            </div>
                             
                             {formData.bookingType === 'agence' && (
-                                <div className="mt-3 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-max">
+                                <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-max">
                                     <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise Agence (4%)</span>
-                                    <span className="text-sm font-black text-emerald-300">- {formatPrice(basePrice - totalPrice)}</span>
+                                    <span className="text-sm font-black text-emerald-300">- {formatPrice(basePrice * 0.04)}</span>
+                                </div>
+                            )}
+
+                            {stayTaxTotal > 0 && (
+                                <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg w-max">
+                                    <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Taxe de Séjour</span>
+                                    <span className="text-sm font-black text-amber-300">+ {formatPrice(stayTaxTotal)}</span>
                                 </div>
                             )}
                         </div>
                         <div className="text-right flex flex-col items-end">
                             {formData.bookingType === 'agence' && (
                                 <span className="text-lg font-bold text-slate-500 line-through opacity-70 mb-1">
-                                    {formatPrice(basePrice)}
+                                    {formatPrice(basePrice + stayTaxTotal)}
                                 </span>
                             )}
                             <span className="text-3xl sm:text-4xl font-black text-[#54b172]">{formatPrice(totalPrice)}</span>

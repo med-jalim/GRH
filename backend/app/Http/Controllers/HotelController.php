@@ -69,6 +69,7 @@ class HotelController extends Controller
             'email'       => 'nullable|email|max:255',
             'adresse'     => 'nullable|string|max:1000',
             'rib'         => 'nullable|string|min:10|max:24',
+            'taxe_sejour' => 'nullable|numeric|min:0',
         ]);
 
         $hotel = Hotel::create($validated);
@@ -140,6 +141,7 @@ class HotelController extends Controller
             'email'       => 'nullable|email|max:255',
             'adresse'     => 'nullable|string|max:1000',
             'rib'         => 'nullable|string|min:10|max:24',
+            'taxe_sejour' => 'nullable|numeric|min:0',
         ]);
 
         $hotel->update($validated);

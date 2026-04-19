@@ -94,6 +94,7 @@ interface Reservation {
   date_arrivee: string;
   date_depart: string;
   nb_personnes: number;
+  taxe_sejour_total: number;
   prix_total: number;
   remarques_speciales: string | null;
   statut: "en_attente" | "en_attente_paiement" | "confirme" | "annule" | "en_validation" | "valide" | "partiellement_paye";
@@ -697,25 +698,41 @@ export default function ReservationShow({ reservation }: Props) {
                   })}
                   
                   {/* Final Total Summary Card */}
-                  {reservation.type_reservant === 'agence' && reservation.prix_avant_remise && (
-                    <div className="mt-8 p-6 bg-emerald-50 rounded-2xl flex items-center justify-between shadow-sm border border-emerald-100 mb-4">
-                      <div>
-                        <p className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.2em] mb-1">Remise Agence Appliquée</p>
-                        <p className="text-emerald-500 text-xs font-medium">Réduction de -{reservation.remise_pourcentage}% sur le total</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-emerald-600/50 line-through mb-0.5">{formatPrice(reservation.prix_avant_remise)}</p>
-                        <p className="text-lg font-black text-emerald-600">- {formatPrice(reservation.prix_avant_remise - reservation.prix_total)} MAD</p>
-                      </div>
-                    </div>
-                  )}
+                  {/* Price Breakdown Card */}
+                  <div className="mt-8 bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-200">
+                    <div className="p-8 space-y-6">
+                      {/* Breakdown Lines */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-slate-400">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sous-total (Hébergement)</span>
+                          <span className="text-sm font-bold text-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - reservation.taxe_sejour_total))}</span>
+                        </div>
 
-                  <div className="mt-8 p-6 bg-slate-900 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200">
-                    <div>
-                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">Montant Total de la Réservation</p>
-                      <p className="text-slate-400 text-xs font-medium">Récapitulatif final des prestations</p>
+                        {reservation.type_reservant === 'agence' && reservation.remise_pourcentage && (
+                          <div className="flex justify-between items-center text-emerald-400">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Remise Agence ({reservation.remise_pourcentage}%)</span>
+                            <span className="text-sm font-black">- {formatPrice((reservation.prix_avant_remise || 0) * (reservation.remise_pourcentage / 100))}</span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-amber-400">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Taxe de séjour</span>
+                          <span className="text-sm font-black">+ {formatPrice(reservation.taxe_sejour_total)}</span>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-white/10" />
+
+                      <div className="flex justify-between items-end">
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em]">Montant Total TTC</p>
+                          <p className="text-slate-400 text-[10px] font-medium">Incluant taxes et remises agence</p>
+                        </div>
+                        <p className="text-4xl font-black text-[#54b172] tracking-tighter">
+                          {formatPrice(reservation.prix_total)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-2xl font-black text-[#54b172]">{formatPrice(reservation.prix_total)}</p>
                   </div>
                 </div>
               </Section>

@@ -23,6 +23,7 @@ interface Hotel {
   ville: string | null;
   stars: number | null;
   description: string | null;
+  taxe_sejour: number;
   chambres_count: number;
   reservations_count: number;
 }
@@ -69,6 +70,7 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
     email: "",
     adresse: "",
     rib: "",
+    taxe_sejour: "0",
   });
 
   function submit(e: React.FormEvent) {
@@ -231,6 +233,22 @@ function CreateHotelModal({ onClose }: { onClose: () => void }) {
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 tracking-widest font-mono"
             />
             {errors.rib && <p className="text-red-500 text-xs mt-1">{errors.rib}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Taxe de séjour (par adulte / nuit)</label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.01"
+                value={data.taxe_sejour}
+                onChange={(e) => setData("taxe_sejour", e.target.value)}
+                placeholder="Ex : 20.00"
+                className="w-full pl-4 pr-12 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">MAD</span>
+            </div>
+            {errors.taxe_sejour && <p className="text-red-500 text-xs mt-1">{errors.taxe_sejour}</p>}
           </div>
 
           {/* Footer */}

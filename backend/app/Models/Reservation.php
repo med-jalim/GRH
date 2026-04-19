@@ -28,7 +28,8 @@ class Reservation extends Model
         'total_amount',
         'type_reservant',
         'remise_pourcentage',
-        'prix_avant_remise'
+        'prix_avant_remise',
+        'taxe_sejour_total'
     ];
 
     protected $appends = ['date_arrivee', 'date_depart'];
@@ -38,6 +39,7 @@ class Reservation extends Model
         'total_amount'       => 'float',
         'remise_pourcentage' => 'float',
         'prix_avant_remise'  => 'float',
+        'taxe_sejour_total'  => 'float',
         'date_arrivee'       => 'date',
         'date_depart'        => 'date',
     ];

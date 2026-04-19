@@ -139,27 +139,38 @@ class ClientReservationController extends Controller
         $groupsData = $validated['groups'];
         unset($validated['groups']);
 
-        $prixTotal = 0;
+        $chambreSousTotal = 0;
+        $taxeSejourTotal = 0;
         $totalPersonnes = 0;
+
+        $hotel = $reservation->hotel;
+        $taxeParAdulte = $hotel->taxe_sejour ?? 0;
+
         foreach ($groupsData as $g) {
             $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
-            $groupOccupants = collect($g['rooms'])->sum(function ($room) {
+            $groupPersonnes = collect($g['rooms'])->sum(function ($room) {
                 return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
             });
-            $totalPersonnes += $groupOccupants;
+            $totalPersonnes += $groupPersonnes;
+
             foreach ($g['rooms'] as $r) {
-                $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+                // Room Price
+                $chambreSousTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+                
+                // Tax Calculation
+                $taxeSejourTotal += ($r['nb_adultes'] * $r['quantite'] * $nights * $taxeParAdulte);
             }
         }
         $validated['nb_personnes'] = $totalPersonnes;
+        $validated['taxe_sejour_total'] = $taxeSejourTotal;
 
         $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
         if ($typeReservant === 'agence') {
-            $validated['prix_avant_remise'] = $prixTotal;
+            $validated['prix_avant_remise'] = $chambreSousTotal;
             $validated['remise_pourcentage'] = 4.0;
-            $validated['prix_total'] = $prixTotal * (1 - (4.0 / 100));
+            $validated['prix_total'] = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
         } else {
-            $validated['prix_total'] = $prixTotal;
+            $validated['prix_total'] = $chambreSousTotal + $taxeSejourTotal;
             $validated['prix_avant_remise'] = null;
             $validated['remise_pourcentage'] = null;
         }

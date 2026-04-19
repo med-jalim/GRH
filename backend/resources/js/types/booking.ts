@@ -42,6 +42,7 @@ export interface Hotel {
   ville: string;
   stars: number;
   description: string;
+  taxe_sejour: number;
   chambres: Chambre[];
   tarifs: Tarif[];
 }
