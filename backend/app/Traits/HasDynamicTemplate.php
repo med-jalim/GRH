@@ -7,7 +7,38 @@ use Illuminate\Support\Facades\View;
 
 trait HasDynamicTemplate
 {
-    
+    /**
+     * Resolve the template and replace variables.
+     */
+    protected function resolveDynamicTemplate(string $slug, array $data): ?string
+    {
+        $template = EmailTemplate::where('slug', $slug)->first();
+
+        if (! $template || ! $template->content_html) {
+            return null;
+        }
+
+        $html = $template->content_html;
+
+        // 1. Digital Variable Replacement (Case insensitive + allows internal spaces)
+        foreach ($data as $key => $value) {
+            $valStr = is_null($value) ? '' : (string)$value;
+            // preserve line breaks for text fields
+            $valStr = nl2br($valStr);
+            
+            // Regex to match {{KEY}}, {{ KEY }}, {{  key  }}, etc.
+            $pattern = '/\{\{\s*' . preg_quote($key, '/') . '\s*\}\}/i';
+            $html = preg_replace($pattern, $valStr, $html);
+        }
+
+        // 2. Preserve multiple spaces (Fix for "spaces not applying" issue)
+        // We replace sequences of 2 or more spaces with non-breaking spaces
+        $html = preg_replace_callback('/  +/', function($matches) {
+            return str_repeat('&nbsp;', strlen($matches[0]));
+        }, $html);
+
+        return $html;
+    }
 
     /**
      * Get all common variables for a reservation.
@@ -78,23 +109,31 @@ trait HasDynamicTemplate
             $html .= "</tr>";
         }
 
+        $html .= '</tbody><tfoot>';
         
-        if ($reservation->type_reservant === 'agence' && $reservation->prix_avant_remise) {
+        // Sécurité : Si le prix avant remise est manquant (anciennes réservations), on le recalcule pour l'affichage
+        $prixTotal = $reservation->prix_total;
+        $prixAvant = $reservation->prix_avant_remise;
+        $remiseP = $reservation->remise_pourcentage ?? 4.0;
+
+        if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
+            $prixAvant = $prixTotal / (1 - ($remiseP / 100));
+        }
+
+        if ($reservation->type_reservant === 'agence' && $prixAvant) {
             $html .= "<tr>";
             $html .= "<td style='padding: 20px 12px 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Valeur Initiale</td>";
-            $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #94a3b8; border-top: 2px solid #f1f5f9; text-align: right; text-decoration: line-through;'>" . number_format($reservation->prix_avant_remise, 0, ',', ' ') . " MAD</td>";
+            $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #94a3b8; border-top: 2px solid #f1f5f9; text-align: right; text-decoration: line-through;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             $html .= "<tr>";
-            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise Agence ({$reservation->remise_pourcentage}%)</td>";
-            $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($reservation->prix_avant_remise - $reservation->prix_total, 0, ',', ' ') . " MAD</td>";
+            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise Agence ({$remiseP}%)</td>";
+            $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($prixAvant - $prixTotal, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
         }
 
-        $html .= '</tbody><tfoot>';
-
         $html .= "<tr>";
         $html .= "<td style='padding: 20px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>TOTAL GÉNÉRAL </td>";
-        $html .= "<td style='padding: 20px 12px; font-weight: 900; font-size: 18px; color: #54b172; border-top: 2px solid #f1f5f9; text-align: right;'>" . number_format($reservation->prix_total, 0, ',', ' ') . " MAD</td>";
+        $html .= "<td style='padding: 20px 12px; font-weight: 900; font-size: 18px; color: #54b172; border-top: 2px solid #f1f5f9; text-align: right;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</td>";
         $html .= "</tr>";
         $html .= '</tfoot></table>';
 
@@ -115,14 +154,23 @@ trait HasDynamicTemplate
         $html .= '</thead><tbody>';
         $html .= "<tr><td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9;'><div style='font-weight: bold; color: #1e293b; margin-bottom: 4px;'>{$arrival} &rarr; {$departure}</div><div style='color: #64748b; font-size: 11px;'>Pour {$reservation->nb_personnes} personne(s)</div></td>";
         
-        if ($reservation->type_reservant === 'agence' && $reservation->prix_avant_remise) {
+        // Sécurité : Si le prix avant remise est manquant, on le recalcule
+        $prixTotal = $reservation->prix_total;
+        $prixAvant = $reservation->prix_avant_remise;
+        $remiseP = $reservation->remise_pourcentage ?? 4.0;
+
+        if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
+            $prixAvant = $prixTotal / (1 - ($remiseP / 100));
+        }
+
+        if ($reservation->type_reservant === 'agence' && $prixAvant) {
             $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right;'>";
-            $html .= "<div style='font-weight: bold; color: #94a3b8; font-size: 13px; text-decoration: line-through; margin-bottom: 2px;'>" . number_format($reservation->prix_avant_remise, 0, ',', ' ') . " MAD</div>";
-            $html .= "<div style='font-weight: 900; color: #059669; font-size: 12px; margin-bottom: 4px;'>- " . number_format($reservation->prix_avant_remise - $reservation->prix_total, 0, ',', ' ') . " MAD (-{$reservation->remise_pourcentage}%)</div>";
-            $html .= "<div style='font-weight: 900; color: #54b172; font-size: 16px; margin-top: 6px; border-top: 1px dashed #e2e8f0; padding-top: 6px;'>" . number_format($reservation->prix_total, 0, ',', ' ') . " MAD</div>";
+            $html .= "<div style='font-weight: bold; color: #94a3b8; font-size: 13px; text-decoration: line-through; margin-bottom: 2px;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</div>";
+            $html .= "<div style='font-weight: 900; color: #059669; font-size: 12px; margin-bottom: 4px;'>- " . number_format($prixAvant - $prixTotal, 0, ',', ' ') . " MAD (-{$remiseP}%)</div>";
+            $html .= "<div style='font-weight: 900; color: #54b172; font-size: 16px; margin-top: 6px; border-top: 1px dashed #e2e8f0; padding-top: 6px;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</div>";
             $html .= "</td></tr>";
         } else {
-            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 900; color: #54b172; font-size: 16px;'>" . number_format($reservation->prix_total, 0, ',', ' ') . " MAD</td></tr>";
+            $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 900; color: #54b172; font-size: 16px;'>" . number_format($prixTotal, 0, ',', ' ') . " MAD</td></tr>";
         }
 
         $html .= '</tbody></table>';
