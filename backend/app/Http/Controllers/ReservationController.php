@@ -94,8 +94,9 @@ class ReservationController extends Controller
     public function store(Request $request): JsonResponse|RedirectResponse
     {
          $validated = $request->validate([
+            'type_reservant'      => 'required|in:agence,groupe',
             'nom_agence'          => 'nullable|string|max:255',
-            'code_agence'         => 'required|string|max:100',
+            'code_agence'         => 'nullable|string|max:100',
             'nom_contact'         => 'required|string|max:255',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
@@ -158,6 +159,12 @@ class ReservationController extends Controller
 
         $validated['prix_total'] = $prixTotal;
         $validated['nb_personnes'] = $totalPersonnes;
+
+        if (($validated['type_reservant'] ?? 'groupe') === 'agence') {
+            $validated['prix_avant_remise'] = $prixTotal;
+            $validated['remise_pourcentage'] = 4.0;
+            $validated['prix_total'] = $prixTotal * (1 - (4.0 / 100));
+        }
 
         unset($validated['groups']);
         $reservation = Reservation::create($validated);
@@ -274,6 +281,7 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
+            'type_reservant'      => 'sometimes|required|in:agence,groupe',
             'nom_agence'          => 'nullable|string|max:255',
             'nom_contact'         => 'sometimes|required|string|max:255',
             'code_agence'         => 'nullable|string|max:100',
@@ -302,7 +310,19 @@ class ReservationController extends Controller
                 $prixTotal += ($item->quantite * $item->prix_unitaire * $nights);
             }
         }
-        $reservation->prix_total = $prixTotal;
+
+        $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
+        
+        if ($typeReservant === 'agence') {
+            $reservation->prix_avant_remise = $prixTotal;
+            $reservation->remise_pourcentage = 4.0;
+            $reservation->prix_total = $prixTotal * (1 - (4.0 / 100));
+        } else {
+            $reservation->prix_avant_remise = null;
+            $reservation->remise_pourcentage = null;
+            $reservation->prix_total = $prixTotal;
+        }
+
         $reservation->nb_personnes = $totalPersonnes;
         $reservation->save();
 

@@ -25,16 +25,21 @@ class Reservation extends Model
         'payment_link',
         'token',
         'paid_amount',
-        'total_amount'
+        'total_amount',
+        'type_reservant',
+        'remise_pourcentage',
+        'prix_avant_remise'
     ];
 
     protected $appends = ['date_arrivee', 'date_depart'];
 
     protected $casts = [
-        'paid_amount'  => 'float',
-        'total_amount' => 'float',
-        'date_arrivee' => 'date',
-        'date_depart'  => 'date',
+        'paid_amount'        => 'float',
+        'total_amount'       => 'float',
+        'remise_pourcentage' => 'float',
+        'prix_avant_remise'  => 'float',
+        'date_arrivee'       => 'date',
+        'date_depart'        => 'date',
     ];
 
     protected function dateArrivee(): Attribute

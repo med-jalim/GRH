@@ -6,8 +6,11 @@ import type { BookingSchemaType } from "@/lib/schemas";
 export function AgencyInfoStep() {
   const {
     register,
+    watch,
     formState: { errors },
   } = useFormContext<BookingSchemaType>();
+
+  const bookingType = watch('bookingType');
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -17,7 +20,7 @@ export function AgencyInfoStep() {
             1
           </div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight uppercase">
-            Informations Agence
+            Informations {bookingType === 'agence' ? 'Agence' : 'Contact'}
           </h2>
         </div>
         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest ml-[52px]">
@@ -25,7 +28,34 @@ export function AgencyInfoStep() {
         </p>
       </div>
 
+
+      {/* toggle button Agence/Groupe */}
+      <div className="flex gap-4 mb-8">
+        <label className={`flex-1 flex items-center justify-center gap-3 px-6 py-2 rounded-2xl border-2 transition-all cursor-pointer ${bookingType === 'groupe' ? 'border-[#54b172] bg-emerald-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+          <input type="radio" value="groupe" {...register('bookingType')} className="hidden" />
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${bookingType === 'groupe' ? 'border-[#54b172]' : 'border-slate-300'}`}>
+            {bookingType === 'groupe' && <div className="w-2.5 h-2.5 rounded-full bg-[#54b172]" />}
+          </div>
+          <span className={`font-bold text-sm ${bookingType === 'groupe' ? 'text-[#54b172]' : 'text-slate-500'}`}>Groupe Privé</span>
+        </label>
+        
+        <label className={`flex-1 flex flex-col items-center justify-center gap-1.5 px-6 py-2 rounded-2xl border-2 transition-all cursor-pointer ${bookingType === 'agence' ? 'border-[#54b172] bg-emerald-50/50' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+          <input type="radio" value="agence" {...register('bookingType')} className="hidden" />
+          <div className="flex items-center gap-3">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${bookingType === 'agence' ? 'border-[#54b172]' : 'border-slate-300'}`}>
+                {bookingType === 'agence' && <div className="w-2.5 h-2.5 rounded-full bg-[#54b172]" />}
+              </div>
+              <span className={`font-bold text-sm ${bookingType === 'agence' ? 'text-[#54b172]' : 'text-slate-500'}`}>Agence de Voyage</span>
+          </div>
+        </label>
+      </div>
+
+
+
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+        {bookingType === 'agence' && (
+          <>
         {/* Nom Agence */}
         <div className="space-y-2">
           <Label htmlFor="agencyName" className="text-slate-700 font-semibold text-sm">Nom de l'agence de voyage</Label>
@@ -61,6 +91,8 @@ export function AgencyInfoStep() {
             )}
           </div>
         </div>
+        </>
+        )}
 
         {/* Contact */}
         <div className="space-y-2">
@@ -68,7 +100,7 @@ export function AgencyInfoStep() {
             htmlFor="contactName"
             className="text-slate-700 font-semibold text-sm"
           >
-            Responsable du dossier
+            {bookingType === 'agence' ? 'Responsable du dossier' : 'Chef de groupe (Nom complet)'}
           </Label>
           <div className="relative">
             <Input

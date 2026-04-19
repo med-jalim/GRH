@@ -9,6 +9,7 @@ import { computeDynamicPrice } from '@/lib/utils';
 
 interface Props {
   hotel:      Hotel | null;
+  basePrice:  number;
   totalPrice: number;
 }
 
@@ -23,7 +24,7 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-export function SummaryStep({ hotel, totalPrice }: Props) {
+export function SummaryStep({ hotel, basePrice, totalPrice }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
@@ -43,8 +44,8 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
         {/* Contact Info */}
         <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
           <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-4 border-b border-slate-100 pb-2">Agence & Contact</h3>
-          <Row label="Agence"      value={formData.agencyName} />
-          <Row label="Code Agence" value={formData.agencyCode} />
+          <Row label="Agence"      value={formData.agencyName || '—'} />
+          <Row label="Code Agence" value={formData.agencyCode || '—'} />
           <Row label="Responsable" value={formData.contactName} />
           <Row label="E-mail"      value={formData.email} />
           <Row label="Téléphone"   value={formData.phone} />
@@ -136,8 +137,20 @@ export function SummaryStep({ hotel, totalPrice }: Props) {
                 <div>
                     <h3 className="text-[10px] font-black text-[#54b172] uppercase tracking-[0.2em] mb-2">Total de la Demande</h3>
                     <p className="text-xs text-slate-400">Taxes de séjour incluses dans l'estimation</p>
+                    
+                    {formData.bookingType === 'agence' && (
+                        <div className="mt-3 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise Agence (4%)</span>
+                            <span className="text-sm font-black text-emerald-300">- {formatPrice(basePrice - totalPrice)}</span>
+                        </div>
+                    )}
                 </div>
                 <div className="text-right">
+                    {formData.bookingType === 'agence' && (
+                        <p className="text-lg font-bold text-slate-500 line-through opacity-70 mb-1">
+                            {formatPrice(basePrice)}
+                        </p>
+                    )}
                     <p className="text-4xl font-black tracking-tighter text-white leading-none">{formatPrice(totalPrice)}</p>
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">{formData.groups?.reduce((acc, g) => acc + g.rooms.reduce((ra, r) => ra + r.quantity, 0), 0)} unité(s) au total</p>
                 </div>

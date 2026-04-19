@@ -35,6 +35,7 @@ export default function BookingFormPage({ hotels }: Props) {
     const methods = useForm<BookingSchemaType>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
+            bookingType: "groupe",
             agencyName: "",
             agencyCode: "",
             contactName: "",
@@ -63,7 +64,7 @@ export default function BookingFormPage({ hotels }: Props) {
         [formData.hotelId, hotels],
     );
 
-    const totalPrice = useMemo(() => {
+    const basePrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
         
         return formData.groups.reduce((sum: number, g: any) => {
@@ -81,6 +82,8 @@ export default function BookingFormPage({ hotels }: Props) {
             return sum + groupTotal;
         }, 0);
     }, [formData.groups, selectedHotel]);
+
+    const totalPrice = formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice;
 
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
@@ -116,6 +119,7 @@ export default function BookingFormPage({ hotels }: Props) {
         setSubmitting(true);
 
         const payload = {
+            type_reservant: data.bookingType,
             nom_agence: data.agencyName,
             nom_contact: data.contactName,
             code_agence: data.agencyCode,
@@ -227,6 +231,7 @@ export default function BookingFormPage({ hotels }: Props) {
                                     {step === 3 && (
                                         <SummaryStep
                                             hotel={selectedHotel}
+                                            basePrice={basePrice}
                                             totalPrice={totalPrice}
                                         />
                                     )}

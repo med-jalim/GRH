@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
 export const bookingSchema = z.object({
-  // Step 1: Agency Info
-  agencyName:  z.string().min(2, 'Le nom de l\'agence est requis'),
-  agencyCode:  z.string().min(3, 'Le code agence est requis'),
+  // Step 1: Info
+  bookingType: z.enum(['agence', 'groupe']),
+  agencyName:  z.string().optional(),
+  agencyCode:  z.string().optional(),
   contactName: z.string().min(2, 'Le nom du contact est requis'),
   email:       z.string().email('Adresse e-mail invalide'),
   phone:       z.string().min(8, 'Numéro de téléphone invalide'),
@@ -29,6 +30,23 @@ export const bookingSchema = z.object({
   // Step 3: Confirmation
   specialRequests: z.string().optional(),
 }).superRefine((data, ctx) => {
+  if (data.bookingType === 'agence') {
+    if (!data.agencyName || data.agencyName.trim().length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Le nom de l'agence est requis (min 2 caractères)",
+        path: ["agencyName"]
+      });
+    }
+    if (!data.agencyCode || data.agencyCode.trim().length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Le code agence est requis (min 3 caractères)",
+        path: ["agencyCode"]
+      });
+    }
+  }
+
   data.groups.forEach((group, index) => {
     if (group.checkIn && group.checkOut && new Date(group.checkOut) <= new Date(group.checkIn)) {
       ctx.addIssue({

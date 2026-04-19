@@ -82,6 +82,9 @@ interface PaymentVerification {
 interface Reservation {
   id: number;
   code_reference: string;
+  type_reservant: 'agence' | 'groupe';
+  remise_pourcentage: number | null;
+  prix_avant_remise: number | null;
   nom_agence: string | null;
   code_agence: string | null;
   nom_contact: string;
@@ -575,10 +578,15 @@ export default function ReservationShow({ reservation }: Props) {
           <div className="lg:col-span-2 flex flex-col gap-6">
             <Section title="Informations du contact" icon={User}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <InfoRow icon={User} label="Nom du contact" value={reservation.nom_contact} />
-                <Tag className="hidden" /> {/* Keep icon import active if needed */}
-                <InfoRow icon={Tag} label="Agence" value={reservation.nom_agence || undefined} />
-                <InfoRow icon={Hash} label="Code agence" value={reservation.code_agence || undefined} mono />
+                <InfoRow icon={User} label="Type de Réservant" value={reservation.type_reservant === 'agence' ? '🏢 Agence de Voyage' : '👥 Groupe / Particulier'} />
+                <InfoRow icon={User} label={reservation.type_reservant === 'agence' ? "Responsable du dossier" : "Chef de groupe"} value={reservation.nom_contact} />
+                {reservation.type_reservant === 'agence' && (
+                  <>
+                    <Tag className="hidden" /> {/* Keep icon import active if needed */}
+                    <InfoRow icon={Tag} label="Agence" value={reservation.nom_agence || undefined} />
+                    <InfoRow icon={Hash} label="Code agence" value={reservation.code_agence || undefined} mono />
+                  </>
+                )}
                 <InfoRow icon={Mail} label="E-mail" value={reservation.email} />
                 <InfoRow icon={Phone} label="Téléphone" value={reservation.telephone} />
               </div>
@@ -689,6 +697,19 @@ export default function ReservationShow({ reservation }: Props) {
                   })}
                   
                   {/* Final Total Summary Card */}
+                  {reservation.type_reservant === 'agence' && reservation.prix_avant_remise && (
+                    <div className="mt-8 p-6 bg-emerald-50 rounded-2xl flex items-center justify-between shadow-sm border border-emerald-100 mb-4">
+                      <div>
+                        <p className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.2em] mb-1">Remise Agence Appliquée</p>
+                        <p className="text-emerald-500 text-xs font-medium">Réduction de -{reservation.remise_pourcentage}% sur le total</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-emerald-600/50 line-through mb-0.5">{formatPrice(reservation.prix_avant_remise)}</p>
+                        <p className="text-lg font-black text-emerald-600">- {formatPrice(reservation.prix_avant_remise - reservation.prix_total)} MAD</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-8 p-6 bg-slate-900 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200">
                     <div>
                       <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-1">Montant Total de la Réservation</p>
