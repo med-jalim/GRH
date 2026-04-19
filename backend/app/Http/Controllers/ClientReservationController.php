@@ -150,8 +150,17 @@ class ClientReservationController extends Controller
                 $prixTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
             }
         }
-        $validated['prix_total'] = $prixTotal;
         $validated['nb_personnes'] = $totalPersonnes;
+
+        if ($reservation->type_reservant === 'agence') {
+            $validated['prix_avant_remise'] = $prixTotal;
+            $validated['remise_pourcentage'] = 4.0;
+            $validated['prix_total'] = $prixTotal * (1 - (4.0 / 100));
+        } else {
+            $validated['prix_total'] = $prixTotal;
+            $validated['prix_avant_remise'] = null;
+            $validated['remise_pourcentage'] = null;
+        }
 
         // Reset status to en_attente and save
         $reservation->statut = 'en_attente';

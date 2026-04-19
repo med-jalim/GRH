@@ -184,6 +184,7 @@ export default function BookingFormPage({ hotels }: Props) {
                 reference={successData.reference}
                 formData={successData.data}
                 hotel={selectedHotel}
+                basePrice={basePrice}
                 totalPrice={totalPrice}
             />
         );

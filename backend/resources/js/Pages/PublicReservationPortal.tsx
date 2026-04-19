@@ -44,6 +44,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const methods = useForm<BookingSchemaType>({
         resolver: zodResolver(bookingSchema),
         defaultValues: {
+            bookingType: reservation.type_reservant || 'groupe',
             agencyName: reservation.nom_agence || "",
             agencyCode: reservation.code_agence || "",
             contactName: reservation.nom_contact || "",
@@ -77,7 +78,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         [formData.hotelId, hotels],
     );
 
-    const totalPrice = useMemo(() => {
+    const basePrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
 
         return formData.groups.reduce((sum: number, g: any) => {
@@ -95,6 +96,8 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             return sum + groupTotal;
         }, 0);
     }, [formData.groups, selectedHotel]);
+
+    const totalPrice = formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice;
 
     const handleNext = async () => {
         let fieldsToValidate: any[] = [];
@@ -122,6 +125,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
     const onSubmit = (data: BookingSchemaType) => {
         setSubmitting(true);
         const payload = {
+            type_reservant: data.bookingType,
             nom_contact: data.contactName,
             email: data.email,
             telephone: data.phone,
@@ -411,6 +415,18 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             })}
                                                         </tbody>
                                                         <tfoot className="bg-slate-50">
+                                                            {reservation.type_reservant === 'agence' && reservation.prix_avant_remise && (
+                                                                <>
+                                                                    <tr>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Valeur Initiale</td>
+                                                                        <td className="px-6 py-4 text-right font-bold text-slate-400 line-through border-b border-white">{formatPrice(reservation.prix_avant_remise)}</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise Agence ({reservation.remise_pourcentage}%)</td>
+                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise - reservation.prix_total)}</td>
+                                                                    </tr>
+                                                                </>
+                                                            )}
                                                             <tr>
                                                                 <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Estimé</td>
                                                                 <td className="px-6 py-4 text-right font-black text-lg text-[#54b172]">{formatPrice(reservation.prix_total)}</td>
@@ -512,10 +528,27 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         Résumé Financier
                                     </h2>
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500 font-medium">Total Séjour</span>
-                                            <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
-                                        </div>
+                                        {reservation.type_reservant === 'agence' && reservation.prix_avant_remise ? (
+                                            <>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-500 font-medium">Valeur Totale</span>
+                                                    <span className="font-bold text-slate-400 line-through">{formatPrice(reservation.prix_avant_remise)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-emerald-600 font-bold">Remise Agence</span>
+                                                    <span className="font-black text-emerald-600">-{formatPrice(reservation.prix_avant_remise - reservation.prix_total)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+                                                    <span className="text-slate-500 font-medium">Total Net</span>
+                                                    <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-slate-500 font-medium">Total Séjour</span>
+                                                <span className="font-bold text-slate-900">{formatPrice(reservation.prix_total)}</span>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500 font-medium">Déjà versé</span>
                                             <span className="font-bold text-emerald-600">-{formatPrice(totalValidPaid)}</span>
@@ -573,7 +606,7 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                 onCapacityErrorChange={(hasError) => setIsCapacityValid(!hasError)}
                                             />
                                         )}
-                                        {step === 3 && <SummaryStep hotel={selectedHotel} totalPrice={totalPrice} />}
+                                        {step === 3 && <SummaryStep hotel={selectedHotel} basePrice={basePrice} totalPrice={totalPrice} />}
                                     </form>
                                 </FormProvider>
                             </div>
