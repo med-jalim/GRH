@@ -178,11 +178,10 @@ class ReservationController extends Controller
         $validated['prix_avant_remise'] = $totals['chambre_sous_total'];
         $validated['prix_total']         = $totals['prix_total'];
         
-        // At the reservation level, we store the aggregate remise percentage for reference
-        $totalRemiseMontant = $totals['remise_montant'];
-        $validated['remise_pourcentage'] = $totals['chambre_sous_total'] > 0 
-            ? ($totalRemiseMontant / $totals['chambre_sous_total']) * 100 
-            : 0;
+        // At the reservation level, we no longer store an aggregate percentage (kept null)
+        // Individual percentages are stored at the group level
+        $validated['remise_pourcentage'] = null;
+        $validated['remise_montant']     = $totals['remise_montant'];
 
         unset($validated['groups']);
         $reservation = Reservation::create($validated);

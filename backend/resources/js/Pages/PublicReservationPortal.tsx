@@ -513,12 +513,34 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-100">
-                                                            {reservation.groups.map((g: any) => {
+                                                            {reservation.groups.map((g: any, gIdx: number) => {
                                                                 const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
                                                                 const groupNights = Math.max(1, Math.round(diff / 86_400_000));
 
                                                                 return (
                                                                     <React.Fragment key={g.id}>
+                                                                        {/* Group Header Row */}
+                                                                        <tr className="bg-slate-50/80 border-y border-slate-100">
+                                                                            <td colSpan={3} className="px-6 py-3">
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                                                                                            {gIdx + 1}
+                                                                                        </span>
+                                                                                        <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider">Groupe #{gIdx + 1}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-4 text-slate-500">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-[10px] font-bold uppercase tracking-tight">
+                                                                                                {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} — {new Date(g.date_depart).toLocaleDateString('FR-fr')}
+                                                                                            </span>
+                                                                                            <span className="text-[10px] font-bold text-[#54b172] ml-2">({groupNights} nuits)</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+
                                                                         {g.items.map((i: any) => (
                                                                             <tr key={i.id} className="bg-white">
                                                                                 <td className="px-6 py-4">
@@ -530,13 +552,19 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                                                                             </span>
                                                                                         )}
                                                                                     </p>
-                                                                                    <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                                                                                        {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
-                                                                                    </p>
-                                                                                    <p className="text-[10px] text-slate-400 font-medium">{formatPrice(i.prix_unitaire)}/nuit</p>
-                                                                                    <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
+                                                                                    <div className="flex items-center gap-3 mt-1 underline decoration-slate-100 underline-offset-4">
+                                                                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                                                                                            {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
+                                                                                        </p>
+                                                                                        <span className="w-1 h-1 rounded-full bg-slate-200" />
+                                                                                        <p className="text-[10px] text-slate-400 font-medium">{formatPrice(i.prix_unitaire)}/nuit</p>
+                                                                                    </div>
                                                                                 </td>
-                                                                                <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
+                                                                                <td className="px-6 py-4 text-center font-medium text-slate-500">
+                                                                                    <span className="inline-flex items-center justify-center px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-black">
+                                                                                        x{i.quantite}
+                                                                                    </span>
+                                                                                </td>
                                                                                 <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
                                                                             </tr>
                                                                         ))}
@@ -555,36 +583,88 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                                                 );
                                                             })}
                                                         </tbody>
-                                                        <tfoot className="bg-slate-50">
-                                                            {reservation.prix_avant_remise && reservation.remise_pourcentage > 0 ? ( 
-                                                                <>
-                                                                    <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
-                                                                        <td className="px-6 py-4 text-right font-bold text-slate-400 line-through border-b border-white">{formatPrice(reservation.prix_avant_remise)}</td>
-                                                                    </tr>
-                                                                    <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise</td>
-                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise - (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</td>
-                                                                    </tr>
-                                                                </>
-                                                            ):(
-                                                                <tr>
-                                                                    <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
-                                                                    <td className="px-6 py-4 text-right font-bold text-slate-400 border-b border-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</td>
-                                                                </tr>
-                                                            )}
-                                                            {reservation.taxe_sejour_total > 0 && (
-                                                                <tr>
-                                                                    <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-500 uppercase tracking-widest border-b border-white">Taxes de séjour</td>
-                                                                    <td className="px-6 py-4 text-right font-bold text-slate-600 border-b border-white">+{formatPrice(reservation.taxe_sejour_total)}</td>
-                                                                </tr>
-                                                            )}
-                                                            <tr>
-                                                                <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Total Net à payer</td>
-                                                                <td className="px-6 py-4 text-right font-black text-lg text-[#54b172]">{formatPrice(reservation.prix_total)}</td>
-                                                            </tr>
-                                                        </tfoot>
                                                     </table>
+                                                </div>
+
+                                                {/* Separated Premium Summary Table */}
+                                                <div className="mt-8 pt-8 border-t border-slate-100/60">
+                                                    <div className="flex justify-between items-end mb-4">
+                                                        <h3 className="text-[10px] font-bold text-[#54b172] uppercase tracking-widest">Récapitulatif Financier</h3>
+                                                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">Document de pré-facturation</span>
+                                                    </div>
+                                                    
+                                                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                                        <table className="w-full border-collapse">
+                                                            <tbody>
+                                                                {/* Sub-total */}
+                                                                <tr className="border-b border-slate-50">
+                                                                    <td className="px-6 py-5 text-left">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sous-total Chambres</span>
+                                                                            <span className="text-[9px] text-slate-300 font-bold uppercase mt-1">Montant hors remises et taxes</span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-5 text-right align-middle bg-slate-50/50 w-48">
+                                                                        <span className="text-sm font-bold text-slate-600">
+                                                                            {formatPrice(reservation.prix_avant_remise || (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+
+                                                                {/* Discount Breakdown */}
+                                                                {reservation.remise_pourcentage > 0 && (
+                                                                    <tr className="border-b border-slate-50">
+                                                                        <td className="px-6 py-5 text-left">
+                                                                            <div className="flex flex-col">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Remise Appliquée</span>
+                                                                                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[8px] font-black">EFFORT COMMERCIAL</span>
+                                                                                </div>
+                                                                                <span className="text-[9px] text-emerald-500 font-bold uppercase mt-1">Économie sur la réservation</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-5 text-right align-middle bg-emerald-50/10 w-48 font-black text-emerald-600">
+                                                                            - {formatPrice(reservation.prix_avant_remise - (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+
+                                                                {/* Stay Tax */}
+                                                                {reservation.taxe_sejour_total > 0 && (
+                                                                    <tr className="border-b border-slate-50">
+                                                                        <td className="px-6 py-5 text-left">
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em]">Taxes de séjour</span>
+                                                                                <span className="text-[9px] text-amber-500 font-bold uppercase mt-1">Taxe légale par occupant/nuit</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-6 py-5 text-right align-middle bg-amber-50/5 w-48 font-bold text-amber-600">
+                                                                            + {formatPrice(reservation.taxe_sejour_total)}
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+
+                                                                {/* Final Net Amount */}
+                                                                <tr className="bg-slate-900 overflow-hidden">
+                                                                    <td className="px-6 py-8 text-left relative overflow-hidden">
+                                                                        <div className="absolute top-0 right-0 w-32 h-full bg-white/5 skew-x-[20deg] translate-x-16" />
+                                                                        <div className="flex flex-col relative z-10">
+                                                                            <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.4em] mb-2">Total Net à payer</span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-[9px] text-[#54b172] font-black uppercase tracking-widest px-2 py-0.5 bg-[#54b172]/10 rounded border border-[#54b172]/20">Toutes taxes comprises</span>
+                                                                                <div className="h-px w-8 bg-white/20" />
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-6 py-8 text-right align-middle relative overflow-hidden bg-white/5 w-48">
+                                                                        <span className="text-3xl font-black text-white tracking-tighter relative z-10">
+                                                                            {formatPrice(reservation.prix_total)}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

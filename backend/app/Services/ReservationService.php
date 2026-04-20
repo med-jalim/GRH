@@ -274,7 +274,7 @@ class ReservationService
                 
                 // Get dynamic price
                 $pricePerNight = $hotel->getPrixPourSubType($item['id_sub_type'] ?? $item['subTypeId'], $checkInDate) ?? 0.0;
-                $priceWithMultiplier = $pricePerNight * $multiplier;
+                $priceWithMultiplier = round($pricePerNight * $multiplier);
                 
                 $itemTotal = $priceWithMultiplier * $nights * ($item['quantite'] ?? $item['quantity']);
                 $groupSousTotal += $itemTotal;

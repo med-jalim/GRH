@@ -181,9 +181,9 @@ export function BookingSuccessPage({
                                 <p className="text-xs text-white/60 font-medium whitespace-nowrap">Incluant taxes et remises</p>
                             </div>
                             
-                            {discountPercentage > 0 && (
+                            {discountAmount > 0 && (
                                 <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-max">
-                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise ({discountPercentage}%)</span>
+                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise Totale</span>
                                     <span className="text-sm font-black text-emerald-300">- {formatPrice(discountAmount)}</span>
                                 </div>
                             )}

@@ -717,7 +717,7 @@ export default function ReservationShow({ reservation }: Props) {
                   
                   {/* Final Total Summary Card */}
                   {/* Price Breakdown Card */}
-                  <div className="mt-8 bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-200">
+                  <div className="mt-8 bg-slate-900 rounded-[1rem] overflow-hidden shadow-2xl shadow-slate-200">
                     <div className="p-8 space-y-6">
                       {/* Breakdown Lines */}
                       <div className="space-y-4">

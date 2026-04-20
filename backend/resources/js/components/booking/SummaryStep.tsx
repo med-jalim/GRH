@@ -1,3 +1,4 @@
+import { BedDouble } from 'lucide-react';
 import { useFormContext } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -113,32 +114,36 @@ export function SummaryStep({
                         const sub = price * groupNights * room.quantity;
 
                         return (
-                            <div key={room.uid} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50">
+                            <div key={room.uid} className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50 hover:bg-slate-50 transition-colors group">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                        </svg>
+                                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm group-hover:border-[#54b172] group-hover:text-[#54b172] transition-all">
+                                        <BedDouble size={20} />
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-slate-800">
                                             {chambre?.type.nom ?? '—'} 
                                             {selectedSubType && (
-                                                <span className="text-[#54b172] ml-1.5">
+                                                <span className="text-[#54b172] ml-1.5 font-bold">
                                                     ({selectedSubType.nom})
                                                 </span>
                                             )}
                                         </p>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                            {room.quantity} unité(s) · {formatPrice(price)}/nuit
-                                        </p>
-                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">
-                                            {room.adults}A {room.children > 0 && `· ${room.children}E`} par chambre
-                                        </p>
+                                        <div className="flex items-center gap-3 mt-1 underline decoration-slate-200/50 underline-offset-4">
+                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
+                                                {room.adults}A {room.children > 0 && `· ${room.children}E`}
+                                            </p>
+                                            <span className="w-1 h-1 rounded-full bg-slate-200" />
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                {formatPrice(price)}/nuit
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-sm font-black text-slate-900 tracking-tighter">{formatPrice(sub)}</p>
+                                    <span className="inline-flex items-center justify-center px-2 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black mb-1">
+                                        x{room.quantity}
+                                    </span>
+                                    <p className="text-sm font-black text-slate-900 tracking-tight">{formatPrice(sub)}</p>
                                 </div>
                             </div>
                         );

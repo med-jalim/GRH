@@ -40,7 +40,7 @@ export default function BookingFormPage({ hotels, discountRules, settings }: Pro
     const [isCapacityValid, setIsCapacityValid] = useState(true);
     const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
     const [successData, setSuccessData] = useState<{
-        reference: string;
+        reservation: any;
         data: any;
     } | null>(null);
 
@@ -244,7 +244,7 @@ export default function BookingFormPage({ hotels, discountRules, settings }: Pro
                 headers: { Accept: "application/json" }
             });
             setSuccessData({
-                reference: res.data.data.code_reference,
+                reservation: res.data.data,
                 data: data,
             });
         } catch (error: any) {
@@ -271,16 +271,17 @@ export default function BookingFormPage({ hotels, discountRules, settings }: Pro
     };
 
     if (successData) {
+        const res = successData.reservation;
         return (
             <BookingSuccessPage
-                reference={successData.reference}
+                reference={res.code_reference}
                 formData={successData.data}
                 hotel={selectedHotel}
-                basePrice={basePrice}
-                stayTaxTotal={stayTaxTotal}
-                totalPrice={totalPrice}
-                discountPercentage={discountPercentage}
-                discountAmount={discountAmount}
+                basePrice={Number(res.prix_avant_remise)}
+                stayTaxTotal={Number(res.taxe_sejour_total)}
+                totalPrice={Number(res.prix_total)}
+                discountPercentage={res.remise_pourcentage ? Number(res.remise_pourcentage) : 0}
+                discountAmount={res.remise_montant ? Number(res.remise_montant) : 0}
             />
         );
     }
