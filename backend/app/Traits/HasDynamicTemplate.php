@@ -130,7 +130,7 @@ trait HasDynamicTemplate
             $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #94a3b8; border-top: 2px solid #f1f5f9; text-align: right; text-decoration: line-through;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             $html .= "<tr>";
-            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise ({$remiseP}%)</td>";
+            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise </td>";
             $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($prixAvant * ($remiseP / 100), 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             

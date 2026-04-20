@@ -219,4 +219,93 @@ class ReservationService
         $nights = $start->diffInDays($end);
         return max(1, $nights);
     }
+
+    /**
+     * Get the applicable discount percentage for a hotel and duration.
+     */
+    public function getApplicableDiscount(int $id_hotel, int $nights): float
+    {
+        // 1. Try hotel-specific rules
+        $rule = \App\Models\DiscountRule::where('id_hotel', $id_hotel)
+            ->where('min_nights', '<=', $nights)
+            ->orderByDesc('min_nights')
+            ->first();
+
+        // 2. Fallback to global rules
+        if (!$rule) {
+            $rule = \App\Models\DiscountRule::whereNull('id_hotel')
+                ->where('min_nights', '<=', $nights)
+                ->orderByDesc('min_nights')
+                ->first();
+        }
+
+        return $rule ? (float) $rule->discount_percentage : 0.0;
+    }
+
+    /**
+     * Calculate totals and discounts for a full reservation.
+     */
+    public function calculateTotals(int $id_hotel, array $groups, string $bookingType = 'agence'): array
+    {
+        $hotel = \App\Models\Hotel::find($id_hotel);
+        if (!$hotel) return [];
+
+        $multiplier = ($bookingType === 'agence') 
+            ? (float) ($hotel->agency_ratio ?? 0.96) 
+            : (float) ($hotel->group_ratio ?? 1.00);
+
+        $taxeParAdulte = (float) ($hotel->taxe_sejour ?? 0);
+        
+        $chambreSousTotalGlobal = 0;
+        $remiseTotaleMontant = 0;
+        $taxeSejourTotal = 0;
+        $groupsData = [];
+
+        foreach ($groups as $group) {
+            $nights = $this->calculateNights($group['date_arrivee'] ?? $group['checkIn'], $group['date_depart'] ?? $group['checkOut']);
+            $remisePourcentage = $this->getApplicableDiscount($id_hotel, $nights);
+            
+            $groupSousTotal = 0;
+            $groupTaxe = 0;
+
+            $items = $group['details'] ?? $group['rooms'] ?? [];
+            foreach ($items as $item) {
+                $checkInDate = Carbon::parse($group['date_arrivee'] ?? $group['checkIn']);
+                
+                // Get dynamic price
+                $pricePerNight = $hotel->getPrixPourSubType($item['id_sub_type'] ?? $item['subTypeId'], $checkInDate) ?? 0.0;
+                $priceWithMultiplier = $pricePerNight * $multiplier;
+                
+                $itemTotal = $priceWithMultiplier * $nights * ($item['quantite'] ?? $item['quantity']);
+                $groupSousTotal += $itemTotal;
+
+                $groupTaxe += ($item['nb_adultes'] ?? $item['adults']) * ($item['quantite'] ?? $item['quantity']) * $nights * $taxeParAdulte;
+            }
+
+            $groupRemiseMontant = $groupSousTotal * ($remisePourcentage / 100);
+            $groupTotalFinal = ($groupSousTotal - $groupRemiseMontant); // Taxes added at the end or per group? 
+            // In current logic, prix_total = (subtotal * (1 - remise/100)) + taxe_sejour_total
+
+            $chambreSousTotalGlobal += $groupSousTotal;
+            $remiseTotaleMontant += $groupRemiseMontant;
+            $taxeSejourTotal += $groupTaxe;
+
+            $groupsData[] = [
+                'nights' => $nights,
+                'remise_pourcentage' => $remisePourcentage,
+                'remise_montant' => $groupRemiseMontant,
+                'sous_total' => $groupSousTotal,
+            ];
+        }
+
+        $prixTotalFinal = ($chambreSousTotalGlobal - $remiseTotaleMontant) + $taxeSejourTotal;
+
+        return [
+            'chambre_sous_total' => $chambreSousTotalGlobal,
+            'remise_montant'     => $remiseTotaleMontant,
+            'taxe_sejour_total'  => $taxeSejourTotal,
+            'prix_total'         => $prixTotalFinal,
+            'groups'             => $groupsData,
+        ];
+    }
 }

@@ -67,6 +67,8 @@ interface ReservationGroup {
   date_arrivee: string;
   date_depart: string;
   nb_personnes: number;
+  remise_pourcentage: number | null;
+  remise_montant: number | null;
   items: ItemReservation[];
 }
 
@@ -693,6 +695,22 @@ export default function ReservationShow({ reservation }: Props) {
                             </tbody>
                           </table>
                         </div>
+
+                        {/* Group Discount Badge */}
+                        {group.remise_pourcentage && group.remise_pourcentage > 0 && (
+                          <div className="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center group/remise">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-sm font-black text-[10px]">
+                                -{group.remise_pourcentage}%
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest leading-none">Remise Appliquée</p>
+                                <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1 tracking-tight">Pour un séjour de {groupNights} nuits</p>
+                              </div>
+                            </div>
+                            <p className="text-sm font-black text-emerald-700 tracking-tighter">-{formatPrice(group.remise_montant || 0)}</p>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -709,10 +727,10 @@ export default function ReservationShow({ reservation }: Props) {
                         </div>
 
                         {/* {reservation.type_reservant === 'agence' && reservation.remise_pourcentage && ( */}
-                        {reservation.remise_pourcentage && (
+                        {reservation.remise_pourcentage && reservation.remise_pourcentage > 0 && (
                           <div className="flex justify-between items-center text-emerald-400">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Remise ({reservation.remise_pourcentage}%)</span>
-                            <span className="text-sm font-black">- {formatPrice((reservation.prix_avant_remise || 0) * (reservation.remise_pourcentage / 100))}</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Remise</span>
+                            <span className="text-sm font-black">- {formatPrice((reservation.prix_avant_remise || 0) - (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</span>
                           </div>
                         )}
 

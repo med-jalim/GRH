@@ -43,6 +43,9 @@ export interface Hotel {
   stars: number;
   description: string;
   taxe_sejour: number;
+  agency_ratio?: number;
+  group_ratio?: number;
+  discount_rules?: any[];
   chambres: Chambre[];
   tarifs: Tarif[];
 }

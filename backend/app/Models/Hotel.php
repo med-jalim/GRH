@@ -31,6 +31,11 @@ class Hotel extends Model
         return $this->hasMany(HotelTypeTarification::class, 'id_hotel');
     }
 
+    public function discountRules(): HasMany
+    {
+        return $this->hasMany(DiscountRule::class, 'id_hotel');
+    }
+
     public function getAvailableSubTypesQuery()
     {
         return SubType::whereIn('id_type', $this->typeTarifications()->pluck('id_type'));
@@ -63,7 +68,8 @@ class Hotel extends Model
             'chambres.subType',
             'tarifs.type',
             'tarifs.subType',
-            'typeTarifications.type'
+            'typeTarifications.type',
+            'discountRules'
         ]);
     }
 }

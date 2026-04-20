@@ -12,13 +12,15 @@ import {
   LayoutDashboard,
   Layers,
   BedDouble,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Percent
 } from "lucide-react";
 import { useState } from "react";
 import { ApercuTab } from "./Partials/ApercuTab";
 import { TypesTab } from "./Partials/TypesTab";
 import { ChambresTab } from "./Partials/ChambresTab";
 import { TarifsTab } from "./Partials/TarifsTab";
+import RemisesTab from "./Partials/RemisesTab";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,11 +84,13 @@ interface Hotel {
   chambres: Chambre[];
   tarifs: Tarif[];
   reservations: Reservation[];
+  discount_rules?: any[];
 }
 
 interface Props {
   hotel: Hotel;
   types: Type[];
+  globalRules: any[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -251,12 +255,12 @@ function EditHotelModal({
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export default function HotelShow({ hotel, types }: Props) {
+export default function HotelShow({ hotel, types, globalRules }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
   // Onglets State
-  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"calendrier">("apercu");
+  const [activeTab, setActiveTab] = useState<"apercu"|"types"|"chambres"|"calendrier"|"remises">("apercu");
 
   // Group rooms by type for Apercu display
   const chambresByType = hotel.chambres.reduce<Record<string, Chambre[]>>((acc, c) => {
@@ -276,6 +280,7 @@ export default function HotelShow({ hotel, types }: Props) {
     { id: "types", label: "Types de Chambres", icon: Layers },
     { id: "chambres", label: "Chambres", icon: BedDouble },
     { id: "calendrier", label: "Tarifs", icon: CalendarIcon },
+    { id: "remises", label: "Remises", icon: Percent },
   ] as const;
 
   return (
@@ -361,6 +366,9 @@ export default function HotelShow({ hotel, types }: Props) {
         {activeTab === "chambres" && <ChambresTab hotel={hotel} types={types} />}
         {activeTab === "calendrier" && (
           <TarifsTab hotel={hotel} types={types} />
+        )}
+        {activeTab === "remises" && (
+          <RemisesTab hotel={hotel} globalRules={globalRules} />
         )}
       </div>
 

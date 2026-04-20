@@ -156,43 +156,23 @@ class ClientReservationController extends Controller
         $groupsData = $validated['groups'];
         unset($validated['groups']);
 
-        $chambreSousTotal = 0;
-        $taxeSejourTotal = 0;
-        $totalPersonnes = 0;
+        // Calculate Totals and Discounts via Service
+        $totals = $this->reservationService->calculateTotals(
+            $reservation->id_hotel,
+            $groupsData,
+            $reservation->type_reservant
+        );
 
-        $hotel = $reservation->hotel;
-        $taxeParAdulte = $hotel->taxe_sejour ?? 0;
-
-        foreach ($groupsData as $g) {
-            $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
-            $groupPersonnes = collect($g['rooms'])->sum(function ($room) {
-                return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
-            });
-            $totalPersonnes += $groupPersonnes;
-
-            foreach ($g['rooms'] as $r) {
-                // Room Price
-                $chambreSousTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
-                
-                // Tax Calculation
-                $taxeSejourTotal += ($r['nb_adultes'] * $r['quantite'] * $nights * $taxeParAdulte);
-            }
-        }
-        $validated['nb_personnes'] = $totalPersonnes;
-        $validated['taxe_sejour_total'] = $taxeSejourTotal;
-
-        // Calculate total nights for tiered discount
-        $totalNights = 0;
-        foreach ($groupsData as $g) {
-            $totalNights += $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
-        }
-
-        // Apply Dynamic Discount
-        $discountData = $this->calculateDiscount($totalNights, $chambreSousTotal, $taxeSejourTotal);
+        $totalPersonnes = collect($groupsData)->sum('nb_personnes');
+        $validated['nb_personnes']      = $totalPersonnes;
+        $validated['taxe_sejour_total'] = $totals['taxe_sejour_total'];
+        $validated['prix_avant_remise'] = $totals['chambre_sous_total'];
+        $validated['prix_total']         = $totals['prix_total'];
         
-        $validated['prix_total'] = $discountData['prix_total'];
-        $validated['prix_avant_remise'] = $discountData['prix_avant_remise'];
-        $validated['remise_pourcentage'] = $discountData['remise_pourcentage'];
+        $totalRemiseMontant = $totals['remise_montant'];
+        $validated['remise_pourcentage'] = $totals['chambre_sous_total'] > 0 
+            ? ($totalRemiseMontant / $totals['chambre_sous_total']) * 100 
+            : 0;
 
         // Reset status to en_attente and save
         $reservation->statut = 'en_attente';
@@ -205,16 +185,18 @@ class ClientReservationController extends Controller
             $group->delete();
         }
 
-        foreach ($groupsData as $groupData) {
+        foreach ($groupsData as $index => $groupData) {
             $groupOccupants = collect($groupData['rooms'])->sum(function ($room) {
                 return ((int) ($room['nb_adultes'] ?? 0)) + ((int) ($room['nb_enfants'] ?? 0));
             });
 
             $group = ReservationGroup::create([
-                'id_reservation' => $reservation->id,
-                'date_arrivee'   => $groupData['date_arrivee'],
-                'date_depart'    => $groupData['date_depart'],
-                'nb_personnes'   => $groupOccupants,
+                'id_reservation'    => $reservation->id,
+                'date_arrivee'      => $groupData['date_arrivee'],
+                'date_depart'       => $groupData['date_depart'],
+                'nb_personnes'      => $groupOccupants,
+                'remise_pourcentage'=> $totals['groups'][$index]['remise_pourcentage'],
+                'remise_montant'    => $totals['groups'][$index]['remise_montant'],
             ]);
 
             foreach ($groupData['rooms'] as $roomData) {
@@ -281,34 +263,5 @@ class ClientReservationController extends Controller
         return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès et est en attente de vérification par notre équipe.');
     }
 
-    /**
-     * Calculate discount based on total nights and tiered rules.
-     */
-    private function calculateDiscount(int $totalNights, float $chambreSousTotal, float $taxeSejourTotal): array
-    {
-        $applicableDiscount = 0;
-        
-        // Find the highest applicable tiered discount
-        $tierRule = DiscountRule::where('min_nights', '<=', $totalNights)
-            ->orderByDesc('min_nights')
-            ->first();
-            
-        if ($tierRule) {
-            $applicableDiscount = (float) $tierRule->discount_percentage;
-        }
-
-        if ($applicableDiscount > 0) {
-            return [
-                'prix_avant_remise'  => $chambreSousTotal,
-                'remise_pourcentage' => $applicableDiscount,
-                'prix_total'         => ($chambreSousTotal * (1 - ($applicableDiscount / 100))) + $taxeSejourTotal,
-            ];
-        }
-
-        return [
-            'prix_avant_remise'  => null,
-            'remise_pourcentage' => null,
-            'prix_total'         => $chambreSousTotal + $taxeSejourTotal,
-        ];
-    }
+    
 }

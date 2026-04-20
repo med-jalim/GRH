@@ -12,7 +12,9 @@ class ReservationGroup extends Model
         'id_reservation',
         'date_arrivee',
         'date_depart',
-        'nb_personnes'
+        'nb_personnes',
+        'remise_pourcentage',
+        'remise_montant'
     ];
 
     protected $casts = [

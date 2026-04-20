@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, usePage } from "@inertiajs/react";
@@ -279,18 +279,51 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
         }, 0);
     }, [reservation.groups]);
 
-    const applicableDiscountRule = useMemo(() => {
-        if (!discountRules || discountRules.length === 0) return null;
-        // Sort rules by min_nights descending to find the highest threshold first
-        return [...discountRules]
-            .sort((a, b) => b.min_nights - a.min_nights)
-            .find(rule => totalNights >= rule.min_nights) ?? null;
-    }, [discountRules, totalNights]);
+    const groupCalculations = useMemo(() => {
+        if (!selectedHotel || !formData.groups) return [];
+        
+        return formData.groups.map((g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return { subTotal: 0, nights: 0, percentage: 0, amount: 0 };
+            
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+            const checkInDate = new Date(g.checkIn);
 
-    const discountPercentage = applicableDiscountRule ? applicableDiscountRule.discount_percentage : 0;
-    const discountAmount = (basePrice * discountPercentage) / 100;
+            const subTotal = g.rooms.reduce((rSum: number, r: any) => {
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
+                return rSum + (prix * nights * r.quantity);
+            }, 0);
+
+            // Get applicable discount for this specific group's nights
+            // Prioritize hotel-specific rules (from selectedHotel.discount_rules)
+            const hotelRules = (selectedHotel as any).discount_rules || [];
+            let rule = [...hotelRules]
+                .sort((a, b) => b.min_nights - a.min_nights)
+                .find(r => nights >= r.min_nights);
+
+            if (!rule) {
+                // Fallback to global rules
+                rule = [...(discountRules || [])]
+                    .sort((a, b) => b.min_nights - a.min_nights)
+                    .find(r => nights >= r.min_nights);
+            }
+
+            const percentage = rule ? rule.discount_percentage : 0;
+            const amount = (subTotal * percentage) / 100;
+
+            return { subTotal, nights, percentage, amount };
+        });
+    }, [formData.groups, selectedHotel, multiplier, discountRules]);
+
+    const discountAmount = useMemo(() => {
+        return groupCalculations.reduce((sum, g) => sum + g.amount, 0);
+    }, [groupCalculations]);
+
+    const discountPercentage = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
     const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
-
+    // console.log({
+    //     totalPrice,discountAmount,discountPercentage,basePrice,stayTaxTotal
+    // });
     const totalRooms = useMemo(() => {
         if (!formData.groups || formData.groups.length === 0) return 0;
         return formData.groups.reduce((sum: number, g: any) => {
@@ -484,39 +517,54 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                                                 const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
                                                                 const groupNights = Math.max(1, Math.round(diff / 86_400_000));
 
-                                                                return g.items.map((i: any) => (
-                                                                    <tr key={i.id} className="bg-white">
-                                                                        <td className="px-6 py-4">
-                                                                            <p className="font-bold text-slate-700">
-                                                                                {i.type?.nom ?? 'Chambre'} 
-                                                                                {i.sub_type && (
-                                                                                    <span className="text-[#54b172] ml-1.5 font-bold">
-                                                                                        ({i.sub_type.nom})
-                                                                                    </span>
-                                                                                )}
-                                                                            </p>
-                                                                            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
-                                                                                {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
-                                                                            </p>
-                                                                            <p className="text-[10px] text-slate-400 font-medium">{formatPrice(i.prix_unitaire)}/nuit</p>
-                                                                            <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
-                                                                        </td>
-                                                                        <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
-                                                                        <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
-                                                                    </tr>
-                                                                ));
+                                                                return (
+                                                                    <React.Fragment key={g.id}>
+                                                                        {g.items.map((i: any) => (
+                                                                            <tr key={i.id} className="bg-white">
+                                                                                <td className="px-6 py-4">
+                                                                                    <p className="font-bold text-slate-700">
+                                                                                        {i.type?.nom ?? 'Chambre'} 
+                                                                                        {i.sub_type && (
+                                                                                            <span className="text-[#54b172] ml-1.5 font-bold">
+                                                                                                ({i.sub_type.nom})
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                    <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">
+                                                                                        {i.nb_adultes} Adultes {i.nb_enfants > 0 && `· ${i.nb_enfants} Enfants`}
+                                                                                    </p>
+                                                                                    <p className="text-[10px] text-slate-400 font-medium">{formatPrice(i.prix_unitaire)}/nuit</p>
+                                                                                    <p className="text-[10px] text-slate-400 font-medium">Du {new Date(g.date_arrivee).toLocaleDateString('FR-fr')} au {new Date(g.date_depart).toLocaleDateString('FR-fr')} ({groupNights} nuits)</p>
+                                                                                </td>
+                                                                                <td className="px-6 py-4 text-center font-medium text-slate-500">x{i.quantite}</td>
+                                                                                <td className="px-6 py-4 text-right font-bold text-slate-900">{formatPrice(i.prix_unitaire * i.quantite * groupNights)}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                        {g.remise_pourcentage && g.remise_pourcentage > 0 && (
+                                                                            <tr className="bg-emerald-50/50">
+                                                                                <td colSpan={2} className="px-6 py-3">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[8px] font-black uppercase">-{g.remise_pourcentage}%</span>
+                                                                                        <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Remise Séjour Longue Durée</span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-6 py-3 text-right text-xs font-black text-emerald-600">-{formatPrice(g.remise_montant)}</td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                );
                                                             })}
                                                         </tbody>
                                                         <tfoot className="bg-slate-50">
-                                                            {discountPercentage > 0 && reservation.prix_avant_remise ? (
+                                                            {reservation.prix_avant_remise && reservation.remise_pourcentage > 0 ? ( 
                                                                 <>
                                                                     <tr>
                                                                         <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
                                                                         <td className="px-6 py-4 text-right font-bold text-slate-400 line-through border-b border-white">{formatPrice(reservation.prix_avant_remise)}</td>
                                                                     </tr>
                                                                     <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise ({discountPercentage}%)</td>
-                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(discountAmount)}</td>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise</td>
+                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise - (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</td>
                                                                     </tr>
                                                                 </>
                                                             ):(
@@ -632,15 +680,15 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                         Résumé Financier
                                     </h2>
                                     <div className="space-y-4">
-                                        {discountPercentage > 0 && reservation.prix_avant_remise ? (
+                                        {reservation.remise_pourcentage > 0 && reservation.prix_avant_remise ? (
                                             <>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-slate-500 font-medium">Prix Chambres</span>
                                                     <span className="font-bold text-slate-400 line-through">{formatPrice(reservation.prix_avant_remise)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-emerald-600 font-bold">Remise ({discountPercentage}%)</span>
-                                                    <span className="font-black text-emerald-600">-{formatPrice(discountAmount)}</span>
+                                                    <span className="text-emerald-600 font-bold">Remise</span>
+                                                    <span className="font-black text-emerald-600">-{formatPrice(reservation.prix_avant_remise - (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</span>
                                                 </div>
                                             </>
                                         ) : (
@@ -727,6 +775,7 @@ export default function PublicReservationPortal({ reservation, hotels, discountR
                                                 totalPrice={totalPrice} 
                                                 discountPercentage={discountPercentage}
                                                 discountAmount={discountAmount}
+                                                groupCalculations={groupCalculations}
                                             />
                                         )}
                                     </form>

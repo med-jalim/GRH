@@ -32,7 +32,7 @@ interface Props {
 
 import { Building2 } from "lucide-react";
 
-export default function BookingFormPage({ hotels, discountRules }: Props) {
+export default function BookingFormPage({ hotels, discountRules, settings }: Props) {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState<string[]>([]);
@@ -79,8 +79,8 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
 
     const multiplier = useMemo(() => {
         if (!selectedHotel) return 1.0;
-        if (formData.bookingType === 'agence') return Number(selectedHotel.agency_ratio ?? 0.96);
-        if (formData.bookingType === 'groupe') return Number(selectedHotel.group_ratio ?? 1.00);
+        if (formData.bookingType === 'agence') return Number((selectedHotel as any).agency_ratio ?? 0.96);
+        if (formData.bookingType === 'groupe') return Number((selectedHotel as any).group_ratio ?? 1.00);
         return 1.0;
     }, [formData.bookingType, selectedHotel]);
 
@@ -120,25 +120,42 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
         }, 0);
     }, [formData.groups, selectedHotel]);
 
-    const totalNights = useMemo(() => {
-        if (!formData.groups || formData.groups.length === 0) return 0;
-        return formData.groups.reduce((sum: number, g: any) => {
-            if (!g.checkIn || !g.checkOut) return sum;
+    // Per-group Discount Calculation
+    const groupCalculations = useMemo(() => {
+        if (!selectedHotel || !formData.groups) return [];
+        
+        // Hotel-specific rules take precedence over global ones
+        const availableRules = (selectedHotel as any).discount_rules && (selectedHotel as any).discount_rules.length > 0
+            ? [...(selectedHotel as any).discount_rules]
+            : [...(discountRules || [])];
+
+        const sortedRules = availableRules.sort((a, b) => b.min_nights - a.min_nights);
+
+        return formData.groups.map((g: any) => {
+            if (!g.checkIn || !g.checkOut || !g.rooms) return { subTotal: 0, nights: 0, percentage: 0, amount: 0 };
+            
             const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
-            return sum + Math.max(1, Math.round(diff / 86_400_000));
-        }, 0);
-    }, [formData.groups]);
+            const nights = Math.max(1, Math.round(diff / 86_400_000));
+            const checkInDate = new Date(g.checkIn);
 
-    const applicableDiscountRule = useMemo(() => {
-        if (!discountRules || discountRules.length === 0) return null;
-        // Sort rules by min_nights descending to find the highest threshold first
-        return [...discountRules]
-            .sort((a, b) => b.min_nights - a.min_nights)
-            .find(rule => totalNights >= rule.min_nights) ?? null;
-    }, [discountRules, totalNights]);
+            const subTotal = g.rooms.reduce((rSum: number, r: any) => {
+                const price = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
+                return rSum + (price * nights * (Number(r.quantity) || 0));
+            }, 0);
 
-    const discountPercentage = applicableDiscountRule ? applicableDiscountRule.discount_percentage : 0;
-    const discountAmount = (basePrice * discountPercentage) / 100;
+            const rule = sortedRules.find(r => nights >= r.min_nights);
+            const percentage = rule ? rule.discount_percentage : 0;
+            const amount = (subTotal * percentage) / 100;
+
+            return { subTotal, nights, percentage, amount };
+        });
+    }, [formData.groups, selectedHotel, multiplier, discountRules]);
+
+    const discountAmount = useMemo(() => {
+        return groupCalculations.reduce((sum, g) => sum + g.amount, 0);
+    }, [groupCalculations]);
+
+    const discountPercentage = basePrice > 0 ? (discountAmount / basePrice) * 100 : 0;
     const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
 
     const totalRooms = useMemo(() => {
@@ -150,7 +167,7 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
     }, [formData.groups]);
 
     const minRooms = useMemo(() => {
-        const setting = settings?.find(s => s.key === 'min_rooms_per_reservation');
+        const setting = settings?.find((s: any) => s.key === 'min_rooms_per_reservation');
         return setting ? parseInt(setting.value) : 11;
     }, [settings]);
 
@@ -315,6 +332,7 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
                                             totalPrice={totalPrice}
                                             discountPercentage={discountPercentage}
                                             discountAmount={discountAmount}
+                                            groupCalculations={groupCalculations}
                                         />
                                     )}
                                 </form>

@@ -14,20 +14,29 @@ interface Props {
   totalPrice: number;
   discountPercentage: number;
   discountAmount: number;
+  groupCalculations: any[];
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Row({ label, value, accent, strikethrough }: { label: string; value: string; accent?: boolean; strikethrough?: boolean }) {
   return (
     <div className="flex justify-between items-start py-2">
       <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400 flex-shrink-0 mr-4">{label}</span>
-      <span className={`text-sm font-bold text-right ${accent ? 'text-[#54b172]' : 'text-slate-700'}`}>
+      <span className={`text-sm font-bold text-right ${accent ? 'text-[#54b172]' : strikethrough ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
         {value}
       </span>
     </div>
   );
 }
 
-export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discountPercentage, discountAmount }: Props) {
+export function SummaryStep({ 
+  hotel, 
+  basePrice, 
+  stayTaxTotal, 
+  totalPrice, 
+  discountPercentage, 
+  discountAmount, 
+  groupCalculations = [] 
+}: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
@@ -67,6 +76,7 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discou
           const diff = group.checkIn && group.checkOut ? new Date(group.checkOut).getTime() - new Date(group.checkIn).getTime() : 0;
           const groupNights = Math.max(1, Math.round(diff / 86_400_000));
           const checkInDate = new Date(group.checkIn);
+          const calculation = groupCalculations[gIdx] || { percentage: 0, amount: 0, subTotal: 0 };
 
           return (
             <div key={group.uid} className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
@@ -96,8 +106,8 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discou
                         const selectedSubType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
                         
                         const multiplier = formData.bookingType === 'agence' 
-                            ? Number(hotel.agency_ratio ?? 0.96) 
-                            : Number(hotel.group_ratio ?? 1.00);
+                            ? Number((hotel as any)?.agency_ratio ?? 0.96) 
+                            : Number((hotel as any)?.group_ratio ?? 1.00);
 
                         const price = computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, checkInDate, multiplier);
                         const sub = price * groupNights * room.quantity;
@@ -133,6 +143,21 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discou
                             </div>
                         );
                     })}
+
+                    {calculation.percentage > 0 && (
+                        <div className="mt-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center group">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-sm">
+                                    <span className="text-[10px] font-black">-{calculation.percentage}%</span>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Remise de nuitée</p>
+                                    <p className="text-[9px] text-emerald-600 font-bold uppercase mt-0.5 tracking-tight">Appliquée sur ce groupe ({groupNights} nuits)</p>
+                                </div>
+                            </div>
+                            <p className="text-sm font-black text-emerald-700 tracking-tighter">-{formatPrice(calculation.amount)}</p>
+                        </div>
+                    )}
                 </div>
             </div>
           );
@@ -148,11 +173,11 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discou
                         <div className="space-y-1">
                             <p className="text-xs text-slate-400 flex justify-between gap-8">
                                 <span>Sous-total Hébergement :</span>
-                                <span className={discountPercentage > 0 ? 'line-through opacity-50' : 'font-bold text-white'}>{formatPrice(basePrice)}</span>
+                                <span className={discountPercentage > 0 ? 'line-through opacity-70' : 'font-bold text-white'}>{formatPrice(basePrice)}</span>
                             </p>
                             {discountPercentage > 0 && (
                                 <p className="text-xs text-emerald-400 flex justify-between gap-8 font-bold">
-                                    <span>Remise ({discountPercentage}%) :</span>
+                                    <span>Remise :</span>
                                     <span>- {formatPrice(discountAmount)}</span>
                                 </p>
                             )}

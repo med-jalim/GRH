@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\DiscountRule;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SettingController extends Controller
@@ -14,14 +15,22 @@ class SettingController extends Controller
     {
         return Inertia::render('Admin/Settings/Index', [
             'settings' => AppSetting::all(),
-            'rules'    => DiscountRule::orderBy('min_nights')->get(),
+            'rules'    => DiscountRule::whereNull('id_hotel')->orderBy('min_nights')->get(),
         ]);
     }
 
     public function storeRule(Request $request)
     {
         $validated = $request->validate([
-            'min_nights'          => 'required|integer|min:1|unique:discount_rules,min_nights',
+            'id_hotel'            => 'nullable|exists:hotels,id',
+            'min_nights'          => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('discount_rules', 'min_nights')->where(function ($query) use ($request) {
+                    return $query->where('id_hotel', $request->id_hotel);
+                }),
+            ],
             'discount_percentage' => 'required|numeric|min:0|max:100',
         ]);
 
@@ -33,7 +42,16 @@ class SettingController extends Controller
     public function updateRule(Request $request, DiscountRule $rule)
     {
         $validated = $request->validate([
-            'min_nights'          => 'required|integer|min:1|unique:discount_rules,min_nights,' . $rule->id,
+            'min_nights'          => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('discount_rules', 'min_nights')
+                    ->where(function ($query) use ($rule) {
+                        return $query->where('id_hotel', $rule->id_hotel);
+                    })
+                    ->ignore($rule->id),
+            ],
             'discount_percentage' => 'required|numeric|min:0|max:100',
         ]);
 
