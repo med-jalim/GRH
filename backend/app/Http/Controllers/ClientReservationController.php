@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\AdminNotification;
 use App\Models\ReservationGroup;
 use App\Models\PaymentVerification;
+use App\Models\DiscountRule;
 
 class ClientReservationController extends Controller
 {
@@ -90,10 +91,12 @@ class ClientReservationController extends Controller
         // We fetch all hotels only to show the selected one as locked, 
         // or we just fetch the selected hotel to keep it simple.
         $hotels = Hotel::withBookingData()->get();
+        $discountRules = DiscountRule::orderBy('min_nights', 'desc')->get();
 
         return Inertia::render('PublicReservationPortal', [
             'reservation' => $reservation,
             'hotels' => $hotels,
+            'discountRules' => $discountRules,
         ]);
     }
 
@@ -164,16 +167,18 @@ class ClientReservationController extends Controller
         $validated['nb_personnes'] = $totalPersonnes;
         $validated['taxe_sejour_total'] = $taxeSejourTotal;
 
-        $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
-        if ($typeReservant === 'agence') {
-            $validated['prix_avant_remise'] = $chambreSousTotal;
-            $validated['remise_pourcentage'] = 4.0;
-            $validated['prix_total'] = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
-        } else {
-            $validated['prix_total'] = $chambreSousTotal + $taxeSejourTotal;
-            $validated['prix_avant_remise'] = null;
-            $validated['remise_pourcentage'] = null;
+        // Calculate total nights for tiered discount
+        $totalNights = 0;
+        foreach ($groupsData as $g) {
+            $totalNights += $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
         }
+
+        // Apply Dynamic Discount
+        $discountData = $this->calculateDiscount($totalNights, $chambreSousTotal, $taxeSejourTotal);
+        
+        $validated['prix_total'] = $discountData['prix_total'];
+        $validated['prix_avant_remise'] = $discountData['prix_avant_remise'];
+        $validated['remise_pourcentage'] = $discountData['remise_pourcentage'];
 
         // Reset status to en_attente and save
         $reservation->statut = 'en_attente';
@@ -260,5 +265,36 @@ class ClientReservationController extends Controller
         }
 
         return redirect()->back()->with('success', 'Votre preuve de paiement a été soumise avec succès et est en attente de vérification par notre équipe.');
+    }
+
+    /**
+     * Calculate discount based on total nights and tiered rules.
+     */
+    private function calculateDiscount(int $totalNights, float $chambreSousTotal, float $taxeSejourTotal): array
+    {
+        $applicableDiscount = 0;
+        
+        // Find the highest applicable tiered discount
+        $tierRule = DiscountRule::where('min_nights', '<=', $totalNights)
+            ->orderByDesc('min_nights')
+            ->first();
+            
+        if ($tierRule) {
+            $applicableDiscount = (float) $tierRule->discount_percentage;
+        }
+
+        if ($applicableDiscount > 0) {
+            return [
+                'prix_avant_remise'  => $chambreSousTotal,
+                'remise_pourcentage' => $applicableDiscount,
+                'prix_total'         => ($chambreSousTotal * (1 - ($applicableDiscount / 100))) + $taxeSejourTotal,
+            ];
+        }
+
+        return [
+            'prix_avant_remise'  => null,
+            'remise_pourcentage' => null,
+            'prix_total'         => $chambreSousTotal + $taxeSejourTotal,
+        ];
     }
 }

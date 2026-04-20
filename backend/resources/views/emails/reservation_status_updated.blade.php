@@ -248,15 +248,15 @@
         <p class="details-title">Récapitulatif de votre séjour</p>
         {!! $TABLEAU_DEVIS !!}
 
-        @if($reservation->type_reservant === 'agence' && $reservation->prix_avant_remise)
+        @if($reservation->remise_pourcentage && $reservation->prix_avant_remise)
             <table class="details-table" style="margin-top: 20px; border-top: 2px dashed #cbd5e1; padding-top: 15px;">
                 <tr>
                     <td class="label" style="padding-top: 15px;">Valeur Initiale</td>
                     <td class="value" style="text-decoration: line-through; color: #94a3b8; padding-top: 15px;">{{ number_format($reservation->prix_avant_remise, 0, ',', ' ') }} MAD</td>
                 </tr>
                 <tr>
-                    <td class="label" style="color: #059669; font-weight: 700; font-size: 14px;">Remise Agence ({{ $reservation->remise_pourcentage }}%)</td>
-                    <td class="value" style="color: #059669; font-weight: 900; font-size: 15px;">- {{ number_format($reservation->prix_avant_remise - $reservation->prix_total, 0, ',', ' ') }} MAD</td>
+                    <td class="label" style="color: #059669; font-weight: 700; font-size: 14px;">Remise ({{ $reservation->remise_pourcentage }}%)</td>
+                    <td class="value" style="color: #059669; font-weight: 900; font-size: 15px;">- {{ number_format($reservation->prix_avant_remise - ($reservation->prix_total - ($reservation->taxe_sejour_total ?? 0)), 0, ',', ' ') }} MAD</td>
                 </tr>
             </table>
         @endif

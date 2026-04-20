@@ -116,22 +116,21 @@ trait HasDynamicTemplate
         $prixTotal = $reservation->prix_total;
         $prixAvant = $reservation->prix_avant_remise;
         $taxeTotal = $reservation->taxe_sejour_total ?? 0;
-        $remiseP = $reservation->remise_pourcentage ?? 4.0;
+        $remiseP = $reservation->remise_pourcentage ?? 0;
 
-        // If it's an agency but we don't have the room subtotal, we try to derive it
-        // Note: For old records, tax might be 0, so deriving is easier.
-        if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
+        // If we have a discount but we don't have the room subtotal, we try to derive it
+        if ($remiseP > 0 && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
             $roomPart = $prixTotal - $taxeTotal;
             $prixAvant = $roomPart / (1 - ($remiseP / 100));
         }
 
-        if ($reservation->type_reservant === 'agence' && $prixAvant) {
+        if ($remiseP > 0 && $prixAvant) {
             $html .= "<tr>";
             $html .= "<td style='padding: 20px 12px 10px 12px; text-align: right; font-weight: bold; text-transform: uppercase; color: #64748b; font-size: 11px;'>Total Hébergement (HT)</td>";
             $html .= "<td style='padding: 20px 12px 10px 12px; font-weight: bold; font-size: 14px; color: #94a3b8; border-top: 2px solid #f1f5f9; text-align: right; text-decoration: line-through;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             $html .= "<tr>";
-            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise Agence ({$remiseP}%)</td>";
+            $html .= "<td style='padding: 10px 12px; text-align: right; font-weight: 800; text-transform: uppercase; color: #059669; font-size: 11px;'>Remise ({$remiseP}%)</td>";
             $html .= "<td style='padding: 10px 12px; font-weight: 900; font-size: 14px; color: #059669; text-align: right;'>- " . number_format($prixAvant * ($remiseP / 100), 0, ',', ' ') . " MAD</td>";
             $html .= "</tr>";
             
@@ -182,14 +181,14 @@ trait HasDynamicTemplate
         $prixTotal = $reservation->prix_total;
         $prixAvant = $reservation->prix_avant_remise;
         $taxeTotal = $reservation->taxe_sejour_total ?? 0;
-        $remiseP = $reservation->remise_pourcentage ?? 4.0;
+        $remiseP = $reservation->remise_pourcentage ?? 0;
 
-        if ($reservation->type_reservant === 'agence' && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
+        if ($remiseP > 0 && (!$prixAvant || $prixAvant <= 0) && $prixTotal > 0) {
             $roomPart = $prixTotal - $taxeTotal;
             $prixAvant = $roomPart / (1 - ($remiseP / 100));
         }
 
-        if ($reservation->type_reservant === 'agence' && $prixAvant) {
+        if ($remiseP > 0 && $prixAvant) {
             $html .= "<td style='padding: 15px 12px; border-bottom: 1px solid #f1f5f9; text-align: right;'>";
             $html .= "<div style='font-weight: bold; color: #94a3b8; font-size: 13px; text-decoration: line-through; margin-bottom: 2px;'>" . number_format($prixAvant, 0, ',', ' ') . " MAD</div>";
             $html .= "<div style='font-weight: 900; color: #059669; font-size: 12px; margin-bottom: 4px;'>- " . number_format($prixAvant * ($remiseP / 100), 0, ',', ' ') . " MAD (-{$remiseP}%)</div>";

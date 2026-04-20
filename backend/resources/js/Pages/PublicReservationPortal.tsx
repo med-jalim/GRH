@@ -12,12 +12,19 @@ import { ReservationDetailsStep } from "@/components/booking/ReservationDetailsS
 import { SummaryStep } from "@/components/booking/SummaryStep";
 import { CheckCircle, XCircle, FileUp, CreditCard, ExternalLink, Calendar, Users, Building2, BedDouble, Upload, Clock, Ban, Loader2, Edit2, AlertTriangle, RefreshCw, Check } from "lucide-react";
 
+interface DiscountRule {
+    id: number;
+    min_nights: number;
+    discount_percentage: number;
+}
+
 interface Props {
     reservation: any;
     hotels: Hotel[];
+    discountRules : DiscountRule[];
 }
 
-export default function PublicReservationPortal({ reservation, hotels }: Props) {
+export default function PublicReservationPortal({ reservation, hotels ,discountRules}: Props) {
     const { flash, errors } = usePage().props as any;
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<"general" | "payment">(() => {
@@ -115,8 +122,6 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
             return sum + groupTax;
         }, 0);
     }, [formData.groups, selectedHotel]);
-
-    const totalPrice = formData.bookingType === 'agence' ? (basePrice * 0.96) + stayTaxTotal : basePrice + stayTaxTotal;
 
     const handleNext = async () => {
         let fieldsToValidate: any[] = [];
@@ -243,6 +248,27 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
         }
     };
     const sInfo = getStatusInfo(reservation.statut);
+
+    const totalNights = useMemo(() => {
+        if (!reservation.groups || reservation.groups.length === 0) return 0;
+        return reservation.groups.reduce((sum: number, g: any) => {
+            if (!g.date_arrivee || !g.date_depart) return sum;
+            const diff = new Date(g.date_depart).getTime() - new Date(g.date_arrivee).getTime();
+            return sum + Math.max(1, Math.round(diff / 86_400_000));
+        }, 0);
+    }, [reservation.groups]);
+
+    const applicableDiscountRule = useMemo(() => {
+        if (!discountRules || discountRules.length === 0) return null;
+        // Sort rules by min_nights descending to find the highest threshold first
+        return [...discountRules]
+            .sort((a, b) => b.min_nights - a.min_nights)
+            .find(rule => totalNights >= rule.min_nights) ?? null;
+    }, [discountRules, totalNights]);
+
+    const discountPercentage = applicableDiscountRule ? applicableDiscountRule.discount_percentage : 0;
+    const discountAmount = (basePrice * discountPercentage) / 100;
+    const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
 
     const totalValidPaid = reservation.payments.filter((p: any) => p.statut === 'valide').reduce((sum: number, p: any) => sum + p.amount, 0);
     const waitingPayments = reservation.payments.filter((p: any) => p.statut === 'en_attente');
@@ -448,15 +474,15 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                             })}
                                                         </tbody>
                                                         <tfoot className="bg-slate-50">
-                                                            {reservation.type_reservant === 'agence' && reservation.prix_avant_remise ? (
+                                                            {discountPercentage > 0 && reservation.prix_avant_remise ? (
                                                                 <>
                                                                     <tr>
                                                                         <td colSpan={2} className="px-6 py-4 text-right font-bold text-slate-400 uppercase tracking-widest border-b border-white">Sous-total Chambres</td>
                                                                         <td className="px-6 py-4 text-right font-bold text-slate-400 line-through border-b border-white">{formatPrice(reservation.prix_avant_remise)}</td>
                                                                     </tr>
                                                                     <tr>
-                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise Agence (4%)</td>
-                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(reservation.prix_avant_remise * 0.04)}</td>
+                                                                        <td colSpan={2} className="px-6 py-4 text-right font-bold text-emerald-500 uppercase tracking-widest border-b border-white">Remise ({discountPercentage}%)</td>
+                                                                        <td className="px-6 py-4 text-right font-black text-emerald-500 border-b border-white">- {formatPrice(discountAmount)}</td>
                                                                     </tr>
                                                                 </>
                                                             ):(
@@ -572,15 +598,15 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                         Résumé Financier
                                     </h2>
                                     <div className="space-y-4">
-                                        {reservation.type_reservant === 'agence' && reservation.prix_avant_remise ? (
+                                        {discountPercentage > 0 && reservation.prix_avant_remise ? (
                                             <>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="text-slate-500 font-medium">Prix Chambres</span>
                                                     <span className="font-bold text-slate-400 line-through">{formatPrice(reservation.prix_avant_remise)}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-emerald-600 font-bold">Remise Agence (4%)</span>
-                                                    <span className="font-black text-emerald-600">-{formatPrice(reservation.prix_avant_remise * 0.04)}</span>
+                                                    <span className="text-emerald-600 font-bold">Remise ({discountPercentage}%)</span>
+                                                    <span className="font-black text-emerald-600">-{formatPrice(discountAmount)}</span>
                                                 </div>
                                             </>
                                         ) : (
@@ -665,6 +691,8 @@ export default function PublicReservationPortal({ reservation, hotels }: Props) 
                                                 basePrice={basePrice} 
                                                 stayTaxTotal={stayTaxTotal}
                                                 totalPrice={totalPrice} 
+                                                discountPercentage={discountPercentage}
+                                                discountAmount={discountAmount}
                                             />
                                         )}
                                     </form>
