@@ -86,6 +86,13 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
         [formData.hotelId, hotels],
     );
 
+    const multiplier = useMemo(() => {
+        if (!selectedHotel) return 1.0;
+        if (formData.bookingType === 'agence') return Number(selectedHotel.agency_ratio ?? 0.96);
+        if (formData.bookingType === 'groupe') return Number(selectedHotel.group_ratio ?? 1.00);
+        return 1.0;
+    }, [formData.bookingType, selectedHotel]);
+
     const allTypes = useMemo(() => {
         if (!selectedHotel || !selectedHotel.chambres) return [];
 
@@ -332,6 +339,7 @@ export function ReservationDetailsStep({ hotels, totalPrice, disabledHotel = fal
                                 onRemoveRoom={removeRoomFromGroup}
                                 onRemoveGroup={removeGroup}
                                 availabilityData={availabilityMap}
+                                multiplier={multiplier}
                             />
                         ))}
 

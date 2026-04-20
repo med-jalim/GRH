@@ -19,9 +19,15 @@ interface DiscountRule {
     discount_percentage: number;
 }
 
+interface AppSetting {
+    key: string;
+    value: string;
+}
+
 interface Props {
     hotels: Hotel[];
     discountRules: DiscountRule[];
+    settings: AppSetting[];
 }
 
 import { Building2 } from "lucide-react";
@@ -71,6 +77,13 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
         [formData.hotelId, hotels],
     );
 
+    const multiplier = useMemo(() => {
+        if (!selectedHotel) return 1.0;
+        if (formData.bookingType === 'agence') return Number(selectedHotel.agency_ratio ?? 0.96);
+        if (formData.bookingType === 'groupe') return Number(selectedHotel.group_ratio ?? 1.00);
+        return 1.0;
+    }, [formData.bookingType, selectedHotel]);
+
     const basePrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
         
@@ -82,13 +95,13 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
                 return rSum + (prix * nights * r.quantity);
             }, 0);
 
             return sum + groupTotal;
         }, 0);
-    }, [formData.groups, selectedHotel]);
+    }, [formData.groups, selectedHotel, multiplier]);
 
     const stayTaxTotal = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
@@ -128,6 +141,19 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
     const discountAmount = (basePrice * discountPercentage) / 100;
     const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
 
+    const totalRooms = useMemo(() => {
+        if (!formData.groups || formData.groups.length === 0) return 0;
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.rooms) return sum;
+            return sum + g.rooms.reduce((rSum: number, r: any) => rSum + (Number(r.quantity) || 0), 0);
+        }, 0);
+    }, [formData.groups]);
+
+    const minRooms = useMemo(() => {
+        const setting = settings?.find(s => s.key === 'min_rooms_per_reservation');
+        return setting ? parseInt(setting.value) : 11;
+    }, [settings]);
+
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
         setApiError([]);
@@ -140,11 +166,17 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
                 "email",
                 "phone",
             ];
-        if (step === 2)
+        if (step === 2) {
             fieldsToValidate = [
                 "hotelId",
                 "groups",
             ];
+            if (totalRooms < minRooms) {
+                setApiError([`Une réservation doit comporter au moins ${minRooms} chambres. (Actuellement : ${totalRooms})`]);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                return;
+            }
+        }
 
         const isValid = await trigger(fieldsToValidate);
         if (isValid) {
@@ -177,7 +209,7 @@ export default function BookingFormPage({ hotels, discountRules }: Props) {
                 nb_personnes: g.rooms.reduce((sum, room) => sum + room.adults + room.children, 0),
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
                     return {
                         id_type: r.roomTypeId,
                         id_sub_type: r.subTypeId,

@@ -25,15 +25,16 @@ interface Props {
     remaining: number;
     total: number;
   } | null;
+  multiplier: number;
 }
 
-export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onChange, onRemove, availability, disabledSubTypeIds = [] }: Props) {
+export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onChange, onRemove, availability, multiplier, disabledSubTypeIds = [] }: Props) {
   const optionsWithDynamicPrices = useMemo(() => {
     return availableOptions.map(opt => ({
       ...opt,
-      dynamicPrice: hotel ? computeDynamicPrice(hotel, opt.type.id, room.subTypeId, checkInDate) : opt.price
+      dynamicPrice: hotel ? computeDynamicPrice(hotel, opt.type.id, room.subTypeId, checkInDate, multiplier) : opt.price
     }));
-  }, [hotel, checkInDate, availableOptions, room.subTypeId]);
+  }, [hotel, checkInDate, availableOptions, room.subTypeId, multiplier]);
 
   const selectedOption = optionsWithDynamicPrices.find(opt => opt.type.id === room.roomTypeId);
   const selectedSubType = selectedOption?.type.sub_types?.find((st: any) => st.id === room.subTypeId);
@@ -154,7 +155,7 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
                   {selectedOption?.type.sub_types
                       ?.filter((st: any) => !disabledSubTypeIds.includes(st.id))
                       .map((st: any) => {
-                      const dynamicPrice = hotel ? computeDynamicPrice(hotel, room.roomTypeId, st.id, checkInDate) : 0;
+                      const dynamicPrice = hotel ? computeDynamicPrice(hotel, room.roomTypeId, st.id, checkInDate, multiplier) : 0;
                       return (
                         <option key={st.id} value={st.id}>
                             {st.nom} — {formatPrice(dynamicPrice)} / nuit

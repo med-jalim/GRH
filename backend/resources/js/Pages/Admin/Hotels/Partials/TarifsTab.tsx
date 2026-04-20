@@ -20,7 +20,6 @@ import { PricingCalendar } from "@/components/Calendar/PricingCalendar";
 interface TarifsTabProps {
     hotel: any;
     types: any[];
-    section: "calendrier";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -50,6 +49,8 @@ function EssentielCalendar({
     const [editingTarif, setEditingTarif] = useState<any>(null);
     const [selectedTypeId, setSelectedTypeId] = useState<string>("all");
     const [selectedSubTypeId, setSelectedSubTypeId] = useState<string>("all");
+    const [priceContext, setPriceContext] = useState<"standard" | "agence" | "groupe">("standard");
+    const [showRatioModal, setShowRatioModal] = useState(false);
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         id_type: "",
@@ -59,6 +60,17 @@ function EssentielCalendar({
         date_debut: "",
         date_fin: "",
     });
+
+    const { data: ratioData, setData: setRatioData, put: putRatio, processing: processingRatio } = useForm({
+        agency_ratio: hotel.agency_ratio ?? 0.96,
+        group_ratio: hotel.group_ratio ?? 1.00,
+    });
+
+    const multiplier = useMemo(() => {
+        if (priceContext === "agence") return Number(hotel.agency_ratio ?? 0.96);
+        if (priceContext === "groupe") return Number(hotel.group_ratio ?? 1.00);
+        return 1.0;
+    }, [priceContext, hotel.agency_ratio, hotel.group_ratio]);
 
     function openCreate(startDate?: Date, endDate?: Date) {
         setEditingTarif(null);
@@ -112,9 +124,24 @@ function EssentielCalendar({
         }
     }
 
+    function submitRatios(e: React.FormEvent) {
+        e.preventDefault();
+        putRatio(`/admin/hotels/${hotel.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setShowRatioModal(false),
+        });
+    }
+
     const allTarifs = hotel.tarifs || [];
 
-    const filteredTarifs = allTarifs.filter((t: any) => {
+    const processedTarifs = useMemo(() => {
+        return allTarifs.map((t: any) => ({
+            ...t,
+            prix: Math.round(t.prix * multiplier),
+        }));
+    }, [allTarifs, multiplier]);
+
+    const filteredTarifs = processedTarifs.filter((t: any) => {
         const typeMatch = selectedTypeId === "all" ? true : t.id_type === Number(selectedTypeId);
         const subTypeMatch = selectedSubTypeId === "all" ? true : t.id_sub_type === Number(selectedSubTypeId);
         return typeMatch && subTypeMatch;
@@ -142,6 +169,68 @@ function EssentielCalendar({
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center bg-white rounded-xl border border-amber-200 p-1 shadow-sm mr-2">
+                        {(["standard", "agence", "groupe"] as const).map((ctx) => (
+                            <button
+                                key={ctx}
+                                onClick={() => setPriceContext(ctx)}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    priceContext === ctx
+                                        ? "bg-amber-600 text-white shadow-md"
+                                        : "text-slate-400 hover:text-slate-600"
+                                }`}
+                            >
+                                {ctx === "standard" ? "Standard" : ctx === "agence" ? "Agence" : "Groupe"}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        onClick={() => setShowRatioModal(true)}
+                        className="h-10 w-10 flex items-center justify-center bg-white border border-amber-200 rounded-xl hover:bg-amber-50 text-amber-700 transition-colors shadow-sm mr-2"
+                        title="Paramètres de ratios"
+                    >
+                        <Settings2 className="w-4.5 h-4.5" />
+                    </button>
+
+                    {/* <select
+                        value={selectedTypeId}
+                        onChange={(e) => {
+                            setSelectedTypeId(e.target.value);
+                            setSelectedSubTypeId("all");
+                        }}
+                        className="h-10 px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 bg-white shadow-sm"
+                    >
+                        <option value="all">Type: Tous</option>
+                        {types.map((t) => (
+                            <option key={t.id} value={t.id}>{t.nom}</option>
+                        ))}
+                    </select>
+
+                    {selectedTypeId !== "all" && (
+                        <select
+                            value={selectedSubTypeId}
+                            onChange={(e) => setSelectedSubTypeId(e.target.value)}
+                            className="h-10 px-3 py-2 rounded-xl border border-amber-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 bg-white shadow-sm animate-in fade-in slide-in-from-left-2 transition-all"
+                        >
+                            <option value="all">Occupation: Toutes</option>
+                            {types.find(t => t.id === Number(selectedTypeId))?.sub_types?.map((st: any) => (
+                                <option key={st.id} value={st.id}>{st.nom}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    <button
+                        onClick={() => openCreate()}
+                        className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm disabled:opacity-40"
+                    >
+                        <Plus className="w-4 h-4" /> Ajouter période
+                    </button> */}
+                </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 bg-amber-50/60 border-b border-amber-100 gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-2 w-full ">
                     <select
                         value={selectedTypeId}
                         onChange={(e) => {
@@ -174,9 +263,10 @@ function EssentielCalendar({
                         className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 h-10 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm disabled:opacity-40"
                     >
                         <Plus className="w-4 h-4" /> Ajouter période
-                    </button>
+                    </button> 
                 </div>
             </div>
+
 
             {/* Calendar */}
             <PricingCalendar
@@ -345,13 +435,96 @@ function EssentielCalendar({
                     </div>
                 </div>
             )}
+            {/* Modale des Ratios */}
+            {showRatioModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowRatioModal(false)} />
+                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden z-10">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/30">
+                            <h3 className="font-bold text-slate-800 tracking-tight">Paramètres de Ratios</h3>
+                            <button onClick={() => setShowRatioModal(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={submitRatios} className="p-7 space-y-5">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ratio Agence</label>
+                                    <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100">
+                                        {Math.round(ratioData.agency_ratio * 100)}%
+                                    </span>
+                                </div>
+                                <div className="relative group">
+                                    <input
+                                        type="range"
+                                        min="50"
+                                        max="150"
+                                        step="1"
+                                        value={Math.round(ratioData.agency_ratio * 100)}
+                                        onChange={e => setRatioData('agency_ratio', Number(e.target.value) / 100)}
+                                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                    />
+                                    <div className="flex justify-between mt-2 text-[9px] font-bold text-slate-400 uppercase">
+                                        <span>50%</span>
+                                        <span>100%</span>
+                                        <span>150%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Ratio Groupe</label>
+                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
+                                        {Math.round(ratioData.group_ratio * 100)}%
+                                    </span>
+                                </div>
+                                <div className="relative group">
+                                    <input
+                                        type="range"
+                                        min="50"
+                                        max="150"
+                                        step="1"
+                                        value={Math.round(ratioData.group_ratio * 100)}
+                                        onChange={e => setRatioData('group_ratio', Number(e.target.value) / 100)}
+                                        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                    <div className="flex justify-between mt-2 text-[9px] font-bold text-slate-400 uppercase">
+                                        <span>50%</span>
+                                        <span>100%</span>
+                                        <span>150%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4">
+                                <button
+                                    type="submit"
+                                    disabled={processingRatio}
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-sm transition-all disabled:opacity-50 shadow-lg shadow-slate-900/20"
+                                >
+                                    {processingRatio ? "Enregistrement..." : (
+                                        <>
+                                            <Check className="w-4 h-4" />
+                                            Enregistrer les ratios
+                                        </>
+                                    )}
+                                </button>
+                                <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest mt-4">
+                                    Les prix seront mis à jour après enregistrement
+                                </p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 // ── Main TarifsTab Component ───────────────────────────────────────────────
 
-export function TarifsTab({ hotel, types }: Omit<TarifsTabProps, "section">) {
+export function TarifsTab({ hotel, types }: TarifsTabProps) {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 

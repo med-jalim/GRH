@@ -97,6 +97,7 @@ class ClientReservationController extends Controller
             'reservation' => $reservation,
             'hotels' => $hotels,
             'discountRules' => $discountRules,
+            'settings' => \App\Models\AppSetting::all(),
         ]);
     }
 
@@ -137,6 +138,19 @@ class ClientReservationController extends Controller
         $failures = $this->reservationService->checkAvailability($reservation->id_hotel, $validated['groups'], $reservation->id);
         if (!empty($failures)) {
             return redirect()->back()->withErrors(['availability' => $failures]);
+        }
+
+        // Minimum rooms validation
+        $minRoomsSetting = \App\Models\AppSetting::where('key', 'min_rooms_per_reservation')->first();
+        $minRooms = $minRoomsSetting ? (int)$minRoomsSetting->value : 11;
+        
+        $totalRooms = collect($validated['groups'])->flatMap(function ($group) {
+            return $group['rooms'];
+        })->sum('quantite');
+
+        if ($totalRooms < $minRooms) {
+            $errorMessage = "Une réservation doit comporter au moins $minRooms chambres.";
+            return redirect()->back()->withErrors(['rooms' => $errorMessage])->withInput();
         }
 
         $groupsData = $validated['groups'];

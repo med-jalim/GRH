@@ -27,6 +27,7 @@ class HotelController extends Controller
         return Inertia::render('BookingFormPage', [
             'hotels' => $hotels,
             'discountRules' => $discountRules,
+            'settings' => \App\Models\AppSetting::all(),
         ]);
     }
 
@@ -75,6 +76,8 @@ class HotelController extends Controller
             'adresse'     => 'nullable|string|max:1000',
             'rib'         => 'nullable|string|min:10|max:24',
             'taxe_sejour' => 'nullable|numeric|min:0',
+            'agency_ratio'=> 'nullable|numeric|min:0|max:2',
+            'group_ratio' => 'nullable|numeric|min:0|max:2',
         ]);
 
         $hotel = Hotel::create($validated);
@@ -147,6 +150,8 @@ class HotelController extends Controller
             'adresse'     => 'nullable|string|max:1000',
             'rib'         => 'nullable|string|min:10|max:24',
             'taxe_sejour' => 'nullable|numeric|min:0',
+            'agency_ratio'=> 'nullable|numeric|min:0|max:2',
+            'group_ratio' => 'nullable|numeric|min:0|max:2',
         ]);
 
         $hotel->update($validated);

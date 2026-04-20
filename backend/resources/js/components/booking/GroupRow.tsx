@@ -22,6 +22,7 @@ interface Props {
   onRemoveRoom:     (groupUid: string, roomUid: string) => void;
   onRemoveGroup:    (uid: string) => void;
   availabilityData?: Record<string, any>;
+  multiplier:        number;
 }
 
 export function GroupRow({ 
@@ -34,7 +35,8 @@ export function GroupRow({
   onAddRoom, 
   onRemoveRoom, 
   onRemoveGroup,
-  availabilityData
+  availabilityData,
+  multiplier
 }: Props) {
   const today = new Date().toISOString().split("T")[0];
   
@@ -43,7 +45,7 @@ export function GroupRow({
   const nights = Math.max(1, Math.round(diff / 86_400_000));
   
   const groupTotal = group.rooms.reduce((acc, room) => {
-    const price = hotel ? computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, group.checkIn) : 0;
+    const price = hotel ? computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, group.checkIn, multiplier) : 0;
     return acc + price * room.quantity * nights;
   }, 0);
 
@@ -144,6 +146,7 @@ export function GroupRow({
                 onChange={(ruid, field, val) => onUpdateRoom(group.uid, ruid, field, val)}
                 onRemove={(ruid) => onRemoveRoom(group.uid, ruid)}
                 availability={availabilityData ? availabilityData[room.uid] : null}
+                multiplier={multiplier}
               />
             );
           })}

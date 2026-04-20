@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function computeDynamicPrice(hotel: any, roomTypeId: number, subTypeId: number | undefined, checkInDateStr: string | Date): number {
+export function computeDynamicPrice(hotel: any, roomTypeId: number, subTypeId: number | undefined, checkInDateStr: string | Date, multiplier: number = 1.0): number {
     if (!subTypeId) return 0;
     
     // Extract YYYY-MM-DD to avoid timezone shifts
@@ -32,7 +32,7 @@ export function computeDynamicPrice(hotel: any, roomTypeId: number, subTypeId: n
     });
 
     if (explicitTarif) {
-        return Number(explicitTarif.prix);
+        return Math.round(Number(explicitTarif.prix) * multiplier);
     }
 
     return 0; // No price found for this specific sub-type on this date

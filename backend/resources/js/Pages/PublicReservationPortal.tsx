@@ -18,13 +18,19 @@ interface DiscountRule {
     discount_percentage: number;
 }
 
+interface AppSetting {
+    key: string;
+    value: string;
+}
+
 interface Props {
     reservation: any;
     hotels: Hotel[];
     discountRules : DiscountRule[];
+    settings: AppSetting[];
 }
 
-export default function PublicReservationPortal({ reservation, hotels ,discountRules}: Props) {
+export default function PublicReservationPortal({ reservation, hotels, discountRules, settings }: Props) {
     const { flash, errors } = usePage().props as any;
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<"general" | "payment">(() => {
@@ -41,6 +47,7 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
     const [isAvailable, setIsAvailable] = useState(true);
     const [isCapacityValid, setIsCapacityValid] = useState(true);
     const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+    const [apiError, setApiError] = useState<string[]>([]);
 
     // Action State
     const [isActioning, setIsActioning] = useState<string | null>(null);
@@ -86,6 +93,13 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
         [formData.hotelId, hotels],
     );
 
+    const multiplier = useMemo(() => {
+        if (!selectedHotel) return 1.0;
+        if (formData.bookingType === 'agence') return Number(selectedHotel.agency_ratio ?? 0.96);
+        if (formData.bookingType === 'groupe') return Number(selectedHotel.group_ratio ?? 1.00);
+        return 1.0;
+    }, [formData.bookingType, selectedHotel]);
+
     const basePrice = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
         
@@ -97,13 +111,13 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
             const checkInDate = new Date(g.checkIn);
 
             const groupTotal = g.rooms.reduce((rSum: number, r: any) => {
-                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
+                const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
                 return rSum + (prix * nights * r.quantity);
             }, 0);
 
             return sum + groupTotal;
         }, 0);
-    }, [formData.groups, selectedHotel]);
+    }, [formData.groups, selectedHotel, multiplier]);
 
     const stayTaxTotal = useMemo(() => {
         if (!selectedHotel || !formData.groups || formData.groups.length === 0) return 0;
@@ -126,7 +140,14 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
     const handleNext = async () => {
         let fieldsToValidate: any[] = [];
         if (step === 1) fieldsToValidate = ["agencyName", "agencyCode", "contactName", "email", "phone"];
-        if (step === 2) fieldsToValidate = ["hotelId", "groups"];
+        if (step === 2) {
+            fieldsToValidate = ["hotelId", "groups"];
+            if (totalRooms < minRooms) {
+                setApiError([`Une réservation doit comporter au moins ${minRooms} chambres. (Actuellement : ${totalRooms})`]);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                return;
+            }
+        }
 
         const isValid = await trigger(fieldsToValidate);
         if (isValid) {
@@ -160,7 +181,7 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
                 nb_personnes: g.rooms.reduce((sum, room) => sum + room.adults + room.children, 0),
                 rooms: g.rooms.map(r => {
                     const checkInDate = new Date(g.checkIn);
-                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate);
+                    const prix = computeDynamicPrice(selectedHotel, r.roomTypeId, r.subTypeId, checkInDate, multiplier);
                     return {
                         id_type: r.roomTypeId,
                         id_sub_type: r.subTypeId,
@@ -269,6 +290,19 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
     const discountPercentage = applicableDiscountRule ? applicableDiscountRule.discount_percentage : 0;
     const discountAmount = (basePrice * discountPercentage) / 100;
     const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
+
+    const totalRooms = useMemo(() => {
+        if (!formData.groups || formData.groups.length === 0) return 0;
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.rooms) return sum;
+            return sum + g.rooms.reduce((rSum: number, r: any) => rSum + (Number(r.quantity) || 0), 0);
+        }, 0);
+    }, [formData.groups]);
+
+    const minRooms = useMemo(() => {
+        const setting = settings?.find(s => s.key === 'min_rooms_per_reservation');
+        return setting ? parseInt(setting.value) : 11;
+    }, [settings]);
 
     const totalValidPaid = reservation.payments.filter((p: any) => p.statut === 'valide').reduce((sum: number, p: any) => sum + p.amount, 0);
     const waitingPayments = reservation.payments.filter((p: any) => p.statut === 'en_attente');
@@ -699,7 +733,28 @@ export default function PublicReservationPortal({ reservation, hotels ,discountR
                                 </FormProvider>
                             </div>
 
-                            {/* API Errors Display */}
+                            {/* Local API Errors Display */}
+                            {apiError.length > 0 && (
+                                <div className="mx-12 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="flex gap-3">
+                                        <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0 mt-0.5">
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Action Requise</p>
+                                            <ul className="list-disc list-inside space-y-0.5">
+                                                {apiError.map((err, idx) => (
+                                                    <li key={idx} className="text-xs font-bold text-rose-600 leading-relaxed">{err}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Server Side Errors Display */}
                             {errors && Object.keys(errors).length > 0 && (
                                 <div className="mx-12 mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="flex gap-3">

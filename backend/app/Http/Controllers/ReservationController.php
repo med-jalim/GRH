@@ -139,6 +139,26 @@ class ReservationController extends Controller
             ], 422);
         }
 
+        // Minimum rooms validation
+        $minRoomsSetting = \App\Models\AppSetting::where('key', 'min_rooms_per_reservation')->first();
+        $minRooms = $minRoomsSetting ? (int)$minRoomsSetting->value : 11;
+        
+        $totalRooms = collect($validated['groups'])->flatMap(function ($group) {
+            return $group['rooms'];
+        })->sum('quantite');
+
+        if ($totalRooms < $minRooms) {
+            $errorMessage = "Une réservation doit comporter au moins $minRooms chambres.";
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $errorMessage,
+                    'errors'  => ['rooms' => [$errorMessage]]
+                ], 422);
+            }
+            return redirect()->back()->withErrors(['rooms' => $errorMessage])->withInput();
+        }
+
         // Auto-generate a unique reference code
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
@@ -151,6 +171,14 @@ class ReservationController extends Controller
         $hotel = Hotel::find($validated['id_hotel']);
         $taxeParAdulte = $hotel->taxe_sejour ?? 0;
 
+        // Ratio handling (Phase 1)
+        $ratio = 1.0;
+        if ($validated['type_reservant'] === 'agence') {
+            $ratio = (float)($hotel->agency_ratio ?? 0.96);
+        } elseif ($validated['type_reservant'] === 'groupe') {
+            $ratio = (float)($hotel->group_ratio ?? 1.00);
+        }
+
         foreach ($groupsData as $g) {
             $nights = $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
             $groupPersonnes = collect($g['rooms'])->sum(function ($room) {
@@ -158,9 +186,11 @@ class ReservationController extends Controller
             });
             $totalPersonnes += $groupPersonnes;
 
-            foreach ($g['rooms'] as $r) {
-                // Room Price
-                $chambreSousTotal += ($r['quantite'] * $r['prix_unitaire'] * $nights);
+            foreach ($g['rooms'] as &$r) {
+                // Ensure price is rounded after applying ratio (if ratio is applied here or previously)
+                // For safety, we trust the prix_unitaire sent but we want to ensure it reflects the ROUNDED Phase 1 price.
+                
+                $chambreSousTotal += ($r['quantite'] * round($r['prix_unitaire']) * $nights);
                 
                 // Tax Calculation (Daily per adult)
                 $taxeSejourTotal += ($r['nb_adultes'] * $r['quantite'] * $nights * $taxeParAdulte);

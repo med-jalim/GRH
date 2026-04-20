@@ -34,7 +34,6 @@ interface Props {
 }
 
 export default function Index({ settings, rules }: Props) {
-  const [activeTab, setActiveTab] = useState<'rules' | 'general'>('rules');
 
   // Form for App Settings
   const { data: settingsData, setData: setSettingsData, patch: patchSettings, processing: processingSettings } = useForm({
@@ -44,14 +43,6 @@ export default function Index({ settings, rules }: Props) {
   // Form for New/Edit Discount Rule
   const [newRule, setNewRule] = useState({ min_nights: '', discount_percentage: '' });
 
-  const handleUpdateSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    patchSettings('/admin/settings/update', {
-      preserveScroll: true,
-      onSuccess: () => alert('Paramètres mis à jour !'),
-    });
-  };
-
   const handleAddRule = (e: React.FormEvent) => {
     e.preventDefault();
     router.post('/admin/settings/rules', newRule, {
@@ -59,9 +50,16 @@ export default function Index({ settings, rules }: Props) {
     });
   };
 
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    patchSettings(route('admin.settings.update'), {
+      preserveScroll: true,
+    });
+  };
+
   const handleDeleteRule = (id: number) => {
     if (confirm('Supprimer cette règle ?')) {
-      router.delete(`/admin/settings/rules/${id}`);
+      router.delete(route('admin.settings.rules.destroy', id));
     }
   };
 
@@ -77,36 +75,9 @@ export default function Index({ settings, rules }: Props) {
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl mb-8 w-fit shadow-inner">
-        <button
-          onClick={() => setActiveTab('rules')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-            activeTab === 'rules' 
-              ? "bg-white text-gray-900 shadow-sm" 
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <Moon className="w-4 h-4" />
-          Paliers de Remise
-        </button>
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-            activeTab === 'general' 
-              ? "bg-white text-gray-900 shadow-sm" 
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <Info className="w-4 h-4" />
-          Configuration Générale
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content Area */}
         <div className="lg:col-span-2 space-y-8">
-          {activeTab === 'rules' && (
             <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                 <div>
@@ -202,71 +173,47 @@ export default function Index({ settings, rules }: Props) {
                 </form>
               </div>
             </div>
-          )}
 
-          {activeTab === 'general' && (
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="p-8 border-b border-gray-50 bg-gray-50/50">
-                <h2 className="text-xl font-bold text-gray-900">Configuration Globale</h2>
-                <p className="text-sm text-gray-500 mt-1">Paramètres avancés du système de gestion.</p>
+            {/* Global Settings Section */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+              <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Paramètres Généraux</h2>
+                  <p className="text-sm text-gray-500 mt-1">Configurez les règles globales du système de réservation.</p>
+                </div>
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={processingSettings}
+                  className="bg-black text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-gray-800 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  Enregistrer
+                </button>
               </div>
 
-              <form onSubmit={handleUpdateSettings} className="p-8 space-y-8">
-                <div className="grid grid-cols-1 gap-8">
-                  {settings.map((setting, index) => (
-                    <div key={setting.key} className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center px-1">
-                        <label className="text-sm font-bold text-gray-700">{setting.label}</label>
-                        <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full font-black text-gray-400 uppercase tracking-tighter">
-                          {setting.key}
-                        </span>
-                      </div>
-                      <div className="relative group">
-                        {setting.type === 'number' ? (
-                          <div className="relative">
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={settingsData.settings[index].value}
-                              onChange={e => {
-                                const newS = [...settingsData.settings];
-                                newS[index].value = e.target.value;
-                                setSettingsData('settings', newS);
-                              }}
-                              className="w-full bg-white border border-gray-200 rounded-2xl px-5 py-4 text-gray-900 font-bold focus:ring-2 focus:ring-black outline-none transition-all pr-12"
-                            />
-                            <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 font-bold">%</div>
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={settingsData.settings[index].value}
-                            onChange={e => {
-                              const newS = [...settingsData.settings];
-                              newS[index].value = e.target.value;
-                              setSettingsData('settings', newS);
-                            }}
-                            className="w-full bg-white border border-gray-200 rounded-2xl px-5 py-4 text-gray-900 font-bold focus:ring-2 focus:ring-black outline-none transition-all"
-                          />
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 pl-1">{setting.description}</p>
+              <div className="p-8 space-y-6">
+                {settings.map((setting, index) => (
+                  <div key={setting.key} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
+                    <div className="md:w-1/3">
+                      <label className="text-sm font-bold text-gray-900 block">{setting.label}</label>
+                      <p className="text-xs text-gray-500 mt-1">{setting.description}</p>
                     </div>
-                  ))}
-                </div>
-
-                <div className="pt-8 border-t border-gray-50 flex justify-end">
-                  <button
-                    disabled={processingSettings}
-                    className="bg-black text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-black/10 disabled:opacity-50"
-                  >
-                    <Save className="w-5 h-5" />
-                    Enregistrer les modifications
-                  </button>
-                </div>
-              </form>
+                    <div className="flex-1">
+                      <input
+                        type={setting.type === 'number' ? 'number' : 'text'}
+                        value={settingsData.settings[index].value}
+                        onChange={e => {
+                          const newSettings = [...settingsData.settings];
+                          newSettings[index].value = e.target.value;
+                          setSettingsData('settings', newSettings);
+                        }}
+                        className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-semibold focus:ring-2 focus:ring-black outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
         </div>
 
         {/* Sidebar Info */}

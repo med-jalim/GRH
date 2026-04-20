@@ -94,7 +94,12 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discou
                     {group.rooms.map((room) => {
                         const chambre = hotel.chambres.find(c => c.id_type === room.roomTypeId);
                         const selectedSubType = (chambre?.type as any)?.sub_types?.find((st: any) => st.id === room.subTypeId);
-                        const price = computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, checkInDate);
+                        
+                        const multiplier = formData.bookingType === 'agence' 
+                            ? Number(hotel.agency_ratio ?? 0.96) 
+                            : Number(hotel.group_ratio ?? 1.00);
+
+                        const price = computeDynamicPrice(hotel, room.roomTypeId, room.subTypeId, checkInDate, multiplier);
                         const sub = price * groupNights * room.quantity;
 
                         return (
