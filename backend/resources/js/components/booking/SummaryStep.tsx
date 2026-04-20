@@ -12,6 +12,8 @@ interface Props {
   basePrice:  number;
   stayTaxTotal: number;
   totalPrice: number;
+  discountPercentage: number;
+  discountAmount: number;
 }
 
 function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
@@ -25,7 +27,7 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   );
 }
 
-export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice }: Props) {
+export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice, discountPercentage, discountAmount }: Props) {
   const { register, watch } = useFormContext<BookingSchemaType>();
   const formData = watch();
 
@@ -141,12 +143,12 @@ export function SummaryStep({ hotel, basePrice, stayTaxTotal, totalPrice }: Prop
                         <div className="space-y-1">
                             <p className="text-xs text-slate-400 flex justify-between gap-8">
                                 <span>Sous-total Hébergement :</span>
-                                <span className={formData.bookingType === 'agence' ? 'line-through opacity-50' : 'font-bold text-white'}>{formatPrice(basePrice)}</span>
+                                <span className={discountPercentage > 0 ? 'line-through opacity-50' : 'font-bold text-white'}>{formatPrice(basePrice)}</span>
                             </p>
-                            {formData.bookingType === 'agence' && (
+                            {discountPercentage > 0 && (
                                 <p className="text-xs text-emerald-400 flex justify-between gap-8 font-bold">
-                                    <span>Remise Agence (4%) :</span>
-                                    <span>- {formatPrice(basePrice * 0.04)}</span>
+                                    <span>Remise ({discountPercentage}%) :</span>
+                                    <span>- {formatPrice(discountAmount)}</span>
                                 </p>
                             )}
                             {stayTaxTotal > 0 && (

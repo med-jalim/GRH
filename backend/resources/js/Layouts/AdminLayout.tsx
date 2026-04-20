@@ -17,6 +17,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Settings,
 } from "lucide-react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { useFlash } from "@/lib/hooks";
@@ -47,6 +48,7 @@ export function AdminLayout({ children }: Props) {
     { name: "Réservations", href: "/admin/reservations", icon: CalendarCheck },
     { name: "Hôtels", href: "/admin/hotels", icon: Building2 },
     { name: "Emails", href: "/admin/email-templates", icon: Mail },
+    { name: "Paramètres", href: "/admin/settings", icon: Settings },
   ];
 
   return (

@@ -13,13 +13,20 @@ import { ReservationDetailsStep } from "@/components/booking/ReservationDetailsS
 import { SummaryStep } from "@/components/booking/SummaryStep";
 import { BookingSuccessPage } from "./BookingSuccessPage";
 
+interface DiscountRule {
+    id: number;
+    min_nights: number;
+    discount_percentage: number;
+}
+
 interface Props {
     hotels: Hotel[];
+    discountRules: DiscountRule[];
 }
 
 import { Building2 } from "lucide-react";
 
-export default function BookingFormPage({ hotels }: Props) {
+export default function BookingFormPage({ hotels, discountRules }: Props) {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState<string[]>([]);
@@ -100,7 +107,26 @@ export default function BookingFormPage({ hotels }: Props) {
         }, 0);
     }, [formData.groups, selectedHotel]);
 
-    const totalPrice = (formData.bookingType === 'agence' ? basePrice * 0.96 : basePrice) + stayTaxTotal;
+    const totalNights = useMemo(() => {
+        if (!formData.groups || formData.groups.length === 0) return 0;
+        return formData.groups.reduce((sum: number, g: any) => {
+            if (!g.checkIn || !g.checkOut) return sum;
+            const diff = new Date(g.checkOut).getTime() - new Date(g.checkIn).getTime();
+            return sum + Math.max(1, Math.round(diff / 86_400_000));
+        }, 0);
+    }, [formData.groups]);
+
+    const applicableDiscountRule = useMemo(() => {
+        if (!discountRules || discountRules.length === 0) return null;
+        // Sort rules by min_nights descending to find the highest threshold first
+        return [...discountRules]
+            .sort((a, b) => b.min_nights - a.min_nights)
+            .find(rule => totalNights >= rule.min_nights) ?? null;
+    }, [discountRules, totalNights]);
+
+    const discountPercentage = applicableDiscountRule ? applicableDiscountRule.discount_percentage : 0;
+    const discountAmount = (basePrice * discountPercentage) / 100;
+    const totalPrice = (basePrice - discountAmount) + stayTaxTotal;
 
     // ── Navigation ───────────────────────────────────────
     const handleNext = async () => {
@@ -204,6 +230,8 @@ export default function BookingFormPage({ hotels }: Props) {
                 basePrice={basePrice}
                 stayTaxTotal={stayTaxTotal}
                 totalPrice={totalPrice}
+                discountPercentage={discountPercentage}
+                discountAmount={discountAmount}
             />
         );
     }
@@ -253,6 +281,8 @@ export default function BookingFormPage({ hotels }: Props) {
                                             basePrice={basePrice}
                                             stayTaxTotal={stayTaxTotal}
                                             totalPrice={totalPrice}
+                                            discountPercentage={discountPercentage}
+                                            discountAmount={discountAmount}
                                         />
                                     )}
                                 </form>

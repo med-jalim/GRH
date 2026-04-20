@@ -708,9 +708,10 @@ export default function ReservationShow({ reservation }: Props) {
                           <span className="text-sm font-bold text-white">{formatPrice(reservation.prix_avant_remise || (reservation.prix_total - (reservation.taxe_sejour_total || 0)))}</span>
                         </div>
 
-                        {reservation.type_reservant === 'agence' && reservation.remise_pourcentage && (
+                        {/* {reservation.type_reservant === 'agence' && reservation.remise_pourcentage && ( */}
+                        {reservation.remise_pourcentage && (
                           <div className="flex justify-between items-center text-emerald-400">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Remise Agence ({reservation.remise_pourcentage}%)</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Remise ({reservation.remise_pourcentage}%)</span>
                             <span className="text-sm font-black">- {formatPrice((reservation.prix_avant_remise || 0) * (reservation.remise_pourcentage / 100))}</span>
                           </div>
                         )}

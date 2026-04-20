@@ -170,17 +170,17 @@ class ReservationController extends Controller
         $validated['nb_personnes'] = $totalPersonnes;
         $validated['taxe_sejour_total'] = $taxeSejourTotal;
 
-        // Discount 
-        if (($validated['type_reservant'] ?? 'groupe') === 'agence') {
-            $validated['prix_avant_remise'] = $chambreSousTotal;
-            $validated['remise_pourcentage'] = 4.0;
-            // Discount applies ONLY to the room subtotal
-            $validated['prix_total'] = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
-        } else {
-            $validated['prix_total'] = $chambreSousTotal + $taxeSejourTotal;
-            $validated['prix_avant_remise'] = null;
-            $validated['remise_pourcentage'] = null;
+        // Calculate total nights for tiered discount
+        $totalNights = 0;
+        foreach ($groupsData as $g) {
+            $totalNights += $this->reservationService->calculateNights($g['date_arrivee'], $g['date_depart']);
         }
+
+        // Apply Dynamic Discount
+        $discountData = $this->calculateDiscount($totalNights, $chambreSousTotal, $taxeSejourTotal);
+        $validated['prix_total'] = $discountData['prix_total'];
+        $validated['prix_avant_remise'] = $discountData['prix_avant_remise'];
+        $validated['remise_pourcentage'] = $discountData['remise_pourcentage'];
 
         unset($validated['groups']);
         $reservation = Reservation::create($validated);
@@ -337,15 +337,17 @@ class ReservationController extends Controller
         $typeReservant = $validated['type_reservant'] ?? $reservation->type_reservant;
         $reservation->taxe_sejour_total = $taxeSejourTotal;
         
-        if ($typeReservant === 'agence') {
-            $reservation->prix_avant_remise = $chambreSousTotal;
-            $reservation->remise_pourcentage = 4.0;
-            $reservation->prix_total = ($chambreSousTotal * 0.96) + $taxeSejourTotal;
-        } else {
-            $reservation->prix_avant_remise = null;
-            $reservation->remise_pourcentage = null;
-            $reservation->prix_total = $chambreSousTotal + $taxeSejourTotal;
+        // Calculate total nights for tiered discount
+        $totalNights = 0;
+        foreach ($reservation->groups as $group) {
+            $totalNights += $this->reservationService->calculateNights($group->date_arrivee, $group->date_depart);
         }
+
+        // Apply Dynamic Discount
+        $discountData = $this->calculateDiscount($totalNights, $chambreSousTotal, $taxeSejourTotal);
+        $reservation->prix_total = $discountData['prix_total'];
+        $reservation->prix_avant_remise = $discountData['prix_avant_remise'];
+        $reservation->remise_pourcentage = $discountData['remise_pourcentage'];
 
         $reservation->nb_personnes = $totalPersonnes;
         $reservation->save();
@@ -455,5 +457,36 @@ class ReservationController extends Controller
         }
 
         return redirect()->route('admin.reservations.index')->with('success', 'Réservation supprimée avec succès.');
+    }
+
+    /**
+     * Calculate discount based on total nights and tiered rules.
+     */
+    private function calculateDiscount(int $totalNights, float $chambreSousTotal, float $taxeSejourTotal): array
+    {
+        $applicableDiscount = 0;
+        
+        // Find the highest applicable tiered discount
+        $tierRule = \App\Models\DiscountRule::where('min_nights', '<=', $totalNights)
+            ->orderByDesc('min_nights')
+            ->first();
+            
+        if ($tierRule) {
+            $applicableDiscount = (float) $tierRule->discount_percentage;
+        }
+
+        if ($applicableDiscount > 0) {
+            return [
+                'prix_avant_remise'  => $chambreSousTotal,
+                'remise_pourcentage' => $applicableDiscount,
+                'prix_total'         => ($chambreSousTotal * (1 - ($applicableDiscount / 100))) + $taxeSejourTotal,
+            ];
+        }
+
+        return [
+            'prix_avant_remise'  => null,
+            'remise_pourcentage' => null,
+            'prix_total'         => $chambreSousTotal + $taxeSejourTotal,
+        ];
     }
 }

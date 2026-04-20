@@ -11,6 +11,7 @@ use App\Http\Controllers\ClientReservationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HotelTypeTarificationController;
 use App\Http\Controllers\SubTypeController;
+use App\Http\Controllers\Admin\SettingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -67,4 +68,11 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::get('/email-templates', [\App\Http\Controllers\EmailTemplateController::class, 'index'])->name('email-templates.index');
     Route::get('/email-templates/{id}/edit', [\App\Http\Controllers\EmailTemplateController::class, 'edit'])->name('email-templates.edit');
     Route::patch('/email-templates/{id}', [\App\Http\Controllers\EmailTemplateController::class, 'update'])->name('email-templates.update');
+
+    // Paramètres
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
+    Route::post('/settings/rules', [SettingController::class, 'storeRule'])->name('settings.rules.store');
+    Route::patch('/settings/rules/{rule}', [SettingController::class, 'updateRule'])->name('settings.rules.update');
+    Route::delete('/settings/rules/{rule}', [SettingController::class, 'deleteRule'])->name('settings.rules.destroy');
+    Route::patch('/settings/update', [SettingController::class, 'updateSettings'])->name('settings.update');
 });

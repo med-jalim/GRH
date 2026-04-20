@@ -19,6 +19,8 @@ interface Props {
   basePrice: number;
   stayTaxTotal: number;
   totalPrice: number;
+  discountPercentage: number;
+  discountAmount: number;
 }
 
 export function BookingSuccessPage({
@@ -28,6 +30,8 @@ export function BookingSuccessPage({
   basePrice,
   stayTaxTotal,
   totalPrice,
+  discountPercentage,
+  discountAmount,
 }: Props) {
   const formatPrice = (amount: number) => new Intl.NumberFormat("fr-MA", { style: "decimal", minimumFractionDigits: 0 }).format(amount) + " MAD";
   
@@ -177,10 +181,10 @@ export function BookingSuccessPage({
                                 <p className="text-xs text-white/60 font-medium whitespace-nowrap">Incluant taxes et remises</p>
                             </div>
                             
-                            {formData.bookingType === 'agence' && (
+                            {discountPercentage > 0 && (
                                 <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg w-max">
-                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise Agence (4%)</span>
-                                    <span className="text-sm font-black text-emerald-300">- {formatPrice(basePrice * 0.04)}</span>
+                                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Remise ({discountPercentage}%)</span>
+                                    <span className="text-sm font-black text-emerald-300">- {formatPrice(discountAmount)}</span>
                                 </div>
                             )}
 
@@ -192,7 +196,7 @@ export function BookingSuccessPage({
                             )}
                         </div>
                         <div className="text-right flex flex-col items-end">
-                            {formData.bookingType === 'agence' && (
+                            {discountPercentage > 0 && (
                                 <span className="text-lg font-bold text-slate-500 line-through opacity-70 mb-1">
                                     {formatPrice(basePrice + stayTaxTotal)}
                                 </span>

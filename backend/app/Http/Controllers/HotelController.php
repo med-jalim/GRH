@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+
+use App\Models\DiscountRule;
+
 class HotelController extends Controller
 {
     /**
@@ -19,9 +22,11 @@ class HotelController extends Controller
     public function bookingPage(): Response
     {
         $hotels = Hotel::withBookingData()->get();
+        $discountRules = DiscountRule::orderBy('min_nights', 'desc')->get();
 
         return Inertia::render('BookingFormPage', [
             'hotels' => $hotels,
+            'discountRules' => $discountRules,
         ]);
     }
 
