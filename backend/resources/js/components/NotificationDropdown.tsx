@@ -155,7 +155,7 @@ export default function NotificationDropdown() {
           {notifications.length > 0 && (
             <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/30 text-center">
               <span className="text-[10px] text-gray-400 font-medium">
-                Affichage des {notifications.length} dernières notifications
+                Affichage les {notifications.length} dernières notifications
               </span>
             </div>
           )}

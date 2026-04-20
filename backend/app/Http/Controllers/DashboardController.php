@@ -98,7 +98,7 @@ class DashboardController extends Controller
         $curCancelled = (clone $curBase)->where('statut', 'annule')->count();
 
         // En attente
-        $curPending = (clone $curBase)->whereIn('statut', $pendingStatuts)->count();
+        $curPending = (clone $curBase)->where('statut', 'en_attente')->count();
 
         // Revenu payé : somme de paid_amount sur les réservations confirmées
         $curRevenuePaid = (clone $curBase)

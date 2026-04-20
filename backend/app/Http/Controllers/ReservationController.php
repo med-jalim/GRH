@@ -170,6 +170,7 @@ class ReservationController extends Controller
         $validated['nb_personnes'] = $totalPersonnes;
         $validated['taxe_sejour_total'] = $taxeSejourTotal;
 
+        // Discount 
         if (($validated['type_reservant'] ?? 'groupe') === 'agence') {
             $validated['prix_avant_remise'] = $chambreSousTotal;
             $validated['remise_pourcentage'] = 4.0;
