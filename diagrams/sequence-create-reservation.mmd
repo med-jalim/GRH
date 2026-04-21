@@ -1,0 +1,18 @@
+sequenceDiagram
+    actor C as Client
+    participant UI as Booking Page
+    participant RC as ReservationController
+    participant RS as ReservationService
+    participant DB as DB
+
+    C->>UI: Saisit formulaire
+    UI->>RC: POST /booking
+    RC->>RS: traiterReservation()
+    RS->>DB: verifierDisponibilite()
+    DB-->>RS: OK
+    RS->>DB: chargerTarifsRemisesTaxes()
+    DB-->>RS: donnees
+    RS->>RS: calculerTotal()
+    RS->>DB: creer Reservation + Groups + Items
+    DB-->>RC: reservation creee
+    RC-->>UI: succes + code_reference + token

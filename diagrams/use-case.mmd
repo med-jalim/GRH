@@ -1,0 +1,36 @@
+flowchart LR
+    Client[Client / Agence]
+    Admin[Administrateur]
+    Sys[Systeme GRH]
+
+    UC1((Creer reservation))
+    UC2((Verifier disponibilite))
+    UC3((Calculer prix))
+    UC4((Consulter reservation via token))
+    UC5((Modifier / Annuler / Confirmer reservation))
+    UC6((Ajouter justificatif de paiement))
+    UC7((Se connecter admin))
+    UC8((Gerer reservations))
+    UC9((Valider / Refuser paiement))
+    UC10((Gerer hotels/chambres/types/sous-types/tarifs))
+    UC11((Configurer remises et parametres))
+    UC12((Gerer templates email))
+    UC13((Consulter dashboard))
+
+    Client --> UC1
+    Client --> UC4
+    Client --> UC5
+    Client --> UC6
+
+    UC1 --> UC2
+    UC1 --> UC3
+    Sys --> UC2
+    Sys --> UC3
+
+    Admin --> UC7
+    Admin --> UC8
+    Admin --> UC9
+    Admin --> UC10
+    Admin --> UC11
+    Admin --> UC12
+    Admin --> UC13

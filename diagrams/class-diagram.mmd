@@ -1,0 +1,111 @@
+classDiagram
+    class Hotel {
+      +id
+      +name
+      +ville
+      +stars
+      +taxe_sejour
+      +agency_ratio
+      +group_ratio
+    }
+
+    class Type {
+      +id
+      +nom
+      +description
+      +color
+    }
+
+    class SubType {
+      +id
+      +id_type
+      +nom
+      +max_adults
+      +max_children
+      +capacity_total
+    }
+
+    class Chambre {
+      +id
+      +numero
+      +id_hotel
+      +id_type
+      +id_sub_type
+    }
+
+    class Tarif {
+      +id
+      +id_hotel
+      +id_type
+      +id_sub_type
+      +prix
+      +date_debut
+      +date_fin
+    }
+
+    class Reservation {
+      +id
+      +id_hotel
+      +nom_contact
+      +email
+      +telephone
+      +statut
+      +code_reference
+      +token
+      +total_amount
+      +paid_amount
+    }
+
+    class ReservationGroup {
+      +id
+      +id_reservation
+      +date_arrivee
+      +date_depart
+      +nb_personnes
+      +remise_pourcentage
+      +remise_montant
+    }
+
+    class ItemReservation {
+      +id
+      +id_group
+      +id_type
+      +id_sub_type
+      +quantite
+      +prix_unitaire
+      +nb_adultes
+      +nb_enfants
+    }
+
+    class PaymentVerification {
+      +id
+      +id_reservation
+      +document_path
+      +amount
+      +statut
+    }
+
+    class DiscountRule {
+      +id
+      +id_hotel
+      +min_nights
+      +discount_percentage
+    }
+
+    Hotel "1" --> "0..*" Chambre
+    Hotel "1" --> "0..*" Tarif
+    Hotel "1" --> "0..*" Reservation
+    Hotel "1" --> "0..*" DiscountRule
+
+    Type "1" --> "0..*" SubType
+    Type "1" --> "0..*" Chambre
+    Type "1" --> "0..*" Tarif
+    Type "1" --> "0..*" ItemReservation
+
+    SubType "1" --> "0..*" Chambre
+    SubType "1" --> "0..*" Tarif
+    SubType "1" --> "0..*" ItemReservation
+
+    Reservation "1" --> "1..*" ReservationGroup
+    ReservationGroup "1" --> "1..*" ItemReservation
+    Reservation "1" --> "0..*" PaymentVerification
