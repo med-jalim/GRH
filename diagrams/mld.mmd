@@ -140,6 +140,17 @@ erDiagram
         string password
     }
 
+    notifications {
+        uuid id PK
+        string type
+        string notifiable_type
+        bigint notifiable_id
+        text data
+        timestamp read_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
     hotels ||--o{ chambres : FK_id_hotel
     types ||--o{ chambres : FK_id_type
     sub_types ||--o{ chambres : FK_id_sub_type
@@ -159,3 +170,8 @@ erDiagram
     hotels ||--o{ hotel_type_tarification : FK_id_hotel
     types ||--o{ hotel_type_tarification : FK_id_type
     types ||--o{ sub_types : FK_id_type
+
+    users ||--o{ notifications : "FK polymorphe notifiable_id + notifiable_type=User"
+
+%% email_templates et app_settings : referentiels sans cle etrangere vers users ni notifications
+%% (emails transactionnels via slug / HasDynamicTemplate ; parametres globaux lus par cle dans le code)

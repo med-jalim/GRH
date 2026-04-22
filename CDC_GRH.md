@@ -17,18 +17,20 @@
 
 ## 1. Contexte & objectifs
 
-Le projet GRH a pour but de digitaliser la gestion des reservations hotelieres en centralisant les operations commerciales, administratives et de suivi client dans une seule application web.
+### Contexte Métier
+Le projet **GRH** s'inscrit dans la transformation digitale d'**eurika digital** pour un groupe hôtelier majeur. L'objectif est de résoudre les inefficacités critiques dans la gestion des relations avec les **Agences de Voyage** et les **Guides Touristiques**. 
 
-### Objectifs metier
-- Reduire les traitements manuels et les erreurs de saisie.
-- Assurer un calcul tarifaire fiable (tarifs, remises, taxe de sejour, totaux).
-- Fluidifier la relation client via un portail de suivi de reservation.
-- Donner a la direction une vision claire de la performance via un dashboard.
+Le processus traditionnel basé sur les emails engendre :
+- Une **lenteur opérationnelle** (recherche d'emails, saisies manuelles).
+- Un **risque d'erreur élevé** lors du recopiage des tarifs et disponibilités.
+- Une **visibilité nulle** sur l'évolution des dossiers de groupe.
+- Une **déconnexion** entre la réservation et le paiement.
 
-### Objectifs operationnels
-- Disposer d'un back-office unique pour gerer hotels, chambres, types, sous-types et tarifs.
-- Controler les statuts de reservation et de paiements avec traçabilite.
-- Personnaliser la communication client (emails et notifications).
+### Objectifs Métier
+- **Digitaliser le flux B2B** : Remplacer les emails par des liens sécurisés menant à des formulaires dynamiques.
+- **Fiabiliser les données** : Synchronisation en temps réel avec le référentiel hôtelier (tarifs, stocks).
+- **Autonomiser les partenaires** : Interface permettant aux agences de modifier ou de confirmer leurs dossiers.
+- **Optimiser la supervision** : Back-office centralisé pour le suivi des statuts et des paiements.
 
 ---
 
