@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useForm, FormProvider, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, usePage } from "@inertiajs/react";
@@ -14,20 +14,24 @@ import { BookingSuccessPage } from "./BookingSuccessPage";
 
 interface Props {
     hotels: Hotel[];
+    types:  any[];
+    settings: { min_rooms: number };
 }
 
-export default function BookingFormPage({ hotels }: Props) {
+export default function BookingFormPage({ hotels, types, settings }: Props) {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [successData, setSuccessData] = useState<{
         reference: string;
         data: any;
     } | null>(null);
+    const [apiError, setApiError] = useState<string | null>(null);
 
     // React Hook Form
     const methods = useForm<BookingSchemaType>({
         resolver: zodResolver(bookingSchema) as any,
         defaultValues: {
+            client_type: "agence",
             agencyName: "",
             agencyCode: "",
             contactName: "",
@@ -49,13 +53,41 @@ export default function BookingFormPage({ hotels }: Props) {
 
     const { trigger, handleSubmit, control } = methods;
 
+    const [hotelTarifs, setHotelTarifs] = useState<any[]>([]);
+
     // Specifically watch these fields for real-time reactivity
     const watchedHotelId = useWatch({ control, name: "hotelId" });
+    const watchedClientType = useWatch({ control, name: "client_type" });
+
+    // Fetch adjusted tarifs from backend when hotel or client type changes
+    useEffect(() => {
+        if (watchedHotelId) {
+            fetch(`/booking/tarifs/${watchedHotelId}?client_type=${watchedClientType}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        setHotelTarifs(data.tarifs);
+                    }
+                })
+                .catch(err => console.error("Error fetching tarifs:", err));
+        } else {
+            setHotelTarifs([]);
+        }
+    }, [watchedHotelId, watchedClientType]);
 
     const selectedHotel = useMemo(
         () => (hotels || []).find((h) => h.id === Number(watchedHotelId)) ?? null,
         [watchedHotelId, hotels],
     );
+
+    // Merge active tarifs into the selected hotel object for easier prop passing
+    const hotelWithActiveTarifs = useMemo(() => {
+        if (!selectedHotel) return null;
+        return {
+            ...selectedHotel,
+            tarifs: hotelTarifs
+        };
+    }, [selectedHotel, hotelTarifs]);
 
     // These are pushed UP from PriceSummary via onTotalChange
     const [totalPrice, setTotalPrice] = useState(0);
@@ -77,20 +109,31 @@ export default function BookingFormPage({ hotels }: Props) {
                 "email",
                 "phone",
             ];
-        if (step === 2)
+        if (step === 2) {
+            const watchedGroups = methods.getValues("groups") || [];
+            const count = watchedGroups.reduce((acc, g) => acc + (g.items?.reduce((iAcc, item) => iAcc + (Number(item.quantite) || 0), 0) || 0), 0);
+            
+            if (count < settings.min_rooms) {
+                setApiError(`Attention: Un minimum de ${settings.min_rooms} chambres est requis.`);
+                return;
+            }
+            
             fieldsToValidate = [
                 "hotelId",
                 "groups",
             ];
+        }
 
         const isValid = await trigger(fieldsToValidate);
         if (isValid) {
+            setApiError(null);
             setStep((s) => s + 1);
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
     };
 
     const handleBack = () => {
+        setApiError(null);
         setStep((s) => Math.max(1, s - 1));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
@@ -99,6 +142,7 @@ export default function BookingFormPage({ hotels }: Props) {
         setSubmitting(true);
 
         const payload = {
+            client_type: data.client_type,
             nom_agence: data.agencyName,
             nom_contact: data.contactName,
             code_agence: data.agencyCode,
@@ -113,21 +157,23 @@ export default function BookingFormPage({ hotels }: Props) {
                     date_arrivee: group.date_arrivee,
                     date_depart: group.date_depart,
                     items: group.items.map((r: any) => {
-                        const checkInDate = new Date(group.date_arrivee);
-                        const validTarif = (selectedHotel?.tarifs || []).find(
-                            (t) => {
-                                const start = new Date(t.date_debut.substring(0, 10) + "T00:00:00");
-                                const end = new Date(t.date_fin.substring(0, 10) + "T23:59:59");
-                                return Number(t.id_type) === Number(r.id_type) && start <= checkInDate && end >= checkInDate;
+                        const checkInStr = group.date_arrivee.substring(0, 10);
+                        const validTarif = (hotelWithActiveTarifs?.tarifs || []).find(
+                            (t: any) => {
+                                const startStr = t.date_debut.toString().substring(0, 10);
+                                const endStr   = t.date_fin.toString().substring(0, 10);
+                                return Number(t.id_capacity) === Number(r.id_capacity) && 
+                                       checkInStr >= startStr && 
+                                       checkInStr <= endStr;
                             }
                         );
                         return {
                             id_type: r.id_type,
+                            id_capacity: r.id_capacity,
                             quantite: r.quantite,
-                            prix_unitaire: validTarif?.prix || 0,
+                            prix_unitaire: Number(validTarif?.prix || 0),
                             nb_adultes: r.nb_adultes,
                             nb_enfants: r.nb_enfants,
-                            nb_bebes: r.nb_bebes,
                         };
                     })
                 };
@@ -135,6 +181,7 @@ export default function BookingFormPage({ hotels }: Props) {
         };
 
         try {
+            setApiError(null);
             const res = await axios.post("/admin/reservations", payload, {
                 headers: { Accept: "application/json" },
             });
@@ -142,9 +189,13 @@ export default function BookingFormPage({ hotels }: Props) {
                 reference: res.data.data.code_reference,
                 data: data,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error("API Error:", error);
-            alert("Une erreur est survenue lors de la réservation.");
+            if (error.response?.data?.message) {
+                setApiError(error.response.data.message);
+            } else {
+                setApiError("Une erreur est survenue lors de la réservation.");
+            }
         } finally {
             setSubmitting(false);
         }
@@ -155,7 +206,7 @@ export default function BookingFormPage({ hotels }: Props) {
             <BookingSuccessPage
                 reference={successData.reference}
                 formData={successData.data}
-                hotel={selectedHotel}
+                hotel={hotelWithActiveTarifs}
                 totalPrice={totalPrice}
                 nights={nights}
             />
@@ -189,19 +240,32 @@ export default function BookingFormPage({ hotels }: Props) {
                             <StepIndicator currentStep={step} />
                         </div>
 
+                        {apiError && (
+                            <div className="mx-8 mt-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-in fade-in slide-in-from-top-2">
+                                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p className="text-sm font-bold">{apiError}</p>
+                            </div>
+                        )}
+
                         <div className="p-8">
                             <FormProvider {...methods}>
                                 <form onSubmit={handleSubmit(onSubmit)}>
                                     {step === 1 && <AgencyInfoStep />}
                                     {step === 2 && (
-                                        <ReservationDetailsStep
-                                            hotels={hotels}
-                                            onTotalChange={handleTotalChange}
-                                        />
+                                            <ReservationDetailsStep
+                                                hotels={hotels}
+                                                activeHotel={hotelWithActiveTarifs}
+                                                types={types}
+                                                onTotalChange={handleTotalChange}
+                                                discounts={hotelWithActiveTarifs?.discounts || []}
+                                                settings={settings}
+                                            />
                                     )}
                                     {step === 3 && (
                                         <SummaryStep
-                                            hotel={selectedHotel}
+                                            hotel={hotelWithActiveTarifs}
                                             nights={nights}
                                             totalPrice={totalPrice}
                                         />

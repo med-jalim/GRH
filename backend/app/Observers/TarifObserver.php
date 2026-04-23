@@ -13,18 +13,17 @@ class TarifObserver
      */
     public function saved(Tarif $tarif): void
     {
-        // Prevent recursive calls if already inside withoutEvents
-        // But Tarif::withoutEvents inside should handle it.
-        
+        // Pricing Rules sync is disabled for now as per user request
+        /*
         $hotel = $tarif->hotel;
         if (!$hotel || !$hotel->main_type_id) {
             return;
         }
 
-        // If this is the main type price being updated, sync other types
         if ($tarif->id_type == $hotel->main_type_id) {
             $this->syncSecondaryPrices($tarif, $hotel);
         }
+        */
     }
 
     /**
@@ -33,26 +32,40 @@ class TarifObserver
     private function syncSecondaryPrices(Tarif $mainTarif, Hotel $hotel): void
     {
         $rules = $hotel->pricingRules()->get();
+        $mainCapacity = $mainTarif->capacity;
 
         foreach ($rules as $rule) {
-            // Avoid syncing the main type itself if it somehow exists in rules
             if ($rule->id_type == $hotel->main_type_id) {
                 continue;
             }
 
-            // Calculate price without rounding
+            // Find matching capacity in the target room type by LABEL
+            $targetCapacityId = null;
+            if ($mainCapacity && $mainCapacity->label) {
+                $targetCapacity = $hotel->typeCapacities()
+                    ->where('id_type', (int) $rule->id_type)
+                    ->where('label', $mainCapacity->label)
+                    ->first();
+                
+                if ($targetCapacity) {
+                    $targetCapacityId = $targetCapacity->id;
+                } else {
+                    // Skip if no matching label is found
+                    continue; 
+                }
+            }
+
             $percentage = (float)$rule->percentage;
             $newPrice = (float)$mainTarif->prix * ($percentage / 100);
 
-            // Update or create the secondary price for the same period
-            // We use withoutEvents to avoid infinite recursion
-            Tarif::withoutEvents(function () use ($mainTarif, $rule, $newPrice) {
+            Tarif::withoutEvents(function () use ($mainTarif, $rule, $newPrice, $targetCapacityId) {
                 Tarif::applyRangeSplit(
-                    hotelId:   $mainTarif->id_hotel,
-                    typeId:    $rule->id_type,
+                    hotelId:   (int) $mainTarif->id_hotel,
+                    typeId:    (int) $rule->id_type,
+                    capacityId: $targetCapacityId ? (int) $targetCapacityId : null,
                     newStart:  $mainTarif->date_debut->format('Y-m-d'),
                     newEnd:    $mainTarif->date_fin->format('Y-m-d'),
-                    newPrice:  $newPrice
+                    newPrice:  (float) $newPrice
                 );
             });
         }

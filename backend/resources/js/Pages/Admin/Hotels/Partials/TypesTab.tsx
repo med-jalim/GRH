@@ -6,11 +6,14 @@ import {
     Trash2,
     X,
     Info,
-    Percent,
+    Users,
+    User,
+    Baby,
+    ChevronRight,
+    Search,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Users } from "lucide-react";
 
 interface Type {
     id: number;
@@ -19,21 +22,18 @@ interface Type {
     color: string | null;
 }
 
-interface PricingRule {
+interface TypeCapacity {
+    id?: number;
     id_type: number;
-    percentage: string | number;
+    label: string | null;
+    capacite_adultes: number;
+    capacite_enfants: number;
+    capacite_totale: number;
 }
 
 interface Hotel {
     id: number;
-    main_type_id: number | null;
-    pricing_rules: PricingRule[];
-    type_capacities: {
-        id_type: number;
-        capacite_adultes: number;
-        capacite_enfants: number;
-        capacite_bebes: number;
-    }[];
+    type_capacities: TypeCapacity[];
 }
 
 interface Props {
@@ -42,355 +42,183 @@ interface Props {
 }
 
 export function TypesTab({ hotel, types }: Props) {
-    // --- Global Type Management ---
-    const [showModal, setShowModal] = useState(false);
-    const [editingType, setEditingType] = useState<any>(null);
-    const [confirmDelete, setConfirmDelete] = useState<{
-        id: number;
-        nom: string;
-    } | null>(null);
-    const [deleting, setDeleting] = useState(false);
+    // --- State ---
+    const [selectedTypeId, setSelectedTypeId] = useState<number | null>(types[0]?.id || null);
+    const [showTypeModal, setShowTypeModal] = useState(false);
+    const [editingType, setEditingType] = useState<Type | null>(null);
+    const [confirmDeleteType, setConfirmDeleteType] = useState<Type | null>(null);
 
+    const [showCapacityModal, setShowCapacityModal] = useState(false);
+    const [editingCapacity, setEditingCapacity] = useState<TypeCapacity | null>(null);
+    const [confirmDeleteCapacity, setConfirmDeleteCapacity] = useState<TypeCapacity | null>(null);
+
+    // --- Forms ---
     const typeForm = useForm({
         nom: "",
         description: "",
-        color: "#6366f1",
+        color: "#f59e0b", // Amber default
     });
 
-    const [selectedTypeId, setSelectedTypeId] = useState<number | null>(types[0]?.id || null);
-
-    // --- Hotel Pricing Rules Management ---
-    const pricingForm = useForm({
-        main_type_id: hotel.main_type_id ?? "",
-        rules: types.map((t) => {
-            const existingRule = hotel.pricing_rules.find(
-                (r) => r.id_type === t.id,
-            );
-            return {
-                id_type: t.id,
-                nom: t.nom,
-                percentage: existingRule ? existingRule.percentage : "100",
-            };
-        }),
-    });
-
-    // --- Hotel Capacities Management ---
     const capacityForm = useForm({
-        capacities: types.map((t) => {
-            const existingCap = hotel.type_capacities?.find(
-                (c) => c.id_type === t.id,
-            );
-            return {
-                id_type: t.id,
-                nom: t.nom,
-                capacite_adultes: existingCap ? existingCap.capacite_adultes : 2,
-                capacite_enfants: existingCap ? existingCap.capacite_enfants : 2,
-                capacite_bebes: existingCap ? existingCap.capacite_bebes : 0,
-            };
-        }),
+        id_type: selectedTypeId || 0,
+        label: "",
+        capacite_adultes: 2,
+        capacite_enfants: 0,
+        capacite_totale: 2,
     });
 
-    function openCreate() {
+    // --- Derived Data ---
+    const selectedType = types.find(t => t.id === selectedTypeId);
+    const filteredCapacities = useMemo(() => {
+        return hotel.type_capacities.filter(c => c.id_type === selectedTypeId);
+    }, [hotel.type_capacities, selectedTypeId]);
+
+    // --- Type Actions ---
+    function openCreateType() {
         setEditingType(null);
         typeForm.reset();
-        setShowModal(true);
+        setShowTypeModal(true);
     }
 
-    function openEdit(t: any) {
+    function openEditType(t: Type) {
         setEditingType(t);
         typeForm.setData({
             nom: t.nom,
             description: t.description || "",
-            color: t.color || "#6366f1",
+            color: t.color || "#f59e0b",
         });
-        setShowModal(true);
+        setShowTypeModal(true);
     }
 
     function submitType(e: React.FormEvent) {
         e.preventDefault();
         if (editingType) {
             typeForm.put(`/admin/types/${editingType.id}`, {
-                onSuccess: () => {
-                    setShowModal(false);
-                    typeForm.reset();
-                },
+                onSuccess: () => setShowTypeModal(false),
             });
         } else {
             typeForm.post("/admin/types", {
-                onSuccess: () => {
-                    setShowModal(false);
-                    typeForm.reset();
-                },
+                onSuccess: () => setShowTypeModal(false),
             });
         }
     }
 
-    function saveAll() {
-        pricingForm.put(`/admin/hotels/${hotel.id}/pricing-rules`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                capacityForm.put(`/admin/hotels/${hotel.id}/type-capacities`, {
-                    preserveScroll: true,
-                });
-            }
+    function handleDeleteType() {
+        if (!confirmDeleteType) return;
+        router.delete(`/admin/types/${confirmDeleteType.id}`, {
+            onSuccess: () => setConfirmDeleteType(null),
         });
     }
 
-    function handleConfirmDelete() {
-        if (!confirmDelete) return;
-        setDeleting(true);
-        router.delete(`/admin/types/${confirmDelete.id}`, {
-            onFinish: () => {
-                setConfirmDelete(null);
-                setDeleting(false);
+    // --- Capacity Actions ---
+    function openCreateCapacity() {
+        if (!selectedTypeId) return;
+        setEditingCapacity(null);
+        capacityForm.setData({
+            id_type: selectedTypeId,
+            label: "",
+            capacite_adultes: 2,
+            capacite_enfants: 0,
+            capacite_totale: 2,
+        });
+        setShowCapacityModal(true);
+    }
+
+    function openEditCapacity(cap: TypeCapacity) {
+        setEditingCapacity(cap);
+        capacityForm.setData({
+            id_type: cap.id_type,
+            label: cap.label || "",
+            capacite_adultes: cap.capacite_adultes,
+            capacite_enfants: cap.capacite_enfants,
+            capacite_totale: cap.capacite_totale || (cap.capacite_adultes + cap.capacite_enfants),
+        });
+        setShowCapacityModal(true);
+    }
+
+    function submitCapacity(e: React.FormEvent) {
+        e.preventDefault();
+        if (editingCapacity && editingCapacity.id) {
+            capacityForm.put(`/admin/hotels/${hotel.id}/type-capacities/${editingCapacity.id}/update`, {
+                onSuccess: () => setShowCapacityModal(false),
+            });
+        } else {
+            capacityForm.post(`/admin/hotels/${hotel.id}/type-capacities/store`, {
+                onSuccess: () => setShowCapacityModal(false),
+            });
+        }
+    }
+
+    function handleDeleteCapacity() {
+        if (!confirmDeleteCapacity || !confirmDeleteCapacity.id) return;
+        router.delete(`/admin/hotels/${hotel.id}/type-capacities/${confirmDeleteCapacity.id}`, {
+            onSuccess: () => {
+                setConfirmDeleteCapacity(null);
+                setShowCapacityModal(false);
             },
         });
     }
 
-    const selectedType = types.find(t => t.id === selectedTypeId);
-    const selectedPricingIndex = pricingForm.data.rules.findIndex(r => r.id_type === selectedTypeId);
-    const selectedCapacityIndex = capacityForm.data.capacities.findIndex(c => c.id_type === selectedTypeId);
-
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
-                {/* 1. Configuration Panel (Left/Main - 2/3) */}
-                <div className="lg:col-span-2">
-                    {selectedType ? (
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
-                                {/* Header with unified save */}
-                                <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div 
-                                            className="w-1.5 h-10 rounded-full" 
-                                            style={{ backgroundColor: selectedType.color || '#6366f1' }} 
-                                        />
-                                        <div>
-                                            <h3 className="text-lg font-bold text-slate-800 leading-tight">
-                                                {selectedType.nom}
-                                            </h3>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Configuration du type</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <button
-                                        onClick={saveAll}
-                                        disabled={pricingForm.processing || capacityForm.processing}
-                                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-all shadow-sm disabled:opacity-50"
-                                    >
-                                        {pricingForm.processing || capacityForm.processing ? (
-                                            <span className="flex items-center gap-2">
-                                                <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                                Enregistrement...
-                                            </span>
-                                        ) : (
-                                            <>
-                                                <Check className="w-4 h-4" />
-                                                Enregistrer les modifications
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-
-                                <div className="p-6 space-y-8">
-                                    {/* 1. Status Section (Main Type Selection) */}
-                                    <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100 hover:border-indigo-100 transition-colors">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <div>
-                                                <h4 className="text-sm font-bold text-slate-800">Statut du type</h4>
-                                                <p className="text-xs text-slate-500 mt-0.5">Définissez si ce type est la référence tarifaire (100%) de l'hôtel.</p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => pricingForm.setData("main_type_id", selectedType.id.toString())}
-                                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
-                                                    Number(pricingForm.data.main_type_id) === selectedType.id
-                                                        ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
-                                                        : 'bg-white border-slate-200 text-slate-600 hover:border-amber-400 hover:text-amber-600'
-                                                }`}
-                                            >
-                                                {Number(pricingForm.data.main_type_id) === selectedType.id ? (
-                                                    <><Check className="w-3.5 h-3.5" /> Type Principal (100%)</>
-                                                ) : (
-                                                    'Définir comme Principal'
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* 2. Pricing Section */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
-                                                <Percent className="w-3.5 h-3.5 text-slate-400" />
-                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tarification Relative</h4>
-                                            </div>
-                                            
-                                            {selectedPricingIndex !== -1 && (
-                                                <div className={`p-5 rounded-xl border transition-all h-24 flex flex-col justify-center ${
-                                                    Number(pricingForm.data.main_type_id) === selectedType.id
-                                                        ? "bg-indigo-50/30 border-indigo-100"
-                                                        : "bg-white border-slate-100"
-                                                }`}>
-                                                    {Number(pricingForm.data.main_type_id) === selectedType.id ? (
-                                                        <div className="text-center">
-                                                            <div className="inline-flex text-[9px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded uppercase tracking-wider mb-1">Référence 100%</div>
-                                                            <p className="text-[11px] text-slate-500 font-medium">Ce type définit le prix des autres.</p>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="relative flex-1">
-                                                                <input
-                                                                    type="number"
-                                                                    value={pricingForm.data.rules[selectedPricingIndex].percentage}
-                                                                    onChange={(e) => {
-                                                                        const newRules = [...pricingForm.data.rules];
-                                                                        newRules[selectedPricingIndex].percentage = e.target.value;
-                                                                        pricingForm.setData("rules", newRules);
-                                                                    }}
-                                                                    className="w-full pl-4 pr-10 py-2.5 rounded-lg border border-slate-200 text-base font-bold focus:border-amber-400 focus:ring-4 focus:ring-amber-500/10 outline-none transition bg-white"
-                                                                />
-                                                                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                                                            </div>
-                                                            <div className="text-[10px] text-slate-400 font-bold uppercase leading-tight">du prix<br/>de base</div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* 3. Capacity Section */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
-                                                <Users className="w-3.5 h-3.5 text-slate-400" />
-                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Capacité d'accueil</h4>
-                                            </div>
-                                            
-                                            {selectedCapacityIndex !== -1 && (
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <CapacityStepper 
-                                                        label="Adultes" 
-                                                        icon="Ad."
-                                                        value={capacityForm.data.capacities[selectedCapacityIndex].capacite_adultes} 
-                                                        onChange={(v) => {
-                                                            const newCaps = [...capacityForm.data.capacities];
-                                                            newCaps[selectedCapacityIndex].capacite_adultes = v;
-                                                            capacityForm.setData('capacities', newCaps);
-                                                        }}
-                                                    />
-                                                    <CapacityStepper 
-                                                        label="Enfants" 
-                                                        icon="Enf."
-                                                        value={capacityForm.data.capacities[selectedCapacityIndex].capacite_enfants} 
-                                                        onChange={(v) => {
-                                                            const newCaps = [...capacityForm.data.capacities];
-                                                            newCaps[selectedCapacityIndex].capacite_enfants = v;
-                                                            capacityForm.setData('capacities', newCaps);
-                                                        }}
-                                                    />
-                                                    <CapacityStepper 
-                                                        label="Bébés" 
-                                                        icon="Béb."
-                                                        value={capacityForm.data.capacities[selectedCapacityIndex].capacite_bebes} 
-                                                        onChange={(v) => {
-                                                            const newCaps = [...capacityForm.data.capacities];
-                                                            newCaps[selectedCapacityIndex].capacite_bebes = v;
-                                                            capacityForm.setData('capacities', newCaps);
-                                                        }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Bottom Info Bar */}
-                                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                        <Info className="w-3.5 h-3.5" />
-                                        Modifications en suspens
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 italic">Dernière mise à jour : aujourd'hui</div>
-                                </div>
+                {/* 1. Category Sidebar */}
+                <div className="lg:col-span-4 space-y-4">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Types de Chambres</h2>
+                                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">{types.length} enregistrés</p>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 p-12 transition-all hover:bg-slate-50">
-                            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm border border-slate-100">
-                                <Info className="w-8 h-8 text-slate-300" />
-                            </div>
-                            <h3 className="text-slate-800 font-bold text-lg mb-1">Aucune sélection</h3>
-                            <p className="text-sm font-medium text-center max-w-[240px] text-slate-500">Choisissez un type de chambre dans la liste pour configurer ses tarifs et capacités.</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* 2. Type Selection Sidebar (Right - 1/3) */}
-                <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[700px]">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                            <h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                Catalogue des Types
-                            </h2>
                             <button
-                                onClick={openCreate}
-                                className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all shadow-sm"
+                                onClick={openCreateType}
+                                className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-all shadow-sm group"
+                                title="Nouveau Type"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                        <div className="p-3 max-h-[600px] overflow-y-auto custom-scrollbar space-y-2">
                             {types.length === 0 ? (
-                                <div className="p-8 text-center text-slate-400 text-xs italic font-medium">
-                                    Aucun type enregistré.
-                                </div>
+                                <div className="p-8 text-center text-slate-400 text-xs italic">Aucun type enregistré.</div>
                             ) : (
                                 types.map((t) => {
                                     const isActive = selectedTypeId === t.id;
-                                    const isMain = Number(pricingForm.data.main_type_id) === t.id;
+                                    const count = hotel.type_capacities.filter(c => c.id_type === t.id).length;
                                     return (
                                         <div
                                             key={t.id}
                                             onClick={() => setSelectedTypeId(t.id)}
-                                            className={`p-4 rounded-xl transition-all cursor-pointer group relative border-2 ${
+                                            className={`group p-3 rounded-xl transition-all cursor-pointer border relative ${
                                                 isActive 
-                                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-900 shadow-sm' 
-                                                    : 'bg-white border-transparent hover:bg-slate-50 text-slate-700'
+                                                    ? 'bg-amber-50 border-amber-200 text-amber-900 shadow-sm' 
+                                                    : 'bg-white border-transparent hover:bg-slate-50 border-slate-100'
                                             }`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 <div
                                                     className="w-1 h-10 rounded-full shrink-0"
-                                                    style={{ backgroundColor: t.color || "#6366f1" }}
+                                                    style={{ backgroundColor: t.color || "#f59e0b" }}
                                                 />
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className={`text-sm font-bold truncate ${isActive ? 'text-indigo-900' : 'text-slate-800'}`}>
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className={`text-sm font-bold truncate ${isActive ? 'text-amber-900' : 'text-slate-800'}`}>
                                                             {t.nom}
                                                         </h4>
-                                                        {isMain && (
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Type principal" />
-                                                        )}
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isActive ? 'bg-amber-200 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {count}
+                                                        </span>
                                                     </div>
-                                                    <p className={`text-[11px] line-clamp-1 italic mt-0.5 ${isActive ? 'text-indigo-400' : 'text-slate-400'}`}>
-                                                        {t.description || "Aucune description"}
-                                                    </p>
+                                                    <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-medium">{t.description || "Aucune description"}</p>
                                                 </div>
                                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); openEdit(t); }}
-                                                        className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-indigo-400 hover:bg-indigo-100' : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                                                        onClick={(e) => { e.stopPropagation(); openEditType(t); }}
+                                                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-amber-100"
                                                     >
                                                         <Edit3 className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ id: t.id, nom: t.nom }); }}
-                                                        className={`p-1.5 rounded-lg transition-colors ${isActive ? 'text-indigo-400 hover:bg-indigo-100' : 'text-slate-400 hover:text-red-600 hover:bg-red-50'}`}
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
                                                 </div>
                                             </div>
@@ -401,134 +229,324 @@ export function TypesTab({ hotel, types }: Props) {
                         </div>
                     </div>
                 </div>
+
+                {/* 2. Detail View */}
+                <div className="lg:col-span-8 flex flex-col gap-6">
+                    {selectedType ? (
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+                            {/* Header */}
+                            <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shadow-sm">
+                                        <Users className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight">{selectedType.nom}</h3>
+                                        <p className="text-xs text-slate-500 font-medium">Configurations de capacité et d'occupation</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={openCreateCapacity}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all shadow-sm active:scale-95"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Ajouter Configuration
+                                </button>
+                            </div>
+
+                            {/* Configurations Table */}
+                            <div className="flex-1 overflow-x-auto p-4">
+                                {filteredCapacities.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                            <Search className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-500">Aucune configuration</p>
+                                        <p className="text-xs font-medium opacity-60">Ajoutez une capacité pour commencer.</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left border-separate border-spacing-y-2">
+                                        <thead>
+                                            <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-4">
+                                                <th className="pb-3 pl-4">Configuration</th>
+                                                <th className="pb-3 text-center">Occupation (Ad/En)</th>
+                                                <th className="pb-3 text-center">Total Pax</th>
+                                                <th className="pb-3 text-right pr-6">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredCapacities.map((cap) => (
+                                                <tr 
+                                                    key={cap.id} 
+                                                    onClick={() => openEditCapacity(cap)}
+                                                    className="group bg-white hover:bg-slate-50 border border-slate-100 rounded-xl transition-all cursor-pointer shadow-sm border-y"
+                                                >
+                                                    <td className="py-4 pl-4 rounded-l-xl border-y border-l border-slate-100">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs border border-amber-100">
+                                                                {cap.label?.substring(0, 1).toUpperCase() || "C"}
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-bold text-slate-800">{cap.label}</div>
+                                                                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-tighter">ID: #{cap.id}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 text-center border-y border-slate-100">
+                                                        <div className="flex items-center justify-center gap-4">
+                                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                                                                <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                <span className="text-xs font-bold text-slate-700">{cap.capacite_adultes}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                                                                <Baby className="w-3.5 h-3.5 text-slate-400" />
+                                                                <span className="text-xs font-bold text-slate-700">{cap.capacite_enfants}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 text-center border-y border-slate-100">
+                                                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-100 text-amber-700 font-bold text-xs">
+                                                            {cap.capacite_totale || (cap.capacite_adultes + cap.capacite_enfants)} Pax
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 pr-4 text-right rounded-r-xl border-y border-r border-slate-100">
+                                                        <div className="flex justify-end pr-2">
+                                                            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:bg-amber-500 group-hover:border-amber-500 group-hover:text-white transition-all">
+                                                                <ChevronRight className="w-4 h-4" />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-full min-h-[500px] flex flex-col items-center justify-center bg-slate-50/50 border border-dashed border-slate-200 rounded-xl text-slate-400 p-12">
+                            <Info className="w-10 h-10 text-slate-300 mb-4" />
+                            <h3 className="text-slate-800 font-bold text-base mb-1">Sélectionnez un type</h3>
+                            <p className="text-xs text-center max-w-xs font-medium">Choisissez un type de chambre dans la colonne de gauche.</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Modal & Dialog */}
-            {showModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-                        onClick={() => setShowModal(false)}
-                    />
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden z-10">
+            {/* --- Modals --- */}
+
+            {/* Capacity Modal */}
+            {showCapacityModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowCapacityModal(false)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
                         <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
-                            <h2 className="text-lg font-bold text-slate-800">
-                                {editingType
-                                    ? "Modifier le type"
-                                    : "Nouveau type"}
-                            </h2>
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors"
-                            >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                                    <Users className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+                                        {editingCapacity ? "Modifier Configuration" : "Nouvelle Configuration"}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">{selectedType?.nom}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowCapacityModal(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <form
-                            onSubmit={submitType}
-                            className="p-7 flex flex-col gap-4"
-                        >
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                                    Nom <span className="text-red-400">*</span>
-                                </label>
+
+                        <form onSubmit={submitCapacity} className="p-7 space-y-6">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide ml-1">Label Affiché</label>
+                                <input
+                                    type="text"
+                                    value={capacityForm.data.label}
+                                    onChange={e => capacityForm.setData('label', e.target.value)}
+                                    placeholder="Ex: Standard Double, Single Room..."
+                                    className="w-full px-4 py-2.5 text-sm font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all"
+                                    required
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide ml-1">Adultes</label>
+                                    <CapacityStepper 
+                                        value={capacityForm.data.capacite_adultes} 
+                                        onChange={v => capacityForm.setData('capacite_adultes', v)} 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wide ml-1">Enfants</label>
+                                    <CapacityStepper 
+                                        value={capacityForm.data.capacite_enfants} 
+                                        onChange={v => capacityForm.setData('capacite_enfants', v)} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-800 uppercase tracking-tight">Capacité Totale (Max Pax)</label>
+                                        <p className="text-[10px] text-slate-500 font-medium">Nombre total de personnes autorisées (Hors bébés)</p>
+                                    </div>
+                                    <div className="w-24">
+                                        <CapacityStepper 
+                                            value={capacityForm.data.capacite_totale} 
+                                            onChange={v => capacityForm.setData('capacite_totale', v)} 
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex items-center justify-between gap-4">
+                                {editingCapacity && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteCapacity(editingCapacity)}
+                                        className="inline-flex items-center gap-2 text-xs font-bold text-red-500 hover:text-red-700 h-10 px-4 rounded-xl transition-all hover:bg-red-50"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Supprimer
+                                    </button>
+                                )}
+                                <div className="flex-1 flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCapacityModal(false)}
+                                        className="px-5 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={capacityForm.processing}
+                                        className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                    >
+                                        <Check className="w-4 h-4" />
+                                        {capacityForm.processing ? "Enregistrement..." : "Enregistrer"}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Type Modal */}
+            {showTypeModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowTypeModal(false)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100">
+                        <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
+                            <h2 className="text-lg font-bold text-slate-800 tracking-tight uppercase">
+                                {editingType ? "Modifier le type" : "Nouveau type"}
+                            </h2>
+                            <button onClick={() => setShowTypeModal(false)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={submitType} className="p-7 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide pl-1">Nom du Type</label>
                                 <input
                                     type="text"
                                     value={typeForm.data.nom}
-                                    onChange={(e) =>
-                                        typeForm.setData("nom", e.target.value)
-                                    }
+                                    onChange={e => typeForm.setData("nom", e.target.value)}
                                     required
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none"
-                                    placeholder="Ex: Suite Présidentielle"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all"
+                                    placeholder="Ex: Chambre Deluxe"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                                    Description
-                                </label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide pl-1">Description</label>
                                 <textarea
                                     value={typeForm.data.description}
-                                    onChange={(e) =>
-                                        typeForm.setData(
-                                            "description",
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={e => typeForm.setData("description", e.target.value)}
                                     rows={3}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                                    Couleur
-                                </label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide pl-1">Couleur</label>
                                 <input
                                     type="color"
                                     value={typeForm.data.color}
-                                    onChange={(e) =>
-                                        typeForm.setData(
-                                            "color",
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="w-full h-10 rounded-xl border border-slate-200 cursor-pointer"
+                                    onChange={e => typeForm.setData("color", e.target.value)}
+                                    className="w-full h-10 rounded-xl border border-slate-200 cursor-pointer overflow-hidden p-0"
                                 />
                             </div>
-                            <button
-                                type="submit"
-                                disabled={typeForm.processing}
-                                className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-colors"
-                            >
-                                <Check className="w-4 h-4" />{" "}
-                                {typeForm.processing
-                                    ? "Enregistrement..."
-                                    : "Enregistrer le Type"}
-                            </button>
+
+                            <div className="pt-2 flex flex-col gap-3">
+                                <button
+                                    type="submit"
+                                    disabled={typeForm.processing}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-sm active:scale-95"
+                                >
+                                    <Check className="w-4 h-4" />
+                                    {typeForm.processing ? "Traitement..." : "Enregistrer Type"}
+                                </button>
+                                {editingType && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteType(editingType)}
+                                        className="w-full text-xs font-bold text-red-500 hover:text-red-700 px-4 py-2 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                        Supprimer ce type
+                                    </button>
+                                )}
+                            </div>
                         </form>
                     </div>
                 </div>
             )}
 
             <ConfirmDialog
-                isOpen={!!confirmDelete}
-                onClose={() => setConfirmDelete(null)}
-                onConfirm={handleConfirmDelete}
-                isLoading={deleting}
+                isOpen={!!confirmDeleteType}
+                onClose={() => setConfirmDeleteType(null)}
+                onConfirm={handleDeleteType}
                 title="Supprimer le type"
-                description={`Êtes-vous sûr ? Cela affectera tous les hôtels.`}
-                confirmLabel="Confirmer"
+                description={`Êtes-vous sûr de vouloir supprimer "${confirmDeleteType?.nom}" ?`}
+                confirmLabel="Supprimer"
+                variant="danger"
+            />
+
+            <ConfirmDialog
+                isOpen={!!confirmDeleteCapacity}
+                onClose={() => setConfirmDeleteCapacity(null)}
+                onConfirm={handleDeleteCapacity}
+                title="Supprimer la configuration"
+                description={`Êtes-vous sûr de vouloir supprimer "${confirmDeleteCapacity?.label}" ?`}
+                confirmLabel="Supprimer"
                 variant="danger"
             />
         </div>
     );
 }
 
-function CapacityStepper({ label, value, onChange, icon }: { label: string; value: number; onChange: (v: number) => void; icon: string }) {
+function CapacityStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
     return (
-        <div className="flex flex-col gap-1.5 items-center sm:items-end min-w-[50px]">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
-                {icon}
+        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+            <button
+                type="button"
+                onClick={() => onChange(Math.max(0, value - 1))}
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all font-bold text-lg"
+            >
+                -
+            </button>
+            <span className="text-xs font-bold text-slate-700">
+                {value}
             </span>
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
-                <button
-                    type="button"
-                    onClick={() => onChange(Math.max(0, value - 1))}
-                    className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded transition-colors"
-                >
-                    -
-                </button>
-                <span className="text-xs font-black w-4 text-center text-slate-700">
-                    {value}
-                </span>
-                <button
-                    type="button"
-                    onClick={() => onChange(value + 1)}
-                    className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded transition-colors"
-                >
-                    +
-                </button>
-            </div>
+            <button
+                type="button"
+                onClick={() => onChange(value + 1)}
+                className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all font-bold text-lg"
+            >
+                +
+            </button>
         </div>
     );
 }

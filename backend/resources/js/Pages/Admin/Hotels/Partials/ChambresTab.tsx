@@ -74,8 +74,8 @@ export function ChambresTab({ hotel, types }: { hotel: any; types: any[] }) {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white rounded-2xl border border-slate-100 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/60">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-            <BedDouble className="w-4 h-4 text-blue-600" />
+          <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center border border-amber-100">
+            <BedDouble className="w-4 h-4 text-amber-600" />
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Liste des Chambres</h2>

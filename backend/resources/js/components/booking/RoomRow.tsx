@@ -1,10 +1,12 @@
+import { useMemo } from "react";
 import type { RoomSelection, RoomType, TypeCapacity } from "@/types/booking";
 import { formatPrice } from "@/data/mockData";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, AlertTriangle } from "lucide-react";
+import { Minus, Plus, AlertTriangle, X } from "lucide-react";
 
 interface RoomOption {
     type: RoomType;
+    capacity: TypeCapacity;
     price: number;
 }
 
@@ -14,11 +16,11 @@ interface Props {
     nights: number;
     index: number;
     typeCapacity?: TypeCapacity;
-    onChange: (uid: string, field: keyof RoomSelection, value: number) => void;
+    onChange: (uid: string, updates: Partial<RoomSelection>) => void;
     onRemove: (uid: string) => void;
 }
 
-function Stepper({
+function CompactStepper({
     label,
     value,
     max,
@@ -33,38 +35,36 @@ function Stepper({
 }) {
     const isOver = value > max;
     return (
-        <div className="flex flex-col gap-1 items-center">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+        <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase min-w-[50px]">
                 {label}
             </span>
             <div
-                className={`flex items-center gap-2 bg-white px-2 py-1.5 rounded-lg border focus-within:ring-2 focus-within:ring-slate-300 transition-all ${isOver ? "border-red-400 bg-red-50" : "border-slate-200"}`}
+                className={`flex items-center gap-1 bg-white border rounded-lg p-0.5 ${isOver ? "border-red-400 bg-red-50" : "border-slate-200"}`}
             >
                 <button
                     type="button"
                     onClick={() => onChange(Math.max(min, value - 1))}
                     disabled={value <= min}
-                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded disabled:opacity-30 transition-colors"
+                    className="p-1 hover:bg-slate-100 rounded disabled:opacity-20"
                 >
-                    <Minus className="w-3 h-3" />
+                    <Minus className="w-3 h-3 text-slate-500" />
                 </button>
                 <span
-                    className={`text-xs font-black w-4 text-center ${isOver ? "text-red-500" : "text-slate-700"}`}
+                    className={`text-xs font-bold w-4 text-center ${isOver ? "text-red-600" : "text-slate-700"}`}
                 >
                     {value}
                 </span>
                 <button
                     type="button"
                     onClick={() => onChange(value + 1)}
-                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                    className="p-1 hover:bg-slate-100 rounded"
                 >
-                    <Plus className="w-3 h-3" />
+                    <Plus className="w-3 h-3 text-slate-500" />
                 </button>
             </div>
-            <span
-                className={`text-[9px] font-medium ${isOver ? "text-red-500" : "text-slate-400"}`}
-            >
-                Max total: {max}
+            <span className="text-[9px] text-slate-400 font-medium">
+                / {max}
             </span>
         </div>
     );
@@ -80,139 +80,202 @@ export function RoomRow({
     onRemove,
 }: Props) {
     const selectedOption = availableOptions.find(
-        (opt) => opt.type.id === room.id_type,
+        (opt) => opt.capacity.id === room.id_capacity,
     );
+
+    const availableTypes = useMemo(() => {
+        const typesMap = new Map();
+        availableOptions.forEach((opt) => {
+            if (!typesMap.has(opt.type.id)) typesMap.set(opt.type.id, opt.type);
+        });
+        return Array.from(typesMap.values());
+    }, [availableOptions]);
+
+    const filteredConfigs = useMemo(() => {
+        return availableOptions.filter((opt) => opt.type.id === room.id_type);
+    }, [availableOptions, room.id_type]);
+
     const price = selectedOption?.price || 0;
-    const subtotal = price * nights;
+    const subtotal = price * nights * room.quantite;
 
-    // Resolve max capacities (multiplied by quantity)
-    const maxAdultes = (typeCapacity?.capacite_adultes ?? 2) * room.quantite;
-    const maxEnfants = (typeCapacity?.capacite_enfants ?? 2) * room.quantite;
-    const maxBebes = (typeCapacity?.capacite_bebes ?? 2) * room.quantite;
+    // Capacity Logic
+    const maxAdultesConfig =
+        (typeCapacity?.capacite_adultes ?? 2) * room.quantite;
+    const maxEnfantsConfig =
+        (typeCapacity?.capacite_enfants ?? 2) * room.quantite;
+    const maxTotal =
+        (typeCapacity?.capacite_totale ?? maxAdultesConfig + maxEnfantsConfig) *
+        room.quantite;
 
-    // Check capacity overrides
-    const overAdultes = room.nb_adultes > maxAdultes;
-    const overEnfants = room.nb_enfants > maxEnfants;
-    const overBebes = room.nb_bebes > maxBebes;
-    const hasCapacityWarning =
-        overAdultes || overEnfants || overBebes;
+    const currentMaxAdultes = Math.min(
+        maxAdultesConfig,
+        maxTotal - room.nb_enfants,
+    );
+    const currentMaxEnfants = Math.min(
+        maxEnfantsConfig,
+        maxTotal - room.nb_adultes,
+    );
+
+    const hasWarning =
+        room.nb_adultes + room.nb_enfants > maxTotal ||
+        room.nb_adultes > maxAdultesConfig ||
+        room.nb_enfants > maxEnfantsConfig;
 
     return (
-        <div className="flex flex-col gap-4 p-5 bg-slate-50/50 rounded-[1.5rem] border border-slate-200 hover:border-slate-300 transition-colors">
-            {/* Top Row: Room Type & Quantity & Price/Delete */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-xl bg-slate-800 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-lg shadow-slate-800/20">
-                        {index + 1}
+        <div className="flex flex-col gap-3 p-4 bg-slate-50/50 rounded-2xl border border-slate-200 transition-all">
+            {/* Top row: Selection & Basic Logistics */}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-400 w-5">
+                        #{index + 1}
                     </span>
                 </div>
 
-                <div className="flex-1 w-full gap-3 grid grid-cols-1 sm:grid-cols-3">
-                    <div className="sm:col-span-2 space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            Type de chambre
-                        </label>
+                <div className="flex-1 min-w-[400px] grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {/* Type Select */}
+                    <div className="sm:col-span-1">
                         <select
-                            value={room.id_type}
-                            onChange={(e) =>
-                                onChange(
-                                    room.uid,
-                                    "id_type",
-                                    Number(e.target.value),
-                                )
-                            }
-                            className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all"
+                            value={room.id_type || ""}
+                            onChange={(e) => {
+                                const typeId = Number(e.target.value);
+                                const firstOpt = availableOptions.find(
+                                    (o) => o.type.id === typeId,
+                                );
+                                if (firstOpt) {
+                                    const mt =
+                                        firstOpt.capacity.capacite_totale;
+                                    let newA = Math.min(
+                                        room.nb_adultes,
+                                        firstOpt.capacity.capacite_adultes,
+                                    );
+                                    let newC = Math.min(
+                                        room.nb_enfants,
+                                        mt - newA,
+                                    );
+                                    onChange(room.uid, {
+                                        id_type: typeId,
+                                        id_capacity: firstOpt.capacity.id,
+                                        nb_adultes: newA,
+                                        nb_enfants: newC,
+                                    });
+                                }
+                            }}
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-slate-400 outline-none transition-all"
                         >
-                            {availableOptions.map((opt) => (
-                                <option key={opt.type.id} value={opt.type.id}>
-                                    {opt.type.nom} — {formatPrice(opt.price)}
-                                    /nuit
+                            <option value="" disabled>
+                                Type...
+                            </option>
+                            {availableTypes.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.nom}
                                 </option>
                             ))}
                         </select>
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            Nombre de chambres
-                        </label>
+                    {/* Config Select */}
+                    <div className="sm:col-span-1">
+                        <select
+                            value={room.id_capacity || ""}
+                            onChange={(e) => {
+                                const capId = Number(e.target.value);
+                                const opt = filteredConfigs.find(
+                                    (o) => o.capacity.id === capId,
+                                );
+                                if (opt) {
+                                    const mt = opt.capacity.capacite_totale;
+                                    let newA = Math.min(
+                                        room.nb_adultes,
+                                        opt.capacity.capacite_adultes,
+                                    );
+                                    let newC = Math.min(
+                                        room.nb_enfants,
+                                        mt - newA,
+                                    );
+                                    onChange(room.uid, {
+                                        id_capacity: capId,
+                                        nb_adultes: newA,
+                                        nb_enfants: newC,
+                                    });
+                                }
+                            }}
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-700 focus:ring-1 focus:ring-slate-400 outline-none transition-all"
+                            disabled={!room.id_type}
+                        >
+                            {!room.id_type ? (
+                                <option value="">Choisir type...</option>
+                            ) : (
+                                filteredConfigs.map((opt) => (
+                                    <option
+                                        key={opt.capacity.id}
+                                        value={opt.capacity.id}
+                                    >
+                                        {opt.capacity.label} —{" "}
+                                        {formatPrice(opt.price)}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                            Rooms
+                        </span>
                         <Input
                             type="number"
                             min="1"
                             value={room.quantite}
                             onChange={(e) =>
-                                onChange(
-                                    room.uid,
-                                    "quantite",
-                                    Math.max(1, Number(e.target.value)),
-                                )
+                                onChange(room.uid, {
+                                    quantite: Math.max(
+                                        1,
+                                        Number(e.target.value),
+                                    ),
+                                })
                             }
-                            className="h-10 bg-white rounded-xl font-bold"
+                            className="h-9 w-16 rounded-lg text-center font-bold text-xs"
                         />
                     </div>
-                </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0">
-                    <div className="text-right">
-                        {subtotal > 0 && (
-                            <p className="text-base font-black text-amber-600 leading-none">
-                                {formatPrice(subtotal * room.quantite)}
-                            </p>
-                        )}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => onRemove(room.uid)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all flex-shrink-0"
-                    >
-                        <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
+                    {/* Price Summary */}
+                    <div className="flex items-center justify-end gap-3 ml-auto">
+                        <div className="text-right">
+                            <span className="text-sm font-black text-slate-800">
+                                {formatPrice(subtotal)}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onRemove(room.uid)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 18L18 6M6 6l12 12"
-                            />
-                        </svg>
-                    </button>
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Bottom Row: Occupancy configuration */}
-            <div className="bg-white rounded-xl border border-slate-100 p-4">
-                <div className="flex flex-wrap gap-6 items-start">
-                    <Stepper
-                        label="Adultes"
-                        value={room.nb_adultes}
-                        max={maxAdultes}
-                        onChange={(val) =>
-                            onChange(room.uid, "nb_adultes", val)
-                        }
-                    />
-                    <Stepper
-                        label="Enfants"
-                        value={room.nb_enfants}
-                        max={maxEnfants}
-                        onChange={(val) =>
-                            onChange(room.uid, "nb_enfants", val)
-                        }
-                    />
-                    <Stepper
-                        label="Bébés"
-                        value={room.nb_bebes}
-                        max={maxBebes}
-                        onChange={(val) => onChange(room.uid, "nb_bebes", val)}
-                    />
-                </div>
+            {/* Bottom row: Occupancy & Warning (Compact) */}
+            <div className="flex flex-wrap items-center gap-6 pl-7">
+                <CompactStepper
+                    label="Adultes"
+                    value={room.nb_adultes}
+                    max={currentMaxAdultes}
+                    onChange={(val) => onChange(room.uid, { nb_adultes: val })}
+                />
+                <CompactStepper
+                    label="Enfants"
+                    value={room.nb_enfants}
+                    max={currentMaxEnfants}
+                    onChange={(val) => onChange(room.uid, { nb_enfants: val })}
+                />
 
-                {hasCapacityWarning && (
-                    <div className="mt-4 flex gap-2 items-center bg-red-50 text-red-600 p-3 rounded-lg border border-red-100 text-xs font-semibold animate-in fade-in slide-in-from-top-2">
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                        Attention, la capacité totale d'accueil pour le nombre de chambres sélectionné a été dépassée !
+                {hasWarning && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-100 rounded-full text-[10px] font-bold text-red-600">
+                        <AlertTriangle className="w-3 h-3" />
+                        Capacité dépassée !
                     </div>
                 )}
             </div>

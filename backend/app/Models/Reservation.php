@@ -15,6 +15,7 @@ class Reservation extends Model
         'email',
         'telephone',
         'id_hotel',
+        'client_type',
         'date_arrivee',
         'date_depart',
         'nb_personnes',

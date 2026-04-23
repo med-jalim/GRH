@@ -12,7 +12,7 @@ interface Props {
   totalPrice: number;
 }
 
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Row({ label, value, accent }: { label: string; value: string |undefined; accent?: boolean }) {
   return (
     <div className="flex justify-between items-start py-2">
       <span className="text-sm text-slate-500 flex-shrink-0 mr-4">{label}</span>
@@ -53,7 +53,7 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
             <Row label="Agence"      value={formData.agencyName} />
-            <Row label="Code Agence" value={formData.agencyCode} />
+            {formData.client_type === 'agence' && <Row label="Code Agence" value={formData.agencyCode} />}
             <Row label="Responsable" value={formData.contactName} />
             <Row label="E-mail"      value={formData.email} />
             <Row label="Téléphone"   value={formData.phone} />
@@ -89,22 +89,29 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
 
                 <div className="space-y-3">
                   {(group.items || []).map((item: any, rIdx: number) => {
-                    const chambre = hotel?.chambres?.find(c => c.id_type === item.id_type);
-                    const tarif   = hotel?.tarifs?.find(t => 
-                      t.id_type === item.id_type && 
-                      new Date(t.date_debut) <= gCheckIn && 
-                      new Date(t.date_fin) >= gCheckIn
+                    const checkInStr = group.date_arrivee;
+                    const type_capacities = hotel?.type_capacities?.find(c => 
+                      Number(c.id_type) === Number(item.id_type) && 
+                      Number(c.id) === Number(item.id_capacity)
                     );
+                    
+                    const tarif = hotel?.tarifs?.find(t => {
+                      const startStr = t.date_debut.toString().substring(0, 10);
+                      const endStr   = t.date_fin.toString().substring(0, 10);
+                      return Number(t.id_capacity) === Number(item.id_capacity) && 
+                             checkInStr >= startStr && 
+                             checkInStr <= endStr;
+                    });
                     const sub = (tarif?.prix || 0) * gNights * (item.quantite || 0);
 
                     return (
                       <div key={item.uid} className="flex justify-between items-start py-1">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">{chambre?.type.nom ?? '—'}</p>
+                          <p className="text-sm font-semibold text-slate-800">{type_capacities?.label ?? '—'}</p>
                           <p className="text-xs text-slate-400">
                              Quantité: {item.quantite} · {formatPrice(tarif?.prix || 0)}/nuit
                              <span className="ml-2 text-amber-600 font-bold">
-                                (Ad. {item.nb_adultes} Enf. {item.nb_enfants} Béb. {item.nb_bebes})
+                                (Ad. {item.nb_adultes} Enf. {item.nb_enfants})
                              </span>
                           </p>
                         </div>
@@ -118,13 +125,34 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
           })}
         </div>
 
-        {/* Grand Total */}
-        <div className="flex justify-between items-center bg-amber-500 p-6 rounded-3xl shadow-lg shadow-amber-500/20">
-          <div>
-            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest opacity-70">Total estimé de la demande</span>
-            <p className="text-xs text-slate-900 font-bold opacity-80">Toutes périodes confondues</p>
+        {/* Grand Total Breakdown */}
+        <div className="bg-white border-2 border-amber-100 rounded-3xl overflow-hidden shadow-lg shadow-amber-200/20">
+          <div className="px-6 py-4 space-y-2">
+            {hotel && hotel.tax_percentage && hotel.tax_percentage > 0 && (
+              <>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Sous-total (Net)</span>
+                  <span className="font-semibold text-slate-700">
+                    {formatPrice(totalPrice / (1 + hotel.tax_percentage / 100))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Taxes ({hotel.tax_percentage}%)</span>
+                  <span className="font-semibold text-emerald-600">
+                    +{formatPrice(totalPrice - (totalPrice / (1 + hotel.tax_percentage / 100)))}
+                  </span>
+                </div>
+                <Separator className="bg-slate-100" />
+              </>
+            )}
           </div>
-          <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatPrice(totalPrice)}</span>
+          <div className="flex justify-between items-center bg-amber-500 p-6">
+            <div>
+              <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest opacity-70">Total estimé de la demande</span>
+              <p className="text-xs text-slate-900 font-bold opacity-80 italic">Toutes périodes & taxes incluses</p>
+            </div>
+            <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatPrice(totalPrice)}</span>
+          </div>
         </div>
 
         {/* Remarks */}
@@ -136,7 +164,7 @@ export function SummaryStep({ hotel, nights, totalPrice }: Props) {
             id="specialRequests" 
             {...register('specialRequests')} 
             rows={4} 
-            placeholder="Ex: Chambres communicantes, lit bébé, arrivée tardive..."
+            placeholder="Chambres communicantes, arrivée tardive..."
             className="resize-none border-slate-200 rounded-2xl focus:ring-slate-300 p-4 text-sm" 
           />
         </div>

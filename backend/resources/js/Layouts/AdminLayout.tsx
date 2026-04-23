@@ -4,7 +4,7 @@ import {
     Building2,
     LayoutDashboard,
     Search,
-    BookOpen,
+    Settings,
     CalendarCheck,
     Bell,
     MessageCircle,
@@ -35,6 +35,7 @@ export function AdminLayout({ children, fullScreen }: Props) {
         { name: "Réservations", href: "/admin/reservations", icon: CalendarCheck },
         { name: "Hôtels", href: "/admin/hotels", icon: Building2 },
         { name: "Modèles d'E-mails", href: "/admin/email-templates", icon: Mail },
+        { name: "Paramètres", href: "/admin/settings", icon: Settings },
     ];
 
     return (

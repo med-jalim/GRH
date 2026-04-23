@@ -50,7 +50,7 @@ class ReservationController extends Controller
             $baseQuery->whereIn('statut', $statuses);
         }
 
-        $reservations = $baseQuery->with(['hotel', 'details.type'])
+        $reservations = $baseQuery->with(['hotel', 'details.type', 'groups'])
             ->withCount('groups')
             ->withSum('details as total_items', 'quantite')
             ->orderByDesc('created_at')
@@ -72,7 +72,7 @@ class ReservationController extends Controller
      */
     public function getCalendarData(Request $request): JsonResponse
     {
-        $query = Reservation::with(['hotel']);
+        $query = Reservation::with(['hotel', 'groups']);
 
         if ($request->has('id_hotel') && $request->id_hotel !== null && $request->id_hotel !== '') {
             $query->where('id_hotel', $request->id_hotel);
@@ -110,8 +110,9 @@ class ReservationController extends Controller
     public function store(Request $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
+            'client_type'         => 'required|string|in:agence,groupe',
             'nom_agence'          => 'nullable|string|max:255',
-            'code_agence'         => 'required|string|max:100',
+            'code_agence'         => 'required_if:client_type,agence|nullable|string|max:100',
             'nom_contact'         => 'required|string|max:255',
             'email'               => 'required|email|max:255',
             'telephone'           => 'required|string|max:30',
@@ -126,32 +127,76 @@ class ReservationController extends Controller
             'groups.*.nb_personnes'   => 'nullable|integer|min:0',
             'groups.*.items'                  => 'required|array|min:1',
             'groups.*.items.*.id_type'        => 'required|integer|exists:types,id',
+            'groups.*.items.*.id_capacity'    => 'required|integer|exists:hotel_type_capacities,id',
             'groups.*.items.*.quantite'       => 'required|integer|min:1',
             'groups.*.items.*.prix_unitaire'  => 'required|numeric|min:0',
             'groups.*.items.*.nb_adultes'     => 'required|integer|min:0',
             'groups.*.items.*.nb_enfants'     => 'nullable|integer|min:0',
-            'groups.*.items.*.nb_bebes'       => 'nullable|integer|min:0',
         ]);
+
+        // Custom Occupancy Validation
+        foreach ($validated['groups'] as $gIdx => $group) {
+            foreach ($group['items'] as $iIdx => $item) {
+                $capacity = \App\Models\HotelTypeCapacity::find($item['id_capacity']);
+                if ($capacity) {
+                    $totalPax = ($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0);
+                    $maxTotal = $capacity->capacite_totale ?: ($capacity->capacite_adultes + $capacity->capacite_enfants);
+                    
+                    if ($totalPax > $maxTotal) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "La configuration \"{$capacity->label}\" ne peut pas dépasser {$maxTotal} personnes (Adultes + Enfants).",
+                            'errors' => ["groups.{$gIdx}.items.{$iIdx}.pax" => "Capacité dépassée"]
+                        ], 422);
+                    }
+                }
+            }
+        }
 
         // Auto-generate a unique reference code
         $validated['code_reference'] = 'RES-' . strtoupper(Str::random(8));
         $validated['statut']         = $validated['statut'] ?? 'en_attente';
         
         $groups = $validated['groups'];
+
+        // --- GLOBAL MIN ROOMS VALIDATION ---
+        $totalRoomsSum = collect($groups)->sum(function($g) {
+            return collect($g['items'])->sum('quantite');
+        });
+        $minRoomsSetting = (int) \App\Models\GlobalSetting::get('min_rooms', 1);
+
+        if ($totalRoomsSum < $minRoomsSetting) {
+            return response()->json([
+                'success' => false,
+                'message' => "Le nombre minimum de chambres requis pour une réservation est de {$minRoomsSetting}.",
+            ], 422);
+        }
         
         // Calculate Global Info (Min Arrivee, Max Depart, Sum Personnes)
         $globalArrivee = collect($groups)->min('date_arrivee');
         $globalDepart  = collect($groups)->max('date_depart');
         $totalPersonnes = collect($groups)->sum(function ($g) {
             return collect($g['items'])->sum(function ($item) {
-                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
-                      + ($item['nb_bebes'] ?? 0))
+                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0))
                       * ($item['quantite'] ?? 1);
             });
         });
         
-        // Calculate total price from groups
-        $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
+        // Calculate total price from groups server-side for security
+        $pricingResult = $this->calculateTotalPriceFromGroups(
+            $groups, 
+            (int) $validated['id_hotel'], 
+            $validated['client_type']
+        );
+
+        $prixTotalCalculated = $pricingResult['total_price'];
+        $decoratedGroups     = $pricingResult['groups'];
+
+        // If client is a group, agency fields must be cleared
+        if (($validated['client_type'] ?? null) === 'groupe') {
+            $validated['code_agence'] = null;
+            $validated['nom_agence']  = null;
+        }
 
         // Prepare reservation data
         $reservationData = array_merge($validated, [
@@ -165,22 +210,22 @@ class ReservationController extends Controller
         $reservation = Reservation::create($reservationData);
 
         // Create Groups and their items
-        foreach ($groups as $groupData) {
+        foreach ($decoratedGroups as $groupData) {
             $items = $groupData['items'];
-            unset($groupData['items']);
+            // Keep calculated fields but remove nested items for the group create
+            $groupFields = collect($groupData)->except(['items', 'final_price'])->toArray();
             
             // Calculate total pax for this group from items
             $groupNbPersonnes = collect($items)->sum(function($item) {
                 return (
                     ($item['nb_adultes'] ?? 0) + 
-                    ($item['nb_enfants'] ?? 0) + 
-                    ($item['nb_bebes'] ?? 0)
+                    ($item['nb_enfants'] ?? 0)
                 ) * ($item['quantite'] ?? 1);
             });
             
-            $groupData['id_reservation'] = $reservation->id;
-            $groupData['nb_personnes'] = $groupNbPersonnes;
-            $group = \App\Models\ReservationGroup::create($groupData);
+            $groupFields['id_reservation'] = $reservation->id;
+            $groupFields['nb_personnes'] = $groupNbPersonnes;
+            $group = \App\Models\ReservationGroup::create($groupFields);
             
             foreach ($items as $itemData) {
                 $itemData['id_reservation'] = $reservation->id;
@@ -189,7 +234,7 @@ class ReservationController extends Controller
             }
         }
 
-        $reservation->load(['hotel', 'groups.items.type', 'details.type']);
+        $reservation->load(['hotel', 'groups.items.type', 'groups.items.capacity', 'details.type', 'details.capacity']);
 
         // Notify client about the new reservation
         try {
@@ -218,7 +263,7 @@ class ReservationController extends Controller
      */
     public function show(string $id): InertiaResponse|JsonResponse|RedirectResponse
     {
-        $reservation = Reservation::with(['hotel', 'groups.items.type', 'details.type', 'payments'])->find($id);
+        $reservation = Reservation::with(['hotel', 'groups.items.type', 'groups.items.capacity', 'groups.discount', 'details.type', 'details.capacity', 'payments'])->find($id);
 
         if (! $reservation) {
             if (request()->wantsJson() && ! request()->header('X-Inertia')) {
@@ -251,9 +296,10 @@ class ReservationController extends Controller
         }
 
         $validated = $request->validate([
+            'client_type'         => 'sometimes|required|string|in:agence,groupe',
             'nom_agence'          => 'nullable|string|max:255',
             'nom_contact'         => 'sometimes|required|string|max:255',
-            'code_agence'         => 'nullable|string|max:100',
+            'code_agence'         => 'required_if:client_type,agence|nullable|string|max:100',
             'email'               => 'sometimes|required|email|max:255',
             'telephone'           => 'sometimes|required|string|max:30',
             'id_hotel'            => 'sometimes|required|integer|exists:hotels,id',
@@ -270,30 +316,55 @@ class ReservationController extends Controller
             'groups.*.items.*.prix_unitaire' => 'required|numeric|min:0',
             'groups.*.items.*.nb_adultes'    => 'required|integer|min:0',
             'groups.*.items.*.nb_enfants'    => 'nullable|integer|min:0',
-            'groups.*.items.*.nb_bebes'      => 'nullable|integer|min:0',
         ]);
 
         $groups = $validated['groups'] ?? null;
+        $decoratedGroups = [];
 
         if ($groups) {
+            // --- GLOBAL MIN ROOMS VALIDATION ---
+            $totalRoomsSum = collect($groups)->sum(function($g) {
+                return collect($g['items'])->sum('quantite');
+            });
+            $minRoomsSetting = (int) \App\Models\GlobalSetting::get('min_rooms', 1);
+
+            if ($totalRoomsSum < $minRoomsSetting) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Le nombre minimum de chambres requis est de {$minRoomsSetting}.",
+                ], 422);
+            }
+
             // Calculate Global Info
             $globalArrivee = collect($groups)->min('date_arrivee');
             $globalDepart  = collect($groups)->max('date_depart');
             $totalPersonnes = collect($groups)->sum(function ($g) {
                 return collect($g['items'])->sum(function ($item) {
-                    return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
-                          + ($item['nb_bebes'] ?? 0))
+                    return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0))
                           * ($item['quantite'] ?? 1);
                 });
             });
             
-            // Calculate total price using helper
-            $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
+            // Calculate total price using helper server-side
+            $pricingResult = $this->calculateTotalPriceFromGroups(
+                $groups, 
+                (int) ($validated['id_hotel'] ?? $reservation->id_hotel), 
+                $validated['client_type'] ?? $reservation->client_type
+            );
+
+            $prixTotalCalculated = $pricingResult['total_price'];
+            $decoratedGroups     = $pricingResult['groups'];
 
             $validated['date_arrivee'] = $globalArrivee;
             $validated['date_depart']  = $globalDepart;
             $validated['nb_personnes'] = $totalPersonnes;
             $validated['prix_total']   = $prixTotalCalculated;
+        }
+
+        // If client is a group, agency fields must be cleared
+        if (($validated['client_type'] ?? $reservation->client_type) === 'groupe') {
+            $validated['code_agence'] = null;
+            $validated['nom_agence']  = null;
         }
 
         $reservation->update($validated);
@@ -305,23 +376,23 @@ class ReservationController extends Controller
                 $group->delete();
             });
 
-            // Create new Groups and Items
-            foreach ($groups as $groupData) {
+            // Create new Groups and Items using pricing results
+            foreach ($decoratedGroups as $groupData) {
                 $items = $groupData['items'];
-                unset($groupData['items']);
+                // Keep calculated fields but remove nested items and final_price for the group create
+                $groupFields = collect($groupData)->except(['items', 'final_price'])->toArray();
                 
                 // Calculate total pax for this group from items
                 $groupNbPersonnes = collect($items)->sum(function($item) {
                     return (
                         ($item['nb_adultes'] ?? 0) + 
-                        ($item['nb_enfants'] ?? 0) + 
-                            ($item['nb_bebes'] ?? 0)
+                        ($item['nb_enfants'] ?? 0)
                     ) * ($item['quantite'] ?? 1);
                 });
                 
-                $groupData['id_reservation'] = $reservation->id;
-                $groupData['nb_personnes'] = $groupNbPersonnes;
-                $group = \App\Models\ReservationGroup::create($groupData);
+                $groupFields['id_reservation'] = $reservation->id;
+                $groupFields['nb_personnes'] = $groupNbPersonnes;
+                $group = \App\Models\ReservationGroup::create($groupFields);
                 
                 foreach ($items as $itemData) {
                     $itemData['id_reservation'] = $reservation->id;
@@ -331,7 +402,7 @@ class ReservationController extends Controller
             }
         }
 
-        $reservation->load(['hotel', 'groups.items.type', 'details.type']);
+        $reservation->load(['hotel', 'groups.items.type', 'groups.items.capacity', 'details.type', 'details.capacity']);
 
         return response()->json([
             'success' => true,
@@ -566,7 +637,7 @@ class ReservationController extends Controller
         }
 
         // Load necessary relations including available tarifs/types for modification
-        $reservation->load(['hotel.tarifs.type', 'groups.items.type', 'details.type']);
+        $reservation->load(['hotel.tarifs.type', 'hotel.tarifs.capacity', 'groups.items.type', 'groups.items.capacity', 'details.type', 'details.capacity']);
 
         return Inertia::render('Booking/Verify', [
             'reservation' => $reservation->load(['payments' => function($q) {
@@ -732,23 +803,61 @@ class ReservationController extends Controller
             'groups.*.nb_personnes'   => 'nullable|integer|min:0',
             'groups.*.items'                  => 'required|array|min:1',
             'groups.*.items.*.id_type'        => 'required|integer|exists:types,id',
+            'groups.*.items.*.id_capacity'    => 'required|integer|exists:hotel_type_capacities,id',
             'groups.*.items.*.quantite'       => 'required|integer|min:1',
             'groups.*.items.*.prix_unitaire'  => 'required|numeric|min:0',
             'groups.*.items.*.nb_adultes'     => 'required|integer|min:0',
             'groups.*.items.*.nb_enfants'     => 'nullable|integer|min:0',
-            'groups.*.items.*.nb_bebes'       => 'nullable|integer|min:0',
         ]);
+
+        // Custom Occupancy Validation
+        foreach ($validated['groups'] as $gIdx => $group) {
+            foreach ($group['items'] as $iIdx => $item) {
+                $capacity = \App\Models\HotelTypeCapacity::find($item['id_capacity'] ?? null);
+                if ($capacity) {
+                    $totalPax = ($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0);
+                    $maxTotal = $capacity->capacite_totale ?: ($capacity->capacite_adultes + $capacity->capacite_enfants);
+                    
+                    if ($totalPax > $maxTotal) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "La configuration \"{$capacity->label}\" ne peut pas dépasser {$maxTotal} personnes (Adultes + Enfants).",
+                        ], 422);
+                    }
+                }
+            }
+        }
 
         $groups = $validated['groups'];
 
-        // Recalculate price and global info
-        $prixTotalCalculated = $this->calculateTotalPriceFromGroups($groups);
+        // --- GLOBAL MIN ROOMS VALIDATION ---
+        $totalRoomsSum = collect($groups)->sum(function($g) {
+            return collect($g['items'])->sum('quantite');
+        });
+        $minRoomsSetting = (int) \App\Models\GlobalSetting::get('min_rooms', 1);
+
+        if ($totalRoomsSum < $minRoomsSetting) {
+            return response()->json([
+                'success' => false,
+                'message' => "Le nombre minimum de chambres requis est de {$minRoomsSetting}.",
+            ], 422);
+        }
+
+        // Recalculate price and global info using the new helper
+        $pricingResult = $this->calculateTotalPriceFromGroups(
+            $groups, 
+            (int) $reservation->id_hotel, 
+            $reservation->client_type
+        );
+        
+        $prixTotalCalculated = $pricingResult['total_price'];
+        $decoratedGroups     = $pricingResult['groups'];
+
         $globalArrivee = collect($groups)->min('date_arrivee');
         $globalDepart  = collect($groups)->max('date_depart');
         $totalPersonnes = collect($groups)->sum(function ($g) {
             return collect($g['items'])->sum(function ($item) {
-                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0)
-                      + ($item['nb_bebes'] ?? 0))
+                return (($item['nb_adultes'] ?? 0) + ($item['nb_enfants'] ?? 0))
                       * ($item['quantite'] ?? 1);
             });
         });
@@ -763,26 +872,27 @@ class ReservationController extends Controller
         ]);
 
         // Sync groups and items (Delete old ones)
-        $reservation->groups()->delete(); // Cascades to items if DB set up correctly, 
-                                          // but let's be safe as we added nullable FK
-        $reservation->details()->delete();
+        $reservation->groups()->each(function($group) {
+            $group->items()->delete();
+            $group->delete();
+        });
 
-        foreach ($groups as $groupData) {
+        foreach ($decoratedGroups as $groupData) {
             $items = $groupData['items'];
-            unset($groupData['items']);
+            // Remove nested items and final_price for DB insertion
+            $groupFields = collect($groupData)->except(['items', 'final_price'])->toArray();
             
             // Calculate total pax for this group from items
             $groupNbPersonnes = collect($items)->sum(function($item) {
                 return (
                     ($item['nb_adultes'] ?? 0) + 
-                    ($item['nb_enfants'] ?? 0) + 
-                    ($item['nb_bebes'] ?? 0)
+                    ($item['nb_enfants'] ?? 0)
                 ) * ($item['quantite'] ?? 1);
             });
             
-            $groupData['id_reservation'] = $reservation->id;
-            $groupData['nb_personnes'] = $groupNbPersonnes;
-            $group = \App\Models\ReservationGroup::create($groupData);
+            $groupFields['id_reservation'] = $reservation->id;
+            $groupFields['nb_personnes'] = $groupNbPersonnes;
+            $group = \App\Models\ReservationGroup::create($groupFields);
             
             foreach ($items as $itemData) {
                 $itemData['id_reservation'] = $reservation->id;
@@ -807,18 +917,96 @@ class ReservationController extends Controller
     }
 
     /**
-     * Helper to calculate total price from nested groups.
+     * Helper to calculate total price from nested groups, applying best discount per group.
      */
-    private function calculateTotalPriceFromGroups(array $groups): float
+    private function calculateTotalPriceFromGroups(array $groups, int $hotelId, string $clientType): array
     {
-        $total = 0;
-        foreach ($groups as $group) {
-            $nights = $this->calculateNights($group['date_arrivee'], $group['date_depart']);
-            foreach ($group['items'] as $item) {
-                $total += (float) ($item['quantite'] * $item['prix_unitaire'] * $nights);
-            }
+        $grandTotal = 0;
+        $decoratedGroups = [];
+
+        // Fetch hotel-specific percentages
+        $hotel = \App\Models\Hotel::find($hotelId);
+        if ($clientType === 'groupe') {
+            $percentage = (float) ($hotel->group_price_percentage ?? 120);
+        } else {
+            $percentage = (float) ($hotel->agency_price_percentage ?? 100);
         }
-        return (float) $total;
+
+        // Fetch active discounts for this specific hotel
+        $allDiscounts = \App\Models\Discount::where('id_hotel', $hotelId)
+            ->where('is_active', true)
+            ->get();
+
+        foreach ($groups as $group) {
+            $nights  = $this->calculateNights($group['date_arrivee'], $group['date_depart']);
+            $checkIn = $group['date_arrivee'];
+            $totalRooms = collect($group['items'])->sum('quantite');
+
+            $groupOriginalPrice = 0;
+
+            foreach ($group['items'] as $item) {
+                $tarif = \App\Models\Tarif::where('id_hotel', $hotelId)
+                    ->where('id_capacity', $item['id_capacity'])
+                    ->whereDate('date_debut', '<=', $checkIn)
+                    ->whereDate('date_fin', '>=', $checkIn)
+                    ->first();
+
+                $rawPrix   = $tarif ? (float) $tarif->prix : 0;
+                $finalPrix = round(($rawPrix * $percentage) / 100, 2);
+
+                $groupOriginalPrice += (float) ($item['quantite'] * $finalPrix * $nights);
+            }
+
+            // --- Find BEST discount for this group ---
+            $bestDiscountId = null;
+            $bestDiscountAmount = 0;
+
+            foreach ($allDiscounts as $discount) {
+                $applies = false;
+                if ($discount->condition_type === 'min_nights' && $nights >= $discount->condition_value) {
+                    $applies = true;
+                } elseif ($discount->condition_type === 'min_rooms' && $totalRooms >= $discount->condition_value) {
+                    $applies = true;
+                }
+
+                if ($applies) {
+                    $amount = 0;
+                    if ($discount->type === 'percentage') {
+                        $amount = ($groupOriginalPrice * $discount->value) / 100;
+                    } else {
+                        $amount = $discount->value;
+                    }
+
+                    if ($amount > $bestDiscountAmount) {
+                        $bestDiscountAmount = $amount;
+                        $bestDiscountId = $discount->id;
+                    }
+                }
+            }
+
+            $groupFinalPrice = round($groupOriginalPrice - $bestDiscountAmount, 2);
+            $grandTotal += $groupFinalPrice;
+
+            // Decorate group with calculation results
+            $group['original_price']  = $groupOriginalPrice;
+            $group['discount_amount'] = $bestDiscountAmount;
+            $group['discount_id']     = $bestDiscountId;
+            $group['final_price']     = $groupFinalPrice;
+
+            $decoratedGroups[] = $group;
+        }
+
+        $taxAmount = 0;
+        if ((float) $hotel->tax_percentage > 0) {
+            $taxAmount = ($grandTotal * (float) $hotel->tax_percentage) / 100;
+        }
+
+        return [
+            'total_price'  => (float) round($grandTotal + $taxAmount, 2),
+            'tax_amount'   => (float) round($taxAmount, 2),
+            'net_price'    => (float) round($grandTotal, 2),
+            'groups'       => $decoratedGroups,
+        ];
     }
 
     /**

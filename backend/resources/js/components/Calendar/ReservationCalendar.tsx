@@ -10,7 +10,6 @@ import {
     format,
     isSameMonth,
     isToday,
-    parseISO,
     addWeeks,
     subWeeks,
     startOfYear,
@@ -19,26 +18,12 @@ import {
     isSameDay,
 } from "date-fns";
 import { fr } from "date-fns/locale";
-import {
-    ChevronLeft,
-    ChevronRight,
-    Users,
-    Hotel,
-    Calendar as CalendarIcon,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Reservation } from "@/types/reservations";
+import { RESERVATION_STATUS_COLORS } from "@/constants/reservation-status";
 
 // --- Types ---
-
-interface Reservation {
-    id: number;
-    code_reference: string;
-    nom_contact: string;
-    date_arrivee: string;
-    date_depart: string;
-    statut: string;
-    hotel?: { name: string };
-}
 
 interface ReservationCalendarProps {
     reservations: Reservation[];
@@ -47,55 +32,35 @@ interface ReservationCalendarProps {
     isLoading?: boolean;
 }
 
-const STATUS_COLORS: Record<
-    string,
-    { bg: string; text: string; border: string; dot: string }
-> = {
-    en_attente: {
-        bg: "bg-amber-50",
-        text: "text-amber-700",
-        border: "border-amber-200",
-        dot: "bg-amber-400",
-    },
-    en_verification: {
-        bg: "bg-blue-50",
-        text: "text-blue-700",
-        border: "border-blue-200",
-        dot: "bg-blue-400",
-    },
-    valide: {
-        bg: "bg-indigo-50",
-        text: "text-indigo-700",
-        border: "border-indigo-200",
-        dot: "bg-indigo-400",
-    },
-    en_attente_paiement: {
-        bg: "bg-violet-50",
-        text: "text-violet-700",
-        border: "border-violet-200",
-        dot: "bg-violet-400",
-    },
-    paye_partiellement: {
-        bg: "bg-cyan-50",
-        text: "text-cyan-700",
-        border: "border-cyan-200",
-        dot: "bg-cyan-400",
-    },
-    confirme: {
-        bg: "bg-emerald-50",
-        text: "text-emerald-700",
-        border: "border-emerald-200",
-        dot: "bg-emerald-400",
-    },
-    annule: {
-        bg: "bg-red-50",
-        text: "text-red-700",
-        border: "border-red-200",
-        dot: "bg-red-400",
-    },
+const STATUS_COLORS = RESERVATION_STATUS_COLORS;
+
+const CHECKIN_STYLE = {
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+    border: "border-emerald-300",
+    dot: "bg-emerald-500",
+};
+const CHECKOUT_STYLE = {
+    bg: "bg-rose-100",
+    text: "text-rose-800",
+    border: "border-rose-300",
+    dot: "bg-rose-500",
 };
 
-export function ReservationCalendar({
+const MAX_EVENTS_IN_MONTH_CELL = 4;
+
+function parseLocalDate(dateInput: string): Date {
+    const datePart = (dateInput || "").split("T")[0];
+    const [year, month, day] = datePart.split("-").map(Number);
+    if (!year || !month || !day) return new Date(dateInput);
+    return new Date(year, month - 1, day);
+}
+
+function dayKey(date: Date): string {
+    return format(date, "yyyy-MM-dd");
+}
+
+export default function ReservationCalendar({
     reservations,
     onReservationClick,
     onMonthChange,
@@ -103,6 +68,32 @@ export function ReservationCalendar({
 }: ReservationCalendarProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<"week" | "month" | "year">("month");
+    const [viewMode, setViewMode] = useState<"checkin" | "checkout">(
+        "checkin",
+    );
+    const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
+
+    const VIEW_MODE_OPTIONS: Array<{
+        value: "checkin" | "checkout";
+        label: string;
+        description: string;
+    }> = [
+        // Removed Stay mode
+        {
+            value: "checkin",
+            label: "Check-in",
+            description: "Arrivees du jour",
+        },
+        {
+            value: "checkout",
+            label: "Check-out",
+            description: "Departs du jour",
+        },
+    ];
+
+    const currentMode =
+        VIEW_MODE_OPTIONS.find((option) => option.value === viewMode) ??
+        VIEW_MODE_OPTIONS[0];
 
     const handleMonthChange = (newDate: Date) => {
         setCurrentDate(newDate);
@@ -123,17 +114,42 @@ export function ReservationCalendar({
 
     const today = () => handleMonthChange(new Date());
 
-    const getReservationsForDay = useCallback(
-        (day: Date) => {
-            return reservations.filter((r) => {
-                const start = parseISO(r.date_arrivee);
-                start.setHours(0, 0, 0, 0);
-                const end = parseISO(r.date_depart);
-                end.setHours(23, 59, 59, 999);
-                return day >= start && day <= end;
+    const reservationsByDay = useMemo(() => {
+        const grouped = new Map<string, Reservation[]>();
+        const push = (key: string, reservation: Reservation) => {
+            const existing = grouped.get(key);
+            if (existing) {
+                if (!existing.find(r => r.id === reservation.id)) {
+                    existing.push(reservation);
+                }
+            } else {
+                grouped.set(key, [reservation]);
+            }
+        };
+
+        reservations.forEach((reservation) => {
+            const groups = reservation.groups && reservation.groups.length > 0 
+                ? reservation.groups 
+                : [{ date_arrivee: reservation.date_arrivee, date_depart: reservation.date_depart } as any];
+
+            groups.forEach(group => {
+                const checkIn = parseLocalDate(group.date_arrivee);
+                const checkOut = parseLocalDate(group.date_depart);
+
+                if (viewMode === "checkin") {
+                    push(dayKey(checkIn), reservation);
+                } else if (viewMode === "checkout") {
+                    push(dayKey(checkOut), reservation);
+                }
             });
-        },
-        [reservations],
+        });
+
+        return grouped;
+    }, [reservations, viewMode]);
+
+    const getReservationsForDay = useCallback(
+        (day: Date) => reservationsByDay.get(dayKey(day)) ?? [],
+        [reservationsByDay],
     );
 
     const renderHeader = () => {
@@ -150,11 +166,15 @@ export function ReservationCalendar({
 
         return (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pt-2">
-                <div className="flex items-center gap-4">
-                    <h3 className="text-xl font-bold text-slate-900 capitalize tracking-tight min-w-[180px]">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                    <h3 className="text-xl font-bold text-slate-900 capitalize tracking-tight min-w-[150px]">
                         {title}
                     </h3>
-                    <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+                    <div
+                        className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner"
+                        role="tablist"
+                        aria-label="Periode d affichage"
+                    >
                         {(["week", "month", "year"] as const).map((v) => (
                             <button
                                 key={v}
@@ -165,6 +185,8 @@ export function ReservationCalendar({
                                         ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
                                         : "text-slate-500 hover:text-slate-800",
                                 )}
+                                role="tab"
+                                aria-selected={view === v}
                             >
                                 {v === "week"
                                     ? "Semaine"
@@ -173,6 +195,56 @@ export function ReservationCalendar({
                                       : "Année"}
                             </button>
                         ))}
+                    </div>
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setIsModeMenuOpen((open) => !open)}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                            aria-label="Changer le mode d affichage"
+                            aria-expanded={isModeMenuOpen}
+                            aria-haspopup="menu"
+                        >
+                            <span className="text-slate-400">Mode:</span>
+                            <span>{currentMode.label}</span>
+                            <ChevronDown
+                                className={cn(
+                                    "w-3.5 h-3.5 text-slate-400 transition-transform",
+                                    isModeMenuOpen && "rotate-180",
+                                )}
+                            />
+                        </button>
+                        {isModeMenuOpen && (
+                            <div
+                                className="absolute z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-xl p-1"
+                                role="menu"
+                            >
+                                {VIEW_MODE_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => {
+                                            setViewMode(option.value);
+                                            setIsModeMenuOpen(false);
+                                        }}
+                                        className={cn(
+                                            "w-full text-left px-3 py-2 rounded-lg transition-colors",
+                                            option.value === viewMode
+                                                ? "bg-amber-50 text-amber-700"
+                                                : "text-slate-700 hover:bg-slate-50",
+                                        )}
+                                        role="menuitem"
+                                    >
+                                        <div className="text-xs font-semibold">
+                                            {option.label}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500">
+                                            {option.description}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -186,18 +258,21 @@ export function ReservationCalendar({
                         <button
                             onClick={prev}
                             className="p-2.5 hover:bg-slate-50 border-r border-slate-200 transition-colors"
+                            aria-label="Periode precedente"
                         >
                             <ChevronLeft className="w-5 h-5 text-slate-600" />
                         </button>
                         <button
                             onClick={today}
                             className="px-5 py-2 text-[13px] font-bold text-slate-700 hover:bg-slate-50 border-r border-slate-200 transition-colors"
+                            aria-label="Retour a aujourd hui"
                         >
                             Aujourd'hui
                         </button>
                         <button
                             onClick={next}
                             className="p-2.5 hover:bg-slate-50 transition-colors"
+                            aria-label="Periode suivante"
                         >
                             <ChevronRight className="w-5 h-5 text-slate-600" />
                         </button>
@@ -230,7 +305,7 @@ export function ReservationCalendar({
                         className={cn(
                             "inline-flex items-center justify-center w-7 h-7 text-xs font-bold rounded-full transition-transform group-hover:scale-110",
                             isTodayDate
-                                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100 ring-2 ring-indigo-50"
+                                ? "bg-amber-600 text-white shadow-lg shadow-amber-100 ring-2 ring-amber-50"
                                 : isCurrent
                                   ? "text-slate-800"
                                   : "text-slate-400",
@@ -240,54 +315,73 @@ export function ReservationCalendar({
                     </span>
                     {reservationsForDay.length > 0 && (
                         <span className="text-[10px] font-black text-slate-300 group-hover:text-amber-500 transition-colors">
-                            {reservationsForDay.length}{" "}
-                            {reservationsForDay.length > 1 ? "RES" : "RES"}
+                            {reservationsForDay.length} RES
                         </span>
                     )}
                 </div>
 
                 <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-0.5">
-                    {reservationsForDay.map((r) => {
-                        const isStart = isSameDay(
-                            day,
-                            parseISO(r.date_arrivee),
-                        );
-                        const isEnd = isSameDay(day, parseISO(r.date_depart));
+                    {(isWeekView
+                        ? reservationsForDay
+                        : reservationsForDay.slice(0, MAX_EVENTS_IN_MONTH_CELL)
+                    ).map((r) => {
+                        const matchesGroupStart = r.groups?.some(g => isSameDay(day, parseLocalDate(g.date_arrivee)));
+                        const matchesGroupEnd = r.groups?.some(g => isSameDay(day, parseLocalDate(g.date_depart)));
+                        
+                        const isStart = matchesGroupStart ?? isSameDay(day, parseLocalDate(r.date_arrivee));
+                        const isEnd = matchesGroupEnd ?? isSameDay(day, parseLocalDate(r.date_depart));
                         const statusStyle =
                             STATUS_COLORS[r.statut] || STATUS_COLORS.en_attente;
+                        const activeStyle = statusStyle;
 
                         return (
                             <div
                                 key={`${r.id}-${day.toISOString()}`}
                                 onClick={() => onReservationClick(r)}
                                 className={cn(
-                                    "px-2 py-1 rounded-md text-[10px] font-bold truncate cursor-pointer transition-all hover:scale-[1.02] active:scale-95 border",
-                                    statusStyle.bg,
-                                    statusStyle.text,
-                                    statusStyle.border,
-                                    isStart ? "rounded-l-lg border-l-4" : "",
-                                    isEnd ? "rounded-r-lg border-r-4" : "",
-                                    !isStart && !isEnd
-                                        ? "rounded-none opacity-90 border-x-0"
-                                        : "",
+                                    "px-2 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer transition-all hover:-translate-y-[1px] active:translate-y-0 border flex items-start gap-2",
+                                    activeStyle.bg,
+                                    activeStyle.text,
+                                    activeStyle.border,
+                                    "border-l-4",
                                 )}
                                 title={`${r.code_reference} - ${r.nom_contact}`}
                             >
-                                <div className="flex items-center gap-1.5">
-                                    <div
-                                        className={cn(
-                                            "w-1.5 h-1.5 rounded-full",
-                                            statusStyle.dot,
+                                <div
+                                    className={cn(
+                                        "mt-1 w-1.5 h-1.5 rounded-full shrink-0",
+                                        activeStyle.dot,
+                                    )}
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate text-[10px] font-bold tracking-wide">
+                                            {r.code_reference}
+                                        </span>
+                                        {/* Show Arrivee/Depart tag for checkins/checkouts if appropriate */}
+                                        {(isStart || isEnd) && (
+                                            <span className="text-[9px] font-bold uppercase text-slate-500">
+                                                {isStart ? "Arrivee" : "Depart"}
+                                            </span>
                                         )}
-                                    />
-                                    <span className="truncate">
-                                        {r.code_reference.split("-")[1]}{" "}
+                                    </div>
+                                    <div className="truncate text-[10px] text-slate-600 font-medium">
                                         {r.nom_contact}
-                                    </span>
+                                    </div>
                                 </div>
                             </div>
                         );
                     })}
+                    {!isWeekView &&
+                        reservationsForDay.length >
+                            MAX_EVENTS_IN_MONTH_CELL && (
+                            <div className="text-left text-[10px] font-semibold text-amber-600 px-1 py-0.5">
+                                +
+                                {reservationsForDay.length -
+                                    MAX_EVENTS_IN_MONTH_CELL}{" "}
+                                more
+                            </div>
+                        )}
                 </div>
             </div>
         );
@@ -399,7 +493,7 @@ export function ReservationCalendar({
                                                     ? "text-transparent"
                                                     : "text-slate-600",
                                                 isTodayDate && isCurrentMonth
-                                                    ? "bg-indigo-600 text-white shadow-md ring-2 ring-indigo-50"
+                                                    ? "bg-amber-600 text-white shadow-md ring-2 ring-amber-50"
                                                     : "",
                                                 hasReservations &&
                                                     isCurrentMonth &&
@@ -436,6 +530,10 @@ export function ReservationCalendar({
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mr-2">
                     Légende :
                 </span>
+                <div className="flex items-center gap-2 text-xs text-slate-500 mr-3">
+                    <span className="font-semibold">Mode:</span>
+                    <span>Check-in / Check-out</span>
+                </div>
                 {Object.entries(STATUS_COLORS).map(([status, style]) => (
                     <div key={status} className="flex items-center gap-2">
                         <div

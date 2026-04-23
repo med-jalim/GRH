@@ -24,6 +24,14 @@ export interface Type {
     nom: string;
 }
 
+export interface Capacity {
+    id: number;
+    label: string;
+    capacite_adultes: number;
+    capacite_enfants: number;
+    capacite_totale: number;
+}
+
 export interface ItemReservation {
     id: number;
     id_type: number;
@@ -32,8 +40,8 @@ export interface ItemReservation {
     prix_unitaire: number;
     nb_adultes: number;
     nb_enfants: number;
-    nb_bebes: number;
     type: Type | null;
+    capacity: Capacity | null;
 }
 
 export interface ReservationGroup {
@@ -42,6 +50,10 @@ export interface ReservationGroup {
     date_depart: string;
     nb_personnes: number;
     nights: number;
+    original_price: number;
+    discount_amount: number;
+    discount_id: number | null;
+    discount: { id: number; name: string; type: string; value: number } | null;
     items: ItemReservation[];
 }
 
@@ -61,6 +73,7 @@ export interface Payment {
 export interface Reservation {
     id: number;
     code_reference: string;
+    client_type: "agence" | "groupe";
     nom_agence: string | null;
     code_agence: string | null;
     nom_contact: string;

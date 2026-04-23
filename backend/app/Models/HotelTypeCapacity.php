@@ -10,14 +10,17 @@ class HotelTypeCapacity extends Model
     protected $fillable = [
         'id_hotel',
         'id_type',
+        'label',
         'capacite_adultes',
         'capacite_enfants',
+        'capacite_totale',
     ];
 
     protected $casts = [
         'capacite_adultes' => 'integer',
         'capacite_enfants' => 'integer',
         'capacite_bebes'   => 'integer',
+        'capacite_totale'  => 'integer',
     ];
 
     public function hotel(): BelongsTo
@@ -30,12 +33,10 @@ class HotelTypeCapacity extends Model
         return $this->belongsTo(Type::class, 'id_type');
     }
 
-    /**
-     * Total capacity for this room type in this hotel.
-     */
-    public function getCapaciteTotaleAttribute(): int
+    public function tarifs(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->capacite_adultes + $this->capacite_enfants
-             + $this->capacite_bebes;
+        return $this->hasMany(Tarif::class, 'id_capacity');
     }
+
+
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Hotel extends Model
 {
-    protected $fillable = ['name', 'stars', 'ville', 'description', 'telephone', 'email', 'adresse', 'rib', 'main_type_id'];
+    protected $fillable = ['name', 'stars', 'ville', 'description', 'telephone', 'email', 'adresse', 'rib', 'main_type_id', 'agency_price_percentage', 'group_price_percentage', 'tax_percentage'];
 
     public function mainType(): BelongsTo
     {
@@ -38,5 +38,10 @@ class Hotel extends Model
     public function typeCapacities(): HasMany
     {
         return $this->hasMany(HotelTypeCapacity::class, 'id_hotel');
+    }
+
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(Discount::class, 'id_hotel');
     }
 }

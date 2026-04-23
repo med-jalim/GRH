@@ -120,6 +120,22 @@ export function BookingSuccessPage({ reference, formData, hotel, totalPrice, nig
                   </div>
 
                   <Separator />
+                  {hotel && hotel.tax_percentage && hotel.tax_percentage > 0 && (
+                    <>
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-500">Sous-total (Net)</span>
+                        <span className="text-sm font-medium text-slate-700">
+                          {formatPrice(totalPrice / (1 + hotel.tax_percentage / 100))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-sm text-slate-500">Taxes ({hotel.tax_percentage}%)</span>
+                        <span className="text-sm font-medium text-emerald-600">
+                          +{formatPrice(totalPrice - (totalPrice / (1 + hotel.tax_percentage / 100)))}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex justify-between py-1 items-center">
                     <span className="text-sm font-semibold text-slate-600">Total estimé</span>
                     <span className="text-xl font-black text-amber-600">{formatPrice(totalPrice)}</span>

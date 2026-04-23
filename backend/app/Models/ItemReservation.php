@@ -14,11 +14,11 @@ class ItemReservation extends Model
         'id_reservation',
         'id_group',
         'id_type',
+        'id_capacity',
         'quantite',
         'prix_unitaire',
         'nb_adultes',
         'nb_enfants',
-        'nb_bebes',
     ];
 
     public function getPrixTotalAttribute(): float
@@ -40,5 +40,10 @@ class ItemReservation extends Model
     public function type(): BelongsTo
     {
         return $this->belongsTo(Type::class, 'id_type');
+    }
+
+    public function capacity(): BelongsTo
+    {
+        return $this->belongsTo(HotelTypeCapacity::class, 'id_capacity');
     }
 }

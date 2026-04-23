@@ -9,10 +9,14 @@ import { PriceSummary } from "./PriceSummary";
 
 interface Props {
     hotels:          Hotel[];
+    activeHotel?:    any; // Hotel with adjusted tarifs
+    types:           any[];
     onTotalChange:   (total: number, nights: number) => void;
+    discounts:       any[];
+    settings:        { min_rooms: number };
 }
 
-export function ReservationDetailsStep({ hotels, onTotalChange }: Props) {
+export function ReservationDetailsStep({ hotels, activeHotel, types, onTotalChange, discounts, settings }: Props) {
     const {
         register,
         setValue,
@@ -31,6 +35,14 @@ export function ReservationDetailsStep({ hotels, onTotalChange }: Props) {
 
     const watchedGroups = useWatch({ control, name: "groups" }) || [];
     const watchedHotelId = useWatch({ control, name: "hotelId" });
+
+    const totalRoomsCount = useMemo(() => {
+        return watchedGroups.reduce((acc, group) => {
+            return acc + (group.items?.reduce((iAcc, item) => iAcc + (Number(item.quantite) || 0), 0) || 0);
+        }, 0);
+    }, [watchedGroups]);
+
+    const isMinRoomsViolated = totalRoomsCount < settings.min_rooms;
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -135,7 +147,8 @@ export function ReservationDetailsStep({ hotels, onTotalChange }: Props) {
                             <GroupBlock
                                 key={groupField.id}
                                 groupIndex={groupIndex}
-                                hotel={selectedHotel}
+                                hotel={activeHotel}
+                                types={types}
                                 onRemove={() => removeGroup(groupIndex)}
                                 isRemovable={groups.length > 1}
                             />
@@ -175,10 +188,23 @@ export function ReservationDetailsStep({ hotels, onTotalChange }: Props) {
                             voyageurs
                         </button>
 
+                        {isMinRoomsViolated && totalRoomsCount > 0 && (
+                            <div className="p-4 bg-rose-50 border-2 border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-pulse">
+                                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <p className="text-xs font-bold">
+                                    Attention: Un minimum de {settings.min_rooms} chambres est requis pour valider votre réservation (Actuel: {totalRoomsCount}).
+                                </p>
+                            </div>
+                        )}
+
                         <PriceSummary
                             groups={watchedGroups}
-                            hotel={selectedHotel}
+                            hotel={activeHotel}
+                            types={types}
                             onTotalChange={onTotalChange}
+                            discounts={discounts}
                         />
                     </div>
                 )}
@@ -191,11 +217,13 @@ export function ReservationDetailsStep({ hotels, onTotalChange }: Props) {
 function GroupBlock({
     groupIndex,
     hotel,
+    types,
     onRemove,
     isRemovable,
 }: {
     groupIndex: number;
     hotel: Hotel;
+    types: any[];
     onRemove: () => void;
     isRemovable: boolean;
 }) {
@@ -236,25 +264,41 @@ function GroupBlock({
               )
             : 0;
 
-    const availableTypes = useMemo(() => {
-        if (!hotel.tarifs || !groupData.date_arrivee) return [];
+    const availableConfigurations = useMemo(() => {
+        if (!hotel.tarifs || !groupData.date_arrivee || !hotel.type_capacities) return [];
 
-        // Get all types available for the selected check-in date
-        const typesForDate = hotel.tarifs
-            .filter(
-                (t) =>
-                    new Date(t.date_debut) <= checkInDate! &&
-                    new Date(t.date_fin) >= checkInDate!,
-            )
-            .map((t) => ({
-                type: hotel.chambres?.find((c) => c.id_type === t.id_type)
-                    ?.type,
-                price: t.prix,
-            }))
-            .filter((t) => t.type) as { type: any; price: number }[];
+        const checkInStr = groupData.date_arrivee; // Use the raw YYYY-MM-DD string
 
-        return typesForDate;
-    }, [hotel, checkInDate]);
+        // Get configurations that have a price for this date
+        const configsWithPrice = hotel.type_capacities.map(cap => {
+            const tarif = hotel.tarifs.find(t => {
+                // Better date comparison: subset string match YYYY-MM-DD
+                const tarifStartStr = t.date_debut.substring(0, 10);
+                const tarifEndStr   = t.date_fin.substring(0, 10);
+                
+                return t.id_capacity === cap.id && 
+                       checkInStr >= tarifStartStr && 
+                       checkInStr <= tarifEndStr;
+            });
+
+            if (!tarif) return null;
+            
+            let finalPrice = Number(tarif.prix);
+
+            // Find type metadata from the passed 'types' prop
+            const type = types.find(t => t.id === cap.id_type);
+            if (!type) return null;
+
+            return {
+                type,
+                capacity: cap,
+                price: finalPrice
+            };
+        }).filter(Boolean) as { type: any; capacity: any; price: number }[];
+        console.log('hoteel', hotel);
+
+        return configsWithPrice;
+    }, [hotel, groupData.date_arrivee, types]);
 
     return (
         <div className="relative p-8 bg-white border border-slate-200 rounded-[2.5rem] shadow-sm hover:shadow-md transition-shadow group-block">
@@ -336,17 +380,18 @@ function GroupBlock({
                 <div className="space-y-3">
                     {roomFields.map((field, roomIdx) => {
                         const currentItem = groupData.items?.[roomIdx] || field;
-                        const currentTypeId = currentItem.id_type;
-                        const rowAvailableOptions = availableTypes.filter(
+                        const currentCapacityId = currentItem.id_capacity;
+                        
+                        const rowAvailableOptions = availableConfigurations.filter(
                             (opt) =>
-                                opt.type.id === currentTypeId ||
+                                opt.capacity.id === currentCapacityId ||
                                 !(groupData.items || []).some(
-                                    (item: any) => item.id_type === opt.type.id
+                                    (item: any) => item.id_capacity === opt.capacity.id
                                 )
                         );
 
                         const typeCapacity = hotel.type_capacities?.find(
-                            (tc) => tc.id_type === currentTypeId
+                            (tc) => tc.id === currentCapacityId
                         );
 
                         return (
@@ -357,10 +402,10 @@ function GroupBlock({
                                 nights={nights}
                                 availableOptions={rowAvailableOptions}
                                 typeCapacity={typeCapacity}
-                                onChange={(uid, fieldName, val) => {
+                                onChange={(uid, updates) => {
                                     updateRoom(roomIdx, {
                                         ...currentItem,
-                                        [fieldName]: val,
+                                        ...updates,
                                     });
                                 }}
                                 onRemove={() => removeRoom(roomIdx)}
@@ -369,10 +414,10 @@ function GroupBlock({
                     })}
 
                     {(() => {
-                        const unassignedTypes = availableTypes.filter(
+                        const unassignedConfigs = availableConfigurations.filter(
                             (opt) =>
                                 !(groupData.items || []).some(
-                                    (item: any) => item.id_type === opt.type.id
+                                    (item: any) => item.id_capacity === opt.capacity.id
                                 )
                         );
 
@@ -381,17 +426,19 @@ function GroupBlock({
                                 type="button"
                                 disabled={
                                     !groupData.date_arrivee ||
-                                    unassignedTypes.length === 0
+                                    unassignedConfigs.length === 0
                                 }
                                 onClick={() => {
-                                    if (unassignedTypes.length > 0) {
+                                    if (unassignedConfigs.length > 0) {
+                                        const firstUnassigned = unassignedConfigs[0];
                                         appendRoom({
                                             uid: crypto.randomUUID(),
-                                            id_type: unassignedTypes[0].type.id,
+                                            id_type: firstUnassigned.type.id,
+                                            id_capacity: firstUnassigned.capacity.id,
                                             quantite: 1,
-                                            nb_adultes: 1,
-                                            nb_enfants: 0,
-                                            nb_bebes: 0,
+                                            nb_adultes: firstUnassigned.capacity.capacite_adultes,
+                                            nb_enfants: firstUnassigned.capacity.capacite_enfants,
+                                            nb_bebes: firstUnassigned.capacity.capacite_bebes,
                                         });
                                     }
                                 }}
@@ -399,10 +446,10 @@ function GroupBlock({
                             >
                                 {!groupData.date_arrivee
                                     ? "Sélectionnez une date pour ajouter des chambres"
-                                    : unassignedTypes.length === 0 &&
+                                    : unassignedConfigs.length === 0 &&
                                         (groupData.items || []).length > 0
-                                      ? "Toutes les chambres disponibles sont déjà ajoutées"
-                                      : "+ Ajouter une chambre pour ce groupe"}
+                                      ? "Toutes les configurations disponibles sont déjà ajoutées"
+                                      : "+ Ajouter une configuration pour ce groupe"}
                             </button>
                         );
                     })()}

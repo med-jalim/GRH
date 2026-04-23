@@ -12,8 +12,19 @@ class ReservationGroup extends Model
         'id_reservation',
         'date_arrivee',
         'date_depart',
-        'nb_personnes'
+        'nb_personnes',
+        'original_price',
+        'discount_amount',
+        'discount_id',
     ];
+
+    /**
+     * Get the discount applied to this group.
+     */
+    public function discount(): BelongsTo
+    {
+        return $this->belongsTo(Discount::class, 'discount_id');
+    }
 
     /**
      * Get the reservation that owns the group.

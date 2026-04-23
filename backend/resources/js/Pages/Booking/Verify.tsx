@@ -27,24 +27,34 @@ import {
     Plus,
     Trash2,
     MoveRight,
+    ChevronDown,
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import axios from "axios";
 
+interface Capacity {
+    id: number;
+    label: string;
+    capacite_adultes: number;
+    capacite_enfants: number;
+    capacite_totale: number;
+}
+
 interface ItemReservation {
     id?: number;
     id_type: number;
+    id_capacity?: number;
     quantite: number;
     prix_unitaire: number;
     nb_adultes: number;
     nb_enfants: number;
-    nb_bebes: number;
     nom?: string;
     type?: {
         id: number;
         nom: string;
     };
+    capacity?: Capacity;
 }
 
 interface ReservationGroup {
@@ -58,6 +68,7 @@ interface ReservationGroup {
 interface Tarif {
     id: number;
     id_type: number;
+    id_capacity?: number;
     prix: number;
     date_debut: string;
     date_fin: string;
@@ -65,6 +76,7 @@ interface Tarif {
         id: number;
         nom: string;
     };
+    capacity?: Capacity;
 }
 
 interface Payment {
@@ -524,7 +536,8 @@ export default function Verify({
     const [isEditing, setIsEditing] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [showAddRoom, setShowAddRoom] = useState(false);
+    const [showAddRoom, setShowAddRoom] = useState<number | null>(null);
+    const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
     // Ensure dates are string YYYY-MM-DD for input[type="date"]
     const formatDateForInput = (dateStr: string) => {
@@ -540,12 +553,14 @@ export default function Verify({
             nb_personnes: g.nb_personnes,
             items: g.items.map((i) => ({
                 id_type: i.id_type,
+                id_capacity: i.id_capacity,
                 quantite: i.quantite,
                 prix_unitaire: i.prix_unitaire,
                 nb_adultes: i.nb_adultes || 2,
                 nb_enfants: i.nb_enfants || 0,
-                nb_bebes: i.nb_bebes || 0,
                 nom: i.nom || i.type?.nom || "Inconnu",
+                type: i.type,
+                capacity: i.capacity
             })),
         })),
     });
@@ -617,7 +632,7 @@ export default function Verify({
         
         // Recalculate total persons for this group
         newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
-            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+            return total + (i.nb_adultes + i.nb_enfants) * i.quantite;
         }, 0);
         
         setData("groups", newGroups);
@@ -629,14 +644,22 @@ export default function Verify({
         setData("groups", newGroups);
     };
 
-    const updateGroupItemOccupant = (groupIndex: number, itemIndex: number, field: string, value: number) => {
+    const updateGroupItemOccupant = (groupIndex: number, itemIndex: number, field: 'nb_adultes' | 'nb_enfants', value: number) => {
         const newGroups = [...data.groups];
-        const item = newGroups[groupIndex].items[itemIndex] as any;
+        const item = newGroups[groupIndex].items[itemIndex];
+        
+        // Capacity check
+        if (item.capacity && (field === 'nb_adultes' || field === 'nb_enfants')) {
+            const currentTotalPax = (field === 'nb_adultes' ? value : item.nb_adultes) + (field === 'nb_enfants' ? value : item.nb_enfants);
+            const maxTotal = item.capacity.capacite_totale || (item.capacity.capacite_adultes + item.capacity.capacite_enfants);
+            if (currentTotalPax > maxTotal) return;
+        }
+
         item[field] = Math.max(0, value);
         
         // Recalculate total persons for this group
         newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
-            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+            return total + (i.nb_adultes + i.nb_enfants) * i.quantite;
         }, 0);
         
         setData("groups", newGroups);
@@ -645,25 +668,27 @@ export default function Verify({
     const addGroupItem = (groupIndex: number, tarif: Tarif) => {
         const newGroups = [...data.groups];
         const group = newGroups[groupIndex];
-        const exists = group.items.find(i => i.id_type === tarif.id_type);
+        const exists = group.items.find(i => i.id_type === tarif.id_type && i.id_capacity === tarif.id_capacity);
 
         if (exists) {
             exists.quantite += 1;
         } else {
             group.items.push({
                 id_type: tarif.id_type,
+                id_capacity: tarif.id_capacity,
                 quantite: 1,
                 prix_unitaire: tarif.prix,
-                nb_adultes: 2, // Default to 2 adults as a reasonable starting point
+                nb_adultes: tarif.capacity?.capacite_adultes || 2,
                 nb_enfants: 0,
-                nb_bebes: 0,
-                nom: tarif.type.nom
+                nom: tarif.type.nom,
+                type: tarif.type,
+                capacity: tarif.capacity
             });
         }
         
         // Recalculate total persons for this group
         newGroups[groupIndex].nb_personnes = newGroups[groupIndex].items.reduce((total, i) => {
-            return total + (i.nb_adultes + i.nb_enfants + i.nb_bebes) * i.quantite;
+            return total + (i.nb_adultes + i.nb_enfants) * i.quantite;
         }, 0);
         
         setData("groups", newGroups);
@@ -811,12 +836,10 @@ export default function Verify({
                                                         const groupItems = isEditing ? group.items : group.items;
                                                         const a = groupItems.reduce((acc, i) => acc + (i.nb_adultes || 0) * i.quantite, 0);
                                                         const e = groupItems.reduce((acc, i) => acc + (i.nb_enfants || 0) * i.quantite, 0);
-                                                        const b = groupItems.reduce((acc, i) => acc + (i.nb_bebes || 0) * i.quantite, 0);
                                                         return (
                                                             <>
                                                                 <span title="Adultes" className="px-2 py-0.5 bg-slate-100 rounded-md text-[10px] font-bold text-slate-600">Ad. {a}</span>
                                                                 {e > 0 && <span title="Enfants" className="px-2 py-0.5 bg-sky-50 rounded-md text-[10px] font-bold text-sky-600">Enf. {e}</span>}
-                                                                {b > 0 && <span title="Bébés" className="px-2 py-0.5 bg-pink-50 rounded-md text-[10px] font-bold text-pink-600">Béb. {b}</span>}
                                                             </>
                                                         );
                                                     })()}
@@ -900,9 +923,16 @@ export default function Verify({
                                                                 <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 shrink-0">
                                                                     <Hotel className="w-4 h-4 text-slate-400" />
                                                                 </div>
-                                                                <span className="font-bold text-slate-900 leading-tight">
-                                                                    {item.nom || item.type?.nom}
-                                                                </span>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-bold text-slate-900 leading-tight">
+                                                                        {item.nom || item.type?.nom}
+                                                                    </span>
+                                                                    {item.capacity && (
+                                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tight">
+                                                                            Conf: {item.capacity.label}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             
                                                             {/* Occupants breakdown */}
@@ -920,18 +950,31 @@ export default function Verify({
                                                                             value={item.nb_enfants} 
                                                                             onChange={(v) => updateGroupItemOccupant(gIdx, iIdx, 'nb_enfants', v)}
                                                                         />
-                                                                        <OccupantStepper 
-                                                                            label="Bébés" 
-                                                                            value={item.nb_bebes} 
-                                                                            onChange={(v) => updateGroupItemOccupant(gIdx, iIdx, 'nb_bebes', v)}
-                                                                        />
                                                                     </div>
                                                                 ) : (
+                                                            <div className="flex flex-col gap-1.5 mt-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span title="Adultes" className="flex items-center gap-1 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded-md font-bold text-slate-600">Ad. {item.nb_adultes}</span>
+                                                                    <span title="Enfants" className="flex items-center gap-1 text-[10px] bg-sky-50 px-1.5 py-0.5 rounded-md font-bold text-sky-600">Enf. {item.nb_enfants}</span>
+                                                                </div>
+                                                                {item.capacity && (
                                                                     <div className="flex items-center gap-2">
-                                                                        <span title="Adultes" className="flex items-center gap-1 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded-md font-bold text-slate-600">Ad. {item.nb_adultes}</span>
-                                                                        <span title="Enfants" className="flex items-center gap-1 text-[10px] bg-sky-50 px-1.5 py-0.5 rounded-md font-bold text-sky-600">Enf. {item.nb_enfants}</span>
-                                                                        <span title="Bébés" className="flex items-center gap-1 text-[10px] bg-pink-50 px-1.5 py-0.5 rounded-md font-bold text-pink-600">Béb. {item.nb_bebes}</span>
+                                                                        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                                            <div 
+                                                                                className={`h-full rounded-full transition-all ${
+                                                                                    (item.nb_adultes + item.nb_enfants) > item.capacity.capacite_totale 
+                                                                                    ? "bg-rose-500 w-full" 
+                                                                                    : "bg-slate-300"
+                                                                                }`}
+                                                                                style={{ width: `${Math.min(100, ((item.nb_adultes + item.nb_enfants) / item.capacity.capacite_totale) * 100)}%` }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className={`text-[9px] font-black ${ (item.nb_adultes + item.nb_enfants) > item.capacity.capacite_totale ? "text-rose-500" : "text-slate-400"}`}>
+                                                                            {item.nb_adultes + item.nb_enfants}/{item.capacity.capacite_totale}
+                                                                        </span>
                                                                     </div>
+                                                                )}
+                                                            </div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -983,32 +1026,72 @@ export default function Verify({
                                                     <td colSpan={5} className="px-8 py-4 bg-slate-50/50">
                                                         <button
                                                             type="button"
-                                                            onClick={() => setShowAddRoom(showAddRoom === gIdx ? null : gIdx)}
+                                                            onClick={() => {
+                                                                setShowAddRoom(showAddRoom === gIdx ? null : gIdx);
+                                                                setSelectedTypeId(null);
+                                                            }}
                                                             className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
                                                         >
                                                             {showAddRoom === gIdx ? "Annuler l'ajout" : "+ Ajouter une chambre à ce groupe"}
                                                         </button>
                                                         {showAddRoom === gIdx && (
-                                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2 animate-in zoom-in-95">
-                                                                {reservation.hotel.tarifs
-                                                                    .filter(t => {
-                                                                        const cin = new Date(group.date_arrivee);
-                                                                        return new Date(t.date_debut) <= cin && new Date(t.date_fin) >= cin;
-                                                                    })
-                                                                    .map(t => (
-                                                                        <button
-                                                                            key={t.id}
-                                                                            onClick={() => {
-                                                                                addGroupItem(gIdx, t);
-                                                                                setShowAddRoom(null);
-                                                                            }}
-                                                                            className="p-3 bg-white border border-slate-100 rounded-xl text-left hover:border-amber-400 transition-all group"
-                                                                        >
-                                                                            <p className="font-bold text-slate-900 text-[11px] group-hover:text-amber-600">{t.type.nom}</p>
-                                                                            <p className="text-[10px] text-slate-400 font-medium">{t.prix.toLocaleString("fr-FR")} MAD / Nuit</p>
-                                                                        </button>
-                                                                    ))
-                                                                }
+                                                            <div className="mt-4 space-y-4 animate-in zoom-in-95">
+                                                                {/* 1. Type Selection */}
+                                                                <div className="relative">
+                                                                    <select
+                                                                        value={selectedTypeId || ""}
+                                                                        onChange={(e) => setSelectedTypeId(e.target.value ? Number(e.target.value) : null)}
+                                                                        className="w-full pl-4 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none appearance-none cursor-pointer"
+                                                                    >
+                                                                        <option value="">-- Sélectionner un type d'hébergement --</option>
+                                                                        {(() => {
+                                                                            const cin = new Date(group.date_arrivee);
+                                                                            const availableTarifs = reservation.hotel.tarifs.filter(t => 
+                                                                                new Date(t.date_debut) <= cin && new Date(t.date_fin) >= cin
+                                                                            );
+                                                                            const uniqueTypes = Array.from(new Map(availableTarifs.map(t => [t.id_type, t.type])).values());
+                                                                            return uniqueTypes.map(type => (
+                                                                                <option key={type.id} value={type.id}>{type.nom}</option>
+                                                                            ));
+                                                                        })()}
+                                                                    </select>
+                                                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                                </div>
+
+                                                                {/* 2. Capacity Selection (shown only when a type is selected) */}
+                                                                {selectedTypeId && (
+                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 animate-in slide-in-from-top-2 duration-300">
+                                                                        {reservation.hotel.tarifs
+                                                                            .filter(t => {
+                                                                                const cin = new Date(group.date_arrivee);
+                                                                                return t.id_type === selectedTypeId && 
+                                                                                       new Date(t.date_debut) <= cin && 
+                                                                                       new Date(t.date_fin) >= cin;
+                                                                            })
+                                                                            .map(t => (
+                                                                                <button
+                                                                                    key={t.id}
+                                                                                    onClick={() => {
+                                                                                        addGroupItem(gIdx, t);
+                                                                                        setShowAddRoom(null);
+                                                                                        setSelectedTypeId(null);
+                                                                                    }}
+                                                                                    className="p-4 bg-white border border-slate-100 rounded-xl text-left hover:border-amber-400 hover:shadow-md transition-all group flex flex-col gap-1"
+                                                                                >
+                                                                                    <div className="flex items-center justify-between">
+                                                                                        <p className="font-black text-slate-900 text-[11px] group-hover:text-amber-600 uppercase tracking-tight">
+                                                                                            {t.capacity?.label || "Standard"}
+                                                                                        </p>
+                                                                                        <p className="text-[10px] font-black text-amber-600">{t.prix.toLocaleString("fr-FR")} MAD</p>
+                                                                                    </div>
+                                                                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                                        {t.type.nom}
+                                                                                    </p>
+                                                                                </button>
+                                                                            ))
+                                                                        }
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </td>
@@ -1156,7 +1239,7 @@ export default function Verify({
                                         <button
                                             onClick={() => {
                                                 setIsEditing(false);
-                                                setShowAddRoom(false);
+                                                setShowAddRoom(null);
                                             }}
                                             className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-xl text-[10px] uppercase tracking-widest transition-colors"
                                         >

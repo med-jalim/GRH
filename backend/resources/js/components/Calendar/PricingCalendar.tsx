@@ -36,6 +36,7 @@ function formatPrice(n: number) {
 export interface PricingCalendarProps {
     tarifs: any[];
     selectedTypeId: string;
+    selectedCapacityId: string;
     onTarifClick: (t: any) => void;
     onRangeSelect: (start: Date, end: Date) => void;
 }
@@ -43,6 +44,7 @@ export interface PricingCalendarProps {
 export function PricingCalendar({
     tarifs,
     selectedTypeId,
+    selectedCapacityId,
     onTarifClick,
     onRangeSelect,
 }: PricingCalendarProps) {
@@ -72,10 +74,13 @@ export function PricingCalendar({
     const filteredTarifs = useMemo(() => {
         if (!tarifs) return [];
         if (selectedTypeId === "all") return tarifs;
-        return tarifs.filter(
-            (t: any) => t.id_type.toString() === selectedTypeId,
-        );
-    }, [tarifs, selectedTypeId]);
+        
+        return tarifs.filter((t: any) => {
+            const matchType = t.id_type.toString() === selectedTypeId;
+            const matchCapacity = selectedCapacityId === "all" || t.id_capacity?.toString() === selectedCapacityId;
+            return matchType && matchCapacity;
+        });
+    }, [tarifs, selectedTypeId, selectedCapacityId]);
 
     const getTarifsForDay = useCallback(
         (day: Date) => {
@@ -239,8 +244,8 @@ export function PricingCalendar({
         let cellBg = !isCurrent
             ? "bg-slate-50/40"
             : "bg-white hover:bg-slate-50/70";
-        if (inDrag) cellBg = "bg-indigo-50";
-        if (isDragStartDay || isDragEndDay) cellBg = "bg-indigo-100";
+        if (inDrag) cellBg = "bg-amber-50";
+        if (isDragStartDay || isDragEndDay) cellBg = "bg-amber-100";
 
         return (
             <div
@@ -252,7 +257,7 @@ export function PricingCalendar({
                     ${isWeekView ? "min-h-[280px]" : "min-h-[110px]"}
                     p-2 flex flex-col justify-start cursor-pointer select-none transition-colors group relative
                     ${cellBg}
-                    ${inDrag ? "ring-1 ring-inset ring-indigo-200" : ""}
+                    ${inDrag ? "ring-1 ring-inset ring-amber-200" : ""}
                 `}
             >
                 <div className="flex justify-between items-start mb-1.5">
@@ -261,12 +266,12 @@ export function PricingCalendar({
                         inline-flex items-center justify-center w-7 h-7 text-xs font-semibold rounded-full
                         ${
                             isTodayDate
-                                ? "bg-indigo-600 text-white shadow-sm shadow-indigo-200"
+                                ? "bg-amber-600 text-white shadow-sm shadow-amber-200"
                                 : isCurrent
                                   ? "text-slate-800"
                                   : "text-slate-400"
                         }
-                        ${inDrag && !isTodayDate ? "text-indigo-700" : ""}
+                        ${inDrag && !isTodayDate ? "text-amber-700" : ""}
                     `}
                     >
                         {format(day, "d")}
@@ -287,6 +292,7 @@ export function PricingCalendar({
                             }}
                             title={selectedTypeId === 'all' ? t.type?.nom : undefined}
                         >
+                            <span className="opacity-70 mr-1">{(`(${t.capacity?.label})`) || '-'}</span>
                             {formatPrice(t.prix)}{" "}
                             <span className="text-[9px] font-semibold opacity-60">
                                 MAD
@@ -415,8 +421,8 @@ export function PricingCalendar({
                                             className={`
                                                 aspect-square rounded-full flex items-center justify-center text-[10px] transition-colors select-none
                                                 ${!isCurrentMonth ? "pointer-events-none text-transparent" : "cursor-pointer"}
-                                                ${isTodayDate && isCurrentMonth ? "ring-1 ring-indigo-500 font-bold" : ""}
-                                                ${inDrag && isCurrentMonth ? "bg-indigo-500 text-white font-bold" : ""}
+                                                ${isTodayDate && isCurrentMonth ? "ring-1 ring-amber-500 font-bold" : ""}
+                                                ${inDrag && isCurrentMonth ? "bg-amber-500 text-white font-bold" : ""}
                                                 ${!hasTarifs && !inDrag && isCurrentMonth ? "text-slate-600 hover:bg-slate-100" : ""}
                                             `}
                                             style={hasTarifs && isCurrentMonth && !inDrag ? {
@@ -444,8 +450,8 @@ export function PricingCalendar({
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-5 py-3.5 bg-slate-950/60 backdrop-blur-2xl text-white rounded-2xl flex items-center gap-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] select-none whitespace-nowrap border border-white/10 animate-in fade-in slide-in-from-bottom-6 duration-300 ease-out">
             <div className="flex items-center gap-4">
                 <div className="relative">
-                    <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full" />
-                    <div className="relative w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <div className="absolute inset-0 bg-amber-500/20 blur-xl rounded-full" />
+                    <div className="relative w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
                         <Calendar className="w-5 h-5" />
                     </div>
                 </div>
@@ -470,7 +476,7 @@ export function PricingCalendar({
             </div>
 
             <div className="hidden sm:flex items-center gap-2.5 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                <MousePointer2 className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                <MousePointer2 className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                 <span className="text-[13px] font-medium text-slate-300">
                     Relâchez pour configurer le tarif
                 </span>
