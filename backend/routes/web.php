@@ -12,13 +12,14 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HotelTypeTarificationController;
 use App\Http\Controllers\SubTypeController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\BookingLinkController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking');
+Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking')->middleware('booking.access');
 Route::post('/booking', [ReservationController::class, 'store'])->name('public.reservation.store');
 Route::post('/booking/check-availability', [ReservationController::class, 'checkAvailabilityAjax'])->name('public.reservation.check');
 
@@ -75,4 +76,8 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     Route::patch('/settings/rules/{rule}', [SettingController::class, 'updateRule'])->name('settings.rules.update');
     Route::delete('/settings/rules/{rule}', [SettingController::class, 'deleteRule'])->name('settings.rules.destroy');
     Route::patch('/settings/update', [SettingController::class, 'updateSettings'])->name('settings.update');
+
+    // Générateur de Liens
+    Route::post('/generate-booking-link', [BookingLinkController::class, 'generate'])->name('generate-booking-link');
+    Route::get('/booking-links', [BookingLinkController::class, 'index'])->name('booking-links.index');
 });

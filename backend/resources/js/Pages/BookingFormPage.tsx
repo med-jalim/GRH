@@ -218,6 +218,7 @@ export default function BookingFormPage({ hotels, discountRules, settings }: Pro
             email: data.email,
             telephone: data.phone,
             id_hotel: data.hotelId,
+            access_token: new URLSearchParams(window.location.search).get('access'),
             prix_total: totalPrice,
             remarques_speciales: data.specialRequests,
             groups: data.groups.map(g => ({

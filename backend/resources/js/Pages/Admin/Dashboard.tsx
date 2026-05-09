@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { router } from "@inertiajs/react";
+import { BookingLinkGenerator } from "@/components/Admin/BookingLinkGenerator";
 import {
     LineChart,
     Line,
@@ -592,6 +593,9 @@ export default function Dashboard({
 
                 {/* ── Right Column ──────────────────────────────────────────── */}
                 <div className="space-y-6">
+                    {/* Booking Link Generator */}
+                    <BookingLinkGenerator />
+
                     {/* 4 Stat Cards */}
                     <div className="grid grid-cols-2 gap-4">
                         <StatCard

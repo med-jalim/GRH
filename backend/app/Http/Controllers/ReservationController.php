@@ -94,6 +94,11 @@ class ReservationController extends Controller
      */
     public function store(Request $request): JsonResponse|RedirectResponse
     {
+        // Invalidate access token if provided
+        if ($request->has('access_token')) {
+            \App\Models\BookingAccessToken::where('token', $request->access_token)->update(['is_used' => true]);
+        }
+
          $validated = $request->validate([
             'type_reservant'      => 'required|in:agence,groupe',
             'nom_agence'          => 'nullable|string|max:255',

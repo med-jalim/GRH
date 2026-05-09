@@ -98,15 +98,6 @@ export function AdminLayout({ children }: Props) {
           </div>
           
           <div className="p-4 border-t border-gray-100 space-y-1">
-            <Link
-              href="/booking"
-              title={isCollapsed ? "Vue Client" : ""}
-              className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-3 text-gray-400 hover:text-gray-900 transition-colors rounded-xl hover:bg-gray-50`}
-            >
-              <Eye className="w-6 h-6" />
-              {!isCollapsed && <span className="font-semibold text-sm">Vue Client</span>}
-            </Link>
-
             <button
               onClick={handleLogout}
               title={isCollapsed ? "Déconnexion" : ""}
