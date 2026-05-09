@@ -12,11 +12,17 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\HotelTypeTarificationController;
 use App\Http\Controllers\SubTypeController;
 use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\BookingLinkController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\BookingLinkController;
+
+
+use Inertia\Inertia;
 
 Route::get('/', function () {
-    return view('welcome');
+    return Inertia::render('Welcome', [
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
+    ]);
 });
 
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking')->middleware('booking.access');
