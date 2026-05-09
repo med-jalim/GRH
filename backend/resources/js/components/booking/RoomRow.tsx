@@ -153,7 +153,7 @@ export function RoomRow({ index, hotel, checkInDate, room, availableOptions, onC
               >
                   <option value={0} disabled>-- Choisir l'occupation --</option>
                   {selectedOption?.type.sub_types
-                      ?.filter((st: any) => !disabledSubTypeIds.includes(st.id))
+                      ?.filter((st: any) => st.id_hotel === hotel?.id && !disabledSubTypeIds.includes(st.id))
                       .map((st: any) => {
                       const dynamicPrice = hotel ? computeDynamicPrice(hotel, room.roomTypeId, st.id, checkInDate, multiplier) : 0;
                       return (

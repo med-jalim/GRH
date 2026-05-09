@@ -55,7 +55,13 @@ class Hotel extends Model
             ->where('date_fin',   '>=', $date->toDateString())
             ->first();
 
-        return $tarif ? (float) $tarif->prix : null;
+        if ($tarif) {
+            return (float) $tarif->prix;
+        }
+
+        // Fallback au prix standard du sous-type
+        $subType = SubType::find($subTypeId);
+        return $subType ? (float) $subType->prix_standard : null;
     }
 
     /**
@@ -68,7 +74,7 @@ class Hotel extends Model
             'chambres.subType',
             'tarifs.type',
             'tarifs.subType',
-            'typeTarifications.type',
+            'typeTarifications.type.subTypes',
             'discountRules'
         ]);
     }

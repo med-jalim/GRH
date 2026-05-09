@@ -35,5 +35,17 @@ export function computeDynamicPrice(hotel: any, roomTypeId: number, subTypeId: n
         return Math.round(Number(explicitTarif.prix) * multiplier);
     }
 
+    // FALLBACK: Look for the SubType's prix_standard
+    // We search through the types linked to the hotel's rooms OR its tarification settings
+    const subTypeFromChambres = hotel?.chambres?.flatMap((c: any) => c.type?.sub_types || []);
+    const subTypeFromTarifications = hotel?.type_tarifications?.flatMap((tt: any) => tt.type?.sub_types || []);
+    
+    const allAvailableSubTypes = [...(subTypeFromChambres || []), ...(subTypeFromTarifications || [])];
+    const subType = allAvailableSubTypes.find((st: any) => st.id === subTypeId);
+
+    if (subType && subType.prix_standard) {
+        return Math.round(Number(subType.prix_standard) * multiplier);
+    }
+
     return 0; // No price found for this specific sub-type on this date
 }

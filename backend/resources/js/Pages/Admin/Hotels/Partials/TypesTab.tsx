@@ -232,6 +232,8 @@ export function TypesTab({ types, hotel }: { types: any[], hotel: any }) {
                             <span>{st.max_children ?? 0}E max</span>
                             <span className="text-slate-300">|</span>
                             <span>{st.capacity_total ?? 0} Total</span>
+                            <span className="text-slate-300">|</span>
+                            <span className="text-amber-600 font-black">{st.prix_standard ?? 0} MAD</span>
                           </div>
                         </div>
                       </div>
@@ -312,6 +314,7 @@ function SubTypeModal({ editingSubType, typeId, hotelId, onClose }: any) {
         id_type: typeId || (editingSubType?.id_type ?? ""),
         id_hotel: hotelId,
         nom: editingSubType?.nom ?? "",
+        prix_standard: editingSubType?.prix_standard ?? 0,
         color: editingSubType?.color ?? "#f59e0b", // default to amber
         max_adults: editingSubType?.max_adults ?? 2,
         max_children: editingSubType?.max_children ?? 0,
@@ -346,6 +349,12 @@ function SubTypeModal({ editingSubType, typeId, hotelId, onClose }: any) {
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nom de l'occupation <span className="text-red-400">*</span></label>
                 <input type="text" value={data.nom} onChange={(e) => setData("nom", e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none" placeholder="Ex: GDH 2" />
                 {errors.nom && <p className="text-red-500 text-xs mt-1">{errors.nom}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Prix Standard (MAD) <span className="text-red-400">*</span></label>
+                <input type="number" step="0.01" value={data.prix_standard} onChange={(e) => setData("prix_standard", e.target.value)} required className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400 bg-slate-50 outline-none" placeholder="Ex: 500" />
+                {errors.prix_standard && <p className="text-red-500 text-xs mt-1">{errors.prix_standard}</p>}
               </div>
 
               <div>

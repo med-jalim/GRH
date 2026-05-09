@@ -12,6 +12,7 @@ class SubType extends Model
         'id_hotel',
         'id_type',
         'nom',
+        'prix_standard',
         'color',
         'max_adults',
         'max_children',
@@ -19,6 +20,7 @@ class SubType extends Model
     ];
 
     protected $casts = [
+        'prix_standard' => 'float',
         'max_adults' => 'integer',
         'max_children' => 'integer',
         'capacity_total' => 'integer',
