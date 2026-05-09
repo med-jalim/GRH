@@ -1,62 +1,49 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-        h2 {
-            color: #54b172;
-            border-bottom: 2px solid #54b172;
-            padding-bottom: 10px;
-        }
-        .info-item {
-            margin-bottom: 10px;
-        }
-        .label {
-            font-weight: bold;
-            color: #555;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>Nouvelle demande de partenariat (Portail GRH)</h2>
-        <p>Vous avez reçu une nouvelle demande d'accès ou de devis depuis la page d'accueil du portail professionnel.</p>
-        
-        <div class="info-item">
-            <span class="label">Type de demandeur :</span> {{ ucfirst($data['type']) }}
-        </div>
-        <div class="info-item">
-            <span class="label">Nom de l'Agence/Groupe :</span> {{ $data['company_name'] }}
-        </div>
-        <div class="info-item">
-            <span class="label">Email :</span> {{ $data['email'] }}
-        </div>
-        <div class="info-item">
-            <span class="label">Téléphone :</span> {{ $data['phone'] }}
-        </div>
-        
-        @if(!empty($data['message']))
-        <div class="info-item">
-            <span class="label">Message supplémentaire :</span><br>
-            <p style="background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 4px;">{{ nl2br(e($data['message'])) }}</p>
-        </div>
-        @endif
-        
-        <p style="margin-top: 30px; font-size: 0.9em; color: #888;">
-            Veuillez contacter cette personne pour valider sa demande et lui générer un lien de réservation si nécessaire.
-        </p>
+@extends('emails.layouts.master')
+
+@section('title', 'Nouvelle demande de partenariat')
+
+@section('content')
+<div style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 32px;">
+    <div style="font-size: 32px; margin-bottom: 12px;">🏢</div>
+    <div style="display: inline-block; background: #dcfce7; color: #15803d; font-size: 14px; font-weight: 700; padding: 6px 16px; border-radius: 99px; margin-bottom: 12px;">
+        Nouvelle Demande B2B
     </div>
-</body>
-</html>
+    
+    <div style="color: #14532d; font-size: 14px; line-height: 1.5;">
+        Vous avez reçu une nouvelle demande d'accès ou de devis depuis la page d'accueil du portail professionnel.
+    </div>
+</div>
+
+<p class="details-title">Informations du demandeur</p>
+<table class="details-table">
+    <tr>
+        <td class="label">Type de demandeur</td>
+        <td class="value"><span class="ref-badge">{{ ucfirst($data['type']) }}</span></td>
+    </tr>
+    <tr>
+        <td class="label">Nom de l'Entité</td>
+        <td class="value">{{ $data['company_name'] }}</td>
+    </tr>
+    <tr>
+        <td class="label">Email de contact</td>
+        <td class="value"><a href="mailto:{{ $data['email'] }}" style="color: #54b172; text-decoration: none;">{{ $data['email'] }}</a></td>
+    </tr>
+    <tr>
+        <td class="label">Téléphone</td>
+        <td class="value">{{ $data['phone'] }}</td>
+    </tr>
+</table>
+
+@if(!empty($data['message']))
+<p class="details-title" style="margin-top: 24px;">Message de l'agence</p>
+<div style="background: #f9fafb; padding: 16px; border-left: 4px solid #54b172; border-radius: 0 8px 8px 0; margin-bottom: 32px;">
+    <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0;">{{ nl2br(e($data['message'])) }}</p>
+</div>
+@endif
+
+<div class="divider"></div>
+
+<p class="notice-text">
+    Veuillez contacter cette personne pour valider sa demande et lui générer un lien de réservation si nécessaire.
+</p>
+@endsection
