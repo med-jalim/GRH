@@ -25,6 +25,8 @@ Route::get('/', function () {
     ]);
 });
 
+Route::post('/partner-request', [\App\Http\Controllers\ContactController::class, 'submitPartnerRequest'])->name('partner.request');
+
 Route::get('/booking', [HotelController::class, 'bookingPage'])->name('booking')->middleware('booking.access');
 Route::post('/booking', [ReservationController::class, 'store'])->name('public.reservation.store');
 Route::post('/booking/check-availability', [ReservationController::class, 'checkAvailabilityAjax'])->name('public.reservation.check');
