@@ -1,30 +1,63 @@
-# GRH : Système de Gestion de Réservations Hôtelières (B2B)
+# 🏨 SGAFO : Système de Gestion et de Réservation Hôtelière (B2B)
 
-![Statut du Projet](https://img.shields.io/badge/Statut-En_Développement-orange)
-![Stack](https://img.shields.io/badge/Stack-Laravel_|_React_|_TypeScript-blue)
+![Laravel](https://img.shields.io/badge/Backend-Laravel_12-red?style=for-the-badge&logo=laravel)
+![React](https://img.shields.io/badge/Frontend-React_19-blue?style=for-the-badge&logo=react)
+![Tailwind](https://img.shields.io/badge/Style-Tailwind_CSS_4-38B2AC?style=for-the-badge&logo=tailwind-css)
+![Status](https://img.shields.io/badge/Statut-Phase_Conception-orange?style=for-the-badge)
 
-## 📌 Présentation
-Le projet **GRH** est une plateforme SaaS de transformation digitale conçue par **eurika digital** pour un groupe hôtelier d'envergure. Elle vise à moderniser les échanges entre les hôtels et leurs partenaires commerciaux (Agences de Voyage, Guides).
+## 📌 Présentation du Projet
+Le projet **SGAFO** est une solution SaaS de transformation digitale conçue pour moderniser les flux de réservation entre les hôtels et leurs partenaires commerciaux (Agences de Voyage, Guides). 
 
-L'application remplace les flux d'emails chronophages par une interface web intuitive, permettant une gestion dynamique des réservations de groupe, une tarification en temps réel et un suivi automatisé des paiements.
+L'application élimine les goulots d'étranglement liés aux échanges d'emails manuels en proposant une interface de réservation dynamique, sécurisée et automatisée.
 
 ## 🚀 Fonctionnalités Clés
-- **Portail B2B sécurisé** : Accès via liens uniques (sans mot de passe) pour les agences.
-- **Formulaires Dynamiques** : Gestion des arrivées échelonnées et des capacités complexes.
-- **Calculateur Temps-Réel** : Application immédiate des tarifs saisonniers et des remises.
-- **Back-Office Administrateur** : Dashboard décisionnel, gestion des stocks et validation des paiements.
-- **Automation Email** : Notifications transactionnelles à chaque étape du cycle de vie du dossier.
+- **🔑 Accès Passwordless** : Authentification des agences via tokens uniques et sécurisés.
+- **📊 Gestion Multi-Groupes** : Capacité de gérer plusieurs segments de voyageurs dans un seul dossier.
+- **💰 Tarification Dynamique** : Calcul automatique des prix selon les saisons, types de chambres et remises agences.
+- **🧾 Validation des Paiements** : Workflow de dépôt et de vérification des preuves de virement.
+- **📈 Dashboard Admin** : Pilotage en temps réel des stocks, revenus et taux d'occupation.
 
-## 🛠 Stack Technique
-- **Backend** : Laravel 12 (PHP 8.2)
-- **Frontend** : React 19 + Inertia.js + TypeScript
-- **Styling** : TailwindCSS 4
-- **Base de données** : MySQL
+## 🛠️ Stack Technique
+*   **Core** : Laravel 12 / React 19 / Inertia.js
+*   **Base de Données** : MySQL (Modèle relationnel complexe à 15 entités)
+*   **Sécurité** : Laravel Sanctum & Token-based access
+*   **UI/UX** : Tailwind CSS 4 & Headless UI
 
-## 📄 Documentation
-- [Cahier des Charges Stratégique](file:///c:/Users/Microsoft/Desktop/GRH/cahier_des_charges.md)
-- [Conception Technique Détailée](file:///c:/Users/Microsoft/Desktop/GRH/CONCEPTION_GRH.md)
-- [Modèles et Flux UML](file:///c:/Users/Microsoft/Desktop/GRH/CDC_GRH.md)
+## ⚙️ Installation & Configuration
+
+### Pré-requis
+- PHP 8.2+
+- Node.js 20+
+- Composer & NPM
+
+### Étapes d'installation
+1. **Cloner le projet**
+   ```bash
+   git clone [url-du-repo]
+   cd SGAFO/backend
+   ```
+2. **Configuration Backend**
+   ```bash
+   composer install
+   cp .env.example .env
+   php artisan key:generate
+   ```
+3. **Base de Données**
+   ```bash
+   # Configurez votre DB dans le .env, puis :
+   php artisan migrate --seed
+   ```
+4. **Configuration Frontend**
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+## 📄 Documentation de Conception
+Le projet s'appuie sur une conception UML rigoureuse (disponible dans les fichiers joints) :
+- [📘 Cahier des Charges](./CDC_GRH.md)
+- [📐 Modèle Conceptuel de Données (MCD)](./CONCEPTION_GRH.md)
+- [🔄 Diagrammes de Séquence (Flux métier)](./CONCEPTION_GRH.md)
 
 ---
-*Ce projet fluidifie le cycle de réservation hôtelier en réduisant drastiquement les erreurs humaines et les délais de traitement.*
+> *Développé dans le cadre d'un stage de fin d'études chez **eurika digital**.*
